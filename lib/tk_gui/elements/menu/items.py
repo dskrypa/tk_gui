@@ -14,10 +14,9 @@ from tkinter import Event, BaseWidget, TclError, Menu as TkMenu, Entry, Text
 from typing import TYPE_CHECKING, Union, Optional, Any, Callable
 from urllib.parse import quote_plus, urlparse
 
-from ds_tools.utils.launch import explore, launch
 from .._utils import get_selection_pos
 from .menu import Mode, CustomMenuItem
-from .utils import MenuMode, get_text, replace_selection, flip_name_parts, get_any_text
+from .utils import MenuMode, get_text, replace_selection, flip_name_parts, get_any_text, explore, launch
 
 if TYPE_CHECKING:
     from ...typing import Bool

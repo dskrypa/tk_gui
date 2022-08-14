@@ -12,7 +12,7 @@ from inspect import isclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Type, Union, Optional, Callable, TypeVar, Generic
 
-from ..__version__ import __title__
+from .__version__ import __title__
 
 if TYPE_CHECKING:
     from .window import Window

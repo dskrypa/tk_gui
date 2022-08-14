@@ -9,11 +9,10 @@ from __future__ import annotations
 import logging
 from functools import cached_property
 from tkinter import Event
-from typing import TYPE_CHECKING, Optional, Iterator, Callable, Literal
+from typing import TYPE_CHECKING, Optional, Iterator, Callable, Literal, Union
 
 from PIL.Image import Image as PILImage, new as new_image
 
-from ...common.ratings import star_fill_counts, stars_to_256
 from .frame import InteractiveRowFrame
 from .images import Image
 from .text import Text, Input
@@ -24,6 +23,8 @@ if TYPE_CHECKING:
 
 __all__ = ['Rating']
 log = logging.getLogger(__name__)
+
+RATING_RANGES = [(1, 31, 15), (32, 95, 64), (96, 159, 128), (160, 223, 196), (224, 255, 255)]
 
 Color = Literal['black', 'gold']
 RatingColor = Literal['black', 'gold', 'mix']
@@ -220,3 +221,48 @@ class Rating(InteractiveRowFrame):
             self._val_change_cb = None
             rating_input.disable()
         self.disabled = True
+
+
+def star_fill_counts(
+    rating: Union[int, float], out_of: int = 10, num_stars: int = 5, half=None
+) -> tuple[int, int, int]:
+    if out_of < 1:
+        raise ValueError('out_of must be > 0')
+
+    filled, remainder = map(int, divmod(num_stars * rating, out_of))
+    if half and remainder:
+        empty = num_stars - filled - 1
+        half = 1
+    else:
+        empty = num_stars - filled
+        half = 0
+    return filled, half, empty
+
+
+def stars_to_256(rating: Union[int, float], out_of: int = 5) -> Optional[int]:
+    """
+    This implementation uses the same values specified in the following link, except for 1 star, which uses 15
+    instead of 1: https://en.wikipedia.org/wiki/ID3#ID3v2_rating_tag_issue
+
+    :param rating: The number of stars to set (out of 5/10/256)
+    :param out_of: The max value to use for mapping from 0-`out_of` to 0-255.  Only supports 5, 10, and 256.
+    :return: The rating mapped to a value between 0 and 255
+    """
+    if not (0 <= rating <= out_of):
+        raise ValueError(f'{rating=} is outside the range of 0-{out_of}')
+    elif out_of == 256:
+        return int(rating)
+    elif out_of not in (5, 10):
+        raise ValueError(f'{out_of=} is invalid - must be 5, 10, or 256')
+    elif rating == 0:
+        return None
+    elif (int_rating := int(rating)) == (0 if out_of == 5 else 1):
+        return 1
+    elif out_of == 5:
+        base, extra = int_rating, int(int_rating != rating)
+        if extra and int_rating + 0.5 != rating:
+            raise ValueError(f'Star ratings {out_of=} must be a multiple of 0.5; invalid value: {rating}')
+    else:
+        base, extra = divmod(int_rating, 2)
+
+    return RATING_RANGES[base - 1][2] + extra

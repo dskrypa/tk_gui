@@ -16,15 +16,14 @@ from typing import TYPE_CHECKING, Union, Optional, Any, MutableMapping
 
 from PIL.ImageTk import PhotoImage
 
-from ds_tools.images.utils import ImageType, as_image, scale_image
-
 from ..enums import Justify
+from ..images import as_image, scale_image
 from .element import Interactive
 
 if TYPE_CHECKING:
     from PIL.Image import Image as PILImage
     from ..pseudo_elements import Row
-    from ..typing import XY, BindCallback, Bool
+    from ..typing import XY, BindCallback, Bool, ImageType
 
 __all__ = ['Button', 'OK', 'Cancel', 'Yes', 'No', 'Submit']
 log = logging.getLogger(__name__)
