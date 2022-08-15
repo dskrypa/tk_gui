@@ -1,13 +1,11 @@
 # need to run as a module
 
+import logging
 from pathlib import Path
 
 from cli_command_parser import Command, Action, Counter, Option, main
 
-from ds_tools.logging import init_logging
-
-from ..__version__ import __author_email__, __version__, __author__, __url__  # noqa
-
+from .__version__ import __author_email__, __version__, __author__, __url__  # noqa
 from .elements import Table, Input, Image, Animation, SpinnerImage, ClockImage, Button, Text, ScrollFrame, SizeGrip
 from .elements.choices import Radio, RadioGroup, CheckBox, Combo, ListBox
 from .elements.bars import HorizontalSeparator, VerticalSeparator, ProgressBar, Slider
@@ -16,6 +14,7 @@ from .elements.menu.items import CopySelection, GoogleSelection, SearchKpopFando
 from .elements.menu.items import FlipNameParts, ToUpperCase, ToTitleCase, ToLowerCase, OpenFileLocation, OpenFile
 from .elements.text import Multiline, gui_log_handler
 from .elements.rating import Rating
+from .images.utils import ICONS_DIR
 from .popups import ImagePopup, AnimatedPopup, SpinnerPopup, ClockPopup, BasicPopup, Popup
 from .popups.about import AboutPopup
 from .popups.base import TextPromptPopup, LoginPromptPopup
@@ -24,8 +23,6 @@ from .popups.raw import PickFolder, PickColor
 from .popups.style import StylePopup
 from .window import Window
 
-ICONS_DIR = Path(__file__).resolve().parents[3].joinpath('icons')
-
 
 class GuiTest(Command):
     action = Action(help='The test to perform')
@@ -33,7 +30,10 @@ class GuiTest(Command):
     color = Option('-c', help='The initial color to display when action=pick_color')
 
     def __init__(self):
-        init_logging(self.verbose, log_path=None, names=None, set_levels={'PIL.PngImagePlugin': 50})
+        logging.getLogger('PIL.PngImagePlugin').setLevel(50)
+        log_fmt = '%(asctime)s %(levelname)s %(name)s %(lineno)d %(message)s' if self.verbose > 1 else '%(message)s'
+        level = logging.DEBUG if self.verbose else logging.INFO
+        logging.basicConfig(level=level, format=log_fmt)
 
     @action
     def about(self):

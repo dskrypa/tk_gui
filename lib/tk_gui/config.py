@@ -221,7 +221,10 @@ class WindowConfig:
         changed = ', '.join(sorted(self._changed))
         suffix = f' for keys={changed}' if changed else ''
         log.debug(f'Saving state to {self.path}{suffix}')
-        with self.path.open('w', encoding='utf-8') as f:
+        path = self.path
+        if not path.parent.exists():
+            path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open('w', encoding='utf-8') as f:
             json.dump(all_data, f, indent=4, sort_keys=True)
 
         self._changed = set()

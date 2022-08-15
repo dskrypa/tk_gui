@@ -9,8 +9,8 @@ from __future__ import annotations
 from functools import partial
 from typing import TYPE_CHECKING, Iterator
 
-from ..color import pick_fg
 from ..elements import Text, HorizontalSeparator, Combo
+from ..images.color import pick_fg
 from ..style import Style, StyleSpec, STATE_NAMES
 from ..window import Window
 from .base import Popup

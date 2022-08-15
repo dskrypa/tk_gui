@@ -11,6 +11,7 @@ import tkinter.constants as tkc
 import webbrowser
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
+from datetime import datetime
 from functools import cached_property, partial
 from tkinter import TclError, StringVar, Label, Event, Entry, BaseWidget
 from typing import TYPE_CHECKING, Optional, Union, Any
@@ -529,6 +530,18 @@ class GuiTextHandler(logging.Handler):
             self.handleError(record)
 
 
+class DatetimeFormatter(logging.Formatter):
+    """Enables use of ``%f`` (micro/milliseconds) in datetime formats."""
+
+    def formatTime(self, record, datefmt=None):
+        dt = datetime.fromtimestamp(record.created)
+        if datefmt:
+            return dt.strftime(datefmt)
+        else:
+            t = dt.strftime(self.default_time_format)
+            return self.default_msec_format % (t, record.msecs)
+
+
 @contextmanager
 def gui_log_handler(
     element: Multiline,
@@ -537,11 +550,11 @@ def gui_log_handler(
     detail: bool = False,
     logger: logging.Logger = None,
 ):
-    from ds_tools.logging import DatetimeFormatter, ENTRY_FMT_DETAILED
-
     handler = GuiTextHandler(element, level)
     if detail:
-        handler.setFormatter(DatetimeFormatter(ENTRY_FMT_DETAILED, '%Y-%m-%d %H:%M:%S %Z'))
+        entry_fmt = '%(asctime)s %(levelname)s %(threadName)s %(name)s %(lineno)d %(message)s'
+        # handler.setFormatter(DatetimeFormatter(entry_fmt, '%Y-%m-%d %H:%M:%S %Z'))
+        handler.setFormatter(DatetimeFormatter(entry_fmt, '%Y-%m-%d %H:%M:%S'))
 
     loggers = [logging.getLogger(logger_name), logger] if logger else [logging.getLogger(logger_name)]
     for logger in loggers:

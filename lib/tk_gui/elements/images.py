@@ -17,10 +17,9 @@ from PIL.Image import Image as PILImage, Resampling
 from PIL.ImageSequence import Iterator as FrameIterator
 from PIL.ImageTk import PhotoImage
 
-from ds_tools.images.animated.cycle import FrameCycle, PhotoImageCycle
-from ds_tools.images.animated.spinner import Spinner
-
 from ..images import SevenSegmentDisplay, calculate_resize, as_image
+from ..images.cycle import FrameCycle, PhotoImageCycle
+from ..images.spinner import Spinner
 from ..style import Style, StyleSpec
 from .element import Element
 
