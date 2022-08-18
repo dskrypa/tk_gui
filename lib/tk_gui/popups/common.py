@@ -6,6 +6,7 @@ Tkinter GUI popups: common popups
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Optional
 
 from ..elements.buttons import OK
@@ -16,8 +17,10 @@ if TYPE_CHECKING:
     from ..typing import Bool, TkSide
 
 __all__ = [
-    'popup_ok', 'popup_error', 'popup_warning', 'popup_yes_no', 'popup_no_yes', 'popup_ok_cancel', 'popup_cancel_ok'
+    'popup_ok', 'popup_error', 'popup_warning', 'popup_input_invalid',
+    'popup_yes_no', 'popup_no_yes', 'popup_ok_cancel', 'popup_cancel_ok',
 ]
+log = logging.getLogger(__name__)
 
 
 def popup_ok(text: str, title: str = None, bind_esc: Bool = True, side: TkSide = 'right', **kwargs) -> None:
@@ -47,3 +50,10 @@ def popup_ok_cancel(text: str, title: str = None, bind_esc: Bool = False, **kwar
 
 def popup_cancel_ok(text: str, title: str = None, bind_esc: Bool = False, **kwargs) -> Optional[bool]:
     return BoolPopup(text, 'OK', 'Cancel', 'FT', title=title, bind_esc=bind_esc, **kwargs).run()
+
+
+def popup_input_invalid(text: str = None, title: str = 'Invalid Input', logger: logging.Logger = None, **kwargs):
+    if logger is None:
+        logger = log
+    logger.debug(f'Received invalid input - {text}' if text else 'Received invalid input')
+    popup_ok(text, title=title, **kwargs)

@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 # fmt: off
 __all__ = [
-    'Bool', 'XY', 'Key', 'HasParent', 'HasValue', 'Layout', 'Axis', 'Orientation',
+    'Bool', 'XY', 'Key', 'HasParent', 'HasValue', 'Layout', 'Axis', 'Orientation', 'PathLike',
     'BindCallback', 'EventCallback', 'BindTarget', 'Bindable', 'BindMap',
     'TkFill', 'TkSide', 'TkJustify',
     'TkContainer',
@@ -38,6 +38,7 @@ XY = tuple[int, int]
 Layout = Iterable[Iterable['Element']]
 Axis = Literal['x', 'y']
 Orientation = Literal['horizontal', 'vertical']
+PathLike = Union['Path', str]
 
 TkFill = Union[Literal['none', 'x', 'y', 'both'], None, bool]
 TkSide = Literal['left', 'right', 'top', 'bottom']
@@ -45,7 +46,7 @@ TkJustify = Literal['left', 'center', 'right']
 
 TkContainer = Union['Toplevel', 'Frame', 'LabelFrame']
 
-ImageType = Union['PILImage', bytes, 'Path', str, None]
+ImageType = Union['PILImage', bytes, PathLike, None]
 
 
 @runtime_checkable
