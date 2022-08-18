@@ -1,27 +1,28 @@
-# need to run as a module
+#!/usr/bin/env python
 
 import logging
 from pathlib import Path
 
 from cli_command_parser import Command, Action, Counter, Option, main
 
-from .__version__ import __author_email__, __version__, __author__, __url__  # noqa
-from .elements import Table, Input, Image, Animation, SpinnerImage, ClockImage, Button, Text, ScrollFrame, SizeGrip
-from .elements.choices import Radio, RadioGroup, CheckBox, Combo, ListBox
-from .elements.bars import HorizontalSeparator, VerticalSeparator, ProgressBar, Slider
-from .elements.menu.menu import Menu, MenuGroup, MenuItem
-from .elements.menu.items import CopySelection, GoogleSelection, SearchKpopFandom, SearchGenerasia, PasteClipboard
-from .elements.menu.items import FlipNameParts, ToUpperCase, ToTitleCase, ToLowerCase, OpenFileLocation, OpenFile
-from .elements.text import Multiline, gui_log_handler
-from .elements.rating import Rating
-from .images.utils import ICONS_DIR
-from .popups import ImagePopup, AnimatedPopup, SpinnerPopup, ClockPopup, BasicPopup, Popup
-from .popups.about import AboutPopup
-from .popups.base import TextPromptPopup, LoginPromptPopup
-from .popups.common import popup_warning, popup_error, popup_yes_no, popup_no_yes, popup_ok
-from .popups.raw import PickFolder, PickColor
-from .popups.style import StylePopup
-from .window import Window
+from tk_gui.__version__ import __author_email__, __version__, __author__, __url__  # noqa
+from tk_gui.elements import Table, Input, Button, Text, ScrollFrame, SizeGrip
+from tk_gui.elements.choices import Radio, RadioGroup, CheckBox, Combo, ListBox
+from tk_gui.elements.bars import HorizontalSeparator, VerticalSeparator, ProgressBar, Slider
+from tk_gui.elements.images import Image, Animation, SpinnerImage, ClockImage
+from tk_gui.elements.menu.menu import Menu, MenuGroup, MenuItem
+from tk_gui.elements.menu.items import CopySelection, GoogleSelection, SearchKpopFandom, SearchGenerasia, PasteClipboard
+from tk_gui.elements.menu.items import FlipNameParts, ToUpperCase, ToTitleCase, ToLowerCase, OpenFileLocation, OpenFile
+from tk_gui.elements.text import Multiline, gui_log_handler
+from tk_gui.elements.rating import Rating
+from tk_gui.images.utils import ICONS_DIR
+from tk_gui.popups import ImagePopup, AnimatedPopup, SpinnerPopup, ClockPopup, BasicPopup, Popup
+from tk_gui.popups.about import AboutPopup
+from tk_gui.popups.base import TextPromptPopup, LoginPromptPopup
+from tk_gui.popups.common import popup_warning, popup_error, popup_yes_no, popup_no_yes, popup_ok
+from tk_gui.popups.raw import PickFolder, PickColor
+from tk_gui.popups.style import StylePopup
+from tk_gui.window import Window
 
 
 class GuiTest(Command):
