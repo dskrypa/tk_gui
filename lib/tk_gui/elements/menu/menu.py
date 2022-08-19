@@ -65,6 +65,7 @@ class MenuEntry(ABC):
 
     @property
     def underline(self) -> Optional[int]:
+        # TODO: Register underlined char to activate when combined with [Alt] & ensure no conflicts exist
         return normalize_underline(self._underline, self.label)
 
     def format_label(self, kwargs: dict[str, Any] = None) -> str:
@@ -143,9 +144,10 @@ class MenuGroup(ContainerMixin, MenuEntry):
     __slots__ = ('members', 'hide_if_disabled')
 
     def __init__(
-        self, label: Optional[str], underline: Union[str, int] = None, *args, hide_if_disabled: Bool = True, **kwargs
+        self, label: Optional[str], underline: Union[str, int] = None, hide_if_disabled: Bool = True, **kwargs
     ):
-        super().__init__(label, underline, *args, **kwargs)
+        # TODO: Add a way to define a menu more like a Window's layout?
+        super().__init__(label, underline, **kwargs)
         self.members: list[Union[MenuEntry, MenuItem, MenuGroup]] = []
         self.hide_if_disabled = hide_if_disabled
 

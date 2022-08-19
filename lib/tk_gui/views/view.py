@@ -7,10 +7,10 @@ Base View class
 from __future__ import annotations
 
 import logging
-from abc import ABCMeta
+from abc import ABCMeta, ABC
 from contextvars import ContextVar
 from functools import partial, update_wrapper, cached_property
-from typing import TYPE_CHECKING, Any, Union, Optional, Callable, Mapping
+from typing import TYPE_CHECKING, Any, Union, Optional, Callable, Type, Mapping
 
 from ..window import Window
 
@@ -43,7 +43,7 @@ def event_handler(*binds: str) -> Callable[[BindCallback], EventHandler]:
 
 class ViewMeta(ABCMeta, type):
     @classmethod
-    def __prepare__(mcs, name: str, bases: tuple[type, ...]) -> dict:
+    def __prepare__(mcs, name: str, bases: tuple[type, ...], **kwargs) -> dict:
         """
         Called before ``__new__`` and before evaluating the contents of a class, which enables the establishment of a
         custom context to handle event handler registration.
@@ -51,10 +51,29 @@ class ViewMeta(ABCMeta, type):
         _view_stack.get().append([])  # This list becomes the _event_handlers class attr for the View subclass
         return {}
 
-    def __new__(mcs, name: str, bases: tuple[type, ...], namespace: dict[str, Any]):
-        cls = super().__new__(mcs, name, bases, namespace)
+    def __new__(mcs, name: str, bases: tuple[type, ...], namespace: dict[str, Any], **kwargs):
+        cls = super().__new__(mcs, name, bases, namespace, **kwargs)
         cls._event_handlers = _view_stack.get().pop()
         return cls
+
+    @classmethod
+    def get_parent_view(mcs, cls: ViewMeta, include_abc: bool = True) -> Optional[ViewMeta]:
+        for parent_cls in type.mro(cls)[1:]:
+            if isinstance(parent_cls, mcs) and (include_abc or ABC not in parent_cls.__bases__):
+                return parent_cls
+        return None
+
+    def event_handler_binds(cls: Type[View]) -> dict[str, BindCallback]:
+        if parent := cls.__class__.get_parent_view(cls):
+            bind_map = parent.event_handler_binds().copy()
+        else:
+            bind_map = {}
+
+        for handler in cls._event_handlers:
+            for bind in handler.binds:
+                bind_map[bind] = handler.handler
+
+        return bind_map
 
 
 class View(metaclass=ViewMeta):
@@ -112,7 +131,7 @@ class View(metaclass=ViewMeta):
             return window.results
 
 
-class TestView(View):
+class TestView(View, title='Test'):
     @event_handler('<Ctrl-Button-1>')
     def handle_ctrl_left_click(self, event: Event):
         print(event)
