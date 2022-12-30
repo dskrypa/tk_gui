@@ -81,11 +81,26 @@ class ContainerMixin:
     def __exit__(self, exc_type=None, exc_val=None, exc_tb=None):
         _menu_group_stack.get().pop()
 
-    def __getitem__(self, index: int) -> Union[MenuEntry, MenuItem, MenuGroup]:
-        return self.members[index]
+    def __getitem__(self, index_or_label: int | str) -> Union[MenuEntry, MenuItem, MenuGroup]:
+        return find_member(self.members, index_or_label)
 
     def __iter__(self) -> Iterator[Union[MenuEntry, MenuItem, MenuGroup]]:
         yield from self.members
+
+
+def find_member(
+    members: Sequence[Union[MenuEntry, MenuItem, MenuGroup]], index_or_label: int | str
+) -> Union[MenuEntry, MenuItem, MenuGroup]:
+    try:
+        return members[index_or_label]
+    except TypeError:
+        pass
+
+    for member in members:
+        if index_or_label == member.label:
+            return member
+
+    raise KeyError(index_or_label)
 
 
 class EntryContainer(ContainerMixin):

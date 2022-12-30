@@ -7,21 +7,24 @@ Tkinter GUI menus
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from functools import partial
 from itertools import count
 from tkinter import Event, BaseWidget, Menu as TkMenu
-from typing import TYPE_CHECKING, Optional, Union, Type, Any, Sequence
+from typing import TYPE_CHECKING, Optional, Union, Type, Any, Sequence, Generic, TypeVar
 
 from ..element import ElementBase
+from ..exceptions import CallbackError, CallbackAlreadyRegistered, NoCallbackRegistered
 from .._utils import normalize_underline
-from .utils import MenuMode, ContainerMixin, MenuMeta, get_current_menu_group, wrap_menu_cb
+from .utils import MenuMode, ContainerMixin, MenuMeta, get_current_menu_group, wrap_menu_cb, find_member
 
 if TYPE_CHECKING:
     from tk_gui.pseudo_elements import Row
     from tk_gui.typing import Bool, XY, EventCallback, ProvidesEventCallback
 
-__all__ = ['Mode', 'MenuEntry', 'MenuItem', 'MenuGroup', 'Menu', 'CustomMenuItem']
+__all__ = ['Mode', 'MenuEntry', 'MenuItem', 'MenuGroup', 'Menu', 'CustomMenuItem', 'MenuProperty']
 
 Mode = Union['MenuMode', str, bool, None]
+M = TypeVar('M', bound='Menu')
 
 
 class MenuEntry(ABC):
@@ -94,7 +97,7 @@ class MenuEntry(ABC):
 
     @abstractmethod
     def maybe_add(
-        self, menu: TkMenu, style: dict[str, Any], event: Event = None, kwargs: dict[str, Any] = None
+        self, menu: TkMenu, style: dict[str, Any], event: Event = None, kwargs: dict[str, Any] = None, cb_inst = None
     ) -> bool:
         """
         Used internally when building the TK widget(s) that represent this entry.
@@ -105,6 +108,8 @@ class MenuEntry(ABC):
         :param event: The :class:`python:tkinter.Event` that triggered this menu to be displayed.
         :param kwargs: Keyword arguments that were provided to :meth:`Menu.show` / :meth:`Menu.popup` to provide
           context and possibly result in items being hidden/shown, enabled/disabled, or formatted to include more info.
+        :param cb_inst: If an item's callback was registered late via the :meth:`MenuItem.callback` method, this will
+          be the instance of the callback method's class for which the callback is being called.
         :return: True if this entry was added and should be shown, False if it was not added and should not be shown.
         """
         raise NotImplementedError
@@ -112,12 +117,12 @@ class MenuEntry(ABC):
 
 class MenuItem(MenuEntry):
     """A button/choice in a menu."""
-    __slots__ = ('_callback', 'use_kwargs', 'store_meta')
+    __slots__ = ('_callback', 'use_kwargs', 'store_meta', '_method')
 
     def __init__(
         self,
         label: str,
-        callback: EventCallback | ProvidesEventCallback,
+        callback: EventCallback | ProvidesEventCallback = None,
         *,
         underline: Union[str, int] = None,
         enabled: Mode = MenuMode.ALWAYS,
@@ -131,7 +136,7 @@ class MenuItem(MenuEntry):
         :param label: The label to be displayed for this menu item.
         :param callback: A callback function/method that accepts a :class:`python:tkinter.Event` as a positional
           argument, or a :class:`.Popup` or other object with a ``as_callback`` method (classmethod if a class is
-          provided).
+          provided).  If not provided,
         :param underline: The character(s) in the label to underline, or the index of the char to underline, if any.
         :param enabled: When / whether this item should be enabled in the menu.
         :param show: When / whether this item should be displayed in the menu.  Defaults to ``MenuMode.ALWAYS`` unless
@@ -153,11 +158,21 @@ class MenuItem(MenuEntry):
             self._callback = callback.as_callback()
         except AttributeError:
             self._callback = callback
+        self._method = False
         self.use_kwargs = use_kwargs
         self.store_meta = store_meta
 
+    def callback(self, func: EventCallback, method: bool = True) -> EventCallback:
+        if self._callback is not None:
+            raise CallbackAlreadyRegistered(
+                f'Unable to register {func=} as a callback for {self} - {self._callback} is already registered'
+            )
+        self._callback = func
+        self._method = method
+        return func
+
     def maybe_add(
-        self, menu: TkMenu, style: dict[str, Any], event: Event = None, kwargs: dict[str, Any] = None
+        self, menu: TkMenu, style: dict[str, Any], event: Event = None, kwargs: dict[str, Any] = None, cb_inst = None
     ) -> bool:
         """
         Used internally when building the TK widget(s) that represent this entry.
@@ -168,12 +183,24 @@ class MenuItem(MenuEntry):
         :param event: The :class:`python:tkinter.Event` that triggered this menu to be displayed.
         :param kwargs: Keyword arguments that were provided to :meth:`Menu.show` / :meth:`Menu.popup` to provide
           context and possibly result in items being hidden/shown, enabled/disabled, or formatted to include more info.
+        :param cb_inst: If the callback was registered late via the :meth:`.callback` method, this will be the instance
+          of the callback method's class for which the callback is being called.
         :return: True if this entry was added and should be shown, False if it was not added and should not be shown.
         """
         if not self.show_for(event, kwargs):
             return False
 
-        callback = self._callback
+        if (callback := self._callback) is None:
+            raise NoCallbackRegistered(f'No callback was registered for {self}')
+        if self._method:
+            if cb_inst is None:
+                raise CallbackError(
+                    f'Invalid callback for {self} - menus containing items with methods registered as callbacks'
+                    ' must be accessed through the MenuProperty descriptor'
+                )
+            else:
+                callback = partial(callback, cb_inst)
+
         if self.use_kwargs and kwargs is not None:
             callback = wrap_menu_cb(self, callback, event, self.store_meta, kwargs=kwargs)
         else:
@@ -227,7 +254,7 @@ class MenuGroup(ContainerMixin, MenuEntry):
         return any(member.enabled_for(event, kwargs) for member in self.members)
 
     def maybe_add(
-        self, menu: TkMenu, style: dict[str, Any], event: Event = None, kwargs: dict[str, Any] = None
+        self, menu: TkMenu, style: dict[str, Any], event: Event = None, kwargs: dict[str, Any] = None, cb_inst = None
     ) -> bool:
         """
         Used internally when building the TK widget(s) that represent this entry.
@@ -238,6 +265,8 @@ class MenuGroup(ContainerMixin, MenuEntry):
         :param event: The :class:`python:tkinter.Event` that triggered this menu to be displayed.
         :param kwargs: Keyword arguments that were provided to :meth:`Menu.show` / :meth:`Menu.popup` to provide
           context and possibly result in items being hidden/shown, enabled/disabled, or formatted to include more info.
+        :param cb_inst: If an item's callback was registered late via the :meth:`MenuItem.callback` method, this will
+          be the instance of the callback method's class for which the callback is being called.
         :return: True if this entry was added and should be shown, False if it was not added and should not be shown.
         """
         if not self.show_for(event, kwargs):
@@ -246,7 +275,7 @@ class MenuGroup(ContainerMixin, MenuEntry):
         sub_menu = TkMenu(menu, tearoff=0, **style)
         added_any = False
         for member in self.members:
-            added_any |= member.maybe_add(sub_menu, style, event, kwargs)
+            added_any |= member.maybe_add(sub_menu, style, event, kwargs, cb_inst)
 
         cascade_kwargs = {'label': self.format_label(kwargs)}
         if not added_any or not self.enabled_for(event, kwargs):
@@ -266,13 +295,16 @@ class Menu(ContainerMixin, ElementBase, metaclass=MenuMeta):
     widget: TkMenu
     members: Sequence[Union[MenuEntry, MenuItem, MenuGroup]]
 
-    def __init__(self, members: Sequence[Union[MenuEntry, MenuItem, MenuGroup]] = None, **kwargs):
+    def __init__(self, members: Sequence[Union[MenuEntry, MenuItem, MenuGroup]] = None, cb_inst=None, **kwargs):
         """
         :param members: A sequence of menu entries that should be used as members in this menu.  Not required if this
           menu is defined as a class with groups / items defined as class members.
+        :param cb_inst: If an item's callback was registered late via the :meth:`MenuItem.callback` method, this will
+          be the instance of the callback method's class for which the callback is being called.
         :param kwargs: Additional keyword arguments to pass to :meth:`.ElementBase.__init__`
         """
         super().__init__(**kwargs)
+        self.cb_inst = cb_inst
         if members is not None:
             if self.members:
                 self.members = all_members = list(self.members)
@@ -306,8 +338,9 @@ class Menu(ContainerMixin, ElementBase, metaclass=MenuMeta):
     def prepare(self, parent: BaseWidget = None, event: Event = None, kwargs: dict[str, Any] = None) -> TkMenu:
         style = self.style_config
         menu = TkMenu(parent, tearoff=0, takefocus=int(self.allow_focus), **style)
+        cb_inst = self.cb_inst
         for member in self.members:
-            member.maybe_add(menu, style, event, kwargs)
+            member.maybe_add(menu, style, event, kwargs, cb_inst)
 
         return menu
 
@@ -329,3 +362,18 @@ class Menu(ContainerMixin, ElementBase, metaclass=MenuMeta):
             menu.tk_popup(*position)
         finally:
             menu.grab_release()
+
+
+class MenuProperty(Generic[M]):
+    __slots__ = ('menu_cls',)
+
+    def __init__(self, menu_cls: Type[M]):
+        self.menu_cls = menu_cls
+
+    def __get__(self, instance, owner) -> MenuProperty | M:
+        if instance is None:
+            return self
+        return self.menu_cls(cb_inst=instance)
+
+    def __getitem__(self, index_or_label: int | str) -> Union[MenuEntry, MenuItem, MenuGroup]:
+        return find_member(self.menu_cls.members, index_or_label)

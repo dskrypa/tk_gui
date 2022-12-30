@@ -10,7 +10,7 @@ from tk_gui.elements import Table, Input, Button, Text, ScrollFrame, SizeGrip
 from tk_gui.elements.choices import Radio, RadioGroup, CheckBox, Combo, ListBox
 from tk_gui.elements.bars import HorizontalSeparator, VerticalSeparator, ProgressBar, Slider
 from tk_gui.elements.images import Image, Animation, SpinnerImage, ClockImage
-from tk_gui.elements.menu.menu import Menu, MenuGroup, MenuItem
+from tk_gui.elements.menu.menu import Menu, MenuGroup, MenuItem, MenuProperty
 from tk_gui.elements.menu.items import CopySelection, GoogleSelection, SearchKpopFandom, SearchGenerasia, PasteClipboard
 from tk_gui.elements.menu.items import FlipNameParts, ToUpperCase, ToTitleCase, ToLowerCase, OpenFileLocation, OpenFile
 from tk_gui.elements.menu.items import CloseWindow
@@ -21,8 +21,9 @@ from tk_gui.popups import ImagePopup, AnimatedPopup, SpinnerPopup, ClockPopup, B
 from tk_gui.popups.about import AboutPopup
 from tk_gui.popups.base import TextPromptPopup, LoginPromptPopup
 from tk_gui.popups.common import popup_warning, popup_error, popup_yes_no, popup_no_yes, popup_ok
-from tk_gui.popups.raw import PickFolder, PickColor
+from tk_gui.popups.raw import PickFolder, PickColor, PickFile
 from tk_gui.popups.style import StylePopup
+from tk_gui.views.view import View
 from tk_gui.window import Window
 
 
@@ -192,6 +193,32 @@ class GuiTest(Command):
     def popup_login(self):
         user, pw = LoginPromptPopup('Enter your login info').run()
         print(f'{user=}, {pw=}')
+
+    @action
+    def menu_handler_method(self):
+        class MenuBar(Menu):
+            with MenuGroup('File'):
+                MenuItem('Select File')
+                CloseWindow()
+            with MenuGroup('Help'):
+                MenuItem('About', AboutPopup)
+
+        class TestView(View, title='Test'):
+            menu = MenuProperty(MenuBar)
+
+            @menu['File']['Select File'].callback
+            def select_file_handler(self, event):
+                path = PickFile().run()
+                try:
+                    path_str = path.as_posix()
+                except AttributeError:
+                    path_str = ''
+                self.window['test_input'].update(path_str)
+
+            def get_init_layout(self):
+                return [[self.menu], [Input(key='test_input', size=(40, 1))]]
+
+        TestView().run()
 
     @action(default=True)
     def window(self):

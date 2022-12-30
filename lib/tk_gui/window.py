@@ -348,7 +348,7 @@ class Window(RowContainer):
 
     # region Results
 
-    def __getitem__(self, item: Union[Key, str, BaseWidget, tuple[int, int]]) -> Union[ElementBase, HasValue]:
+    def __getitem__(self, item: Union[Key, str, BaseWidget, tuple[int, int]]) -> Union[ElementBase, Element, HasValue]:
         try:
             return self.element_map[item]
         except KeyError:
