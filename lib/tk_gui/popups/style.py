@@ -7,9 +7,9 @@ Tkinter GUI popup: Style
 from __future__ import annotations
 
 from functools import partial
-from typing import TYPE_CHECKING, Iterator
+from typing import TYPE_CHECKING, Iterator, Optional
 
-from ..elements import Text, HorizontalSeparator, Combo
+from ..elements import Text, HorizontalSeparator, Combo, Button
 from ..images.color import pick_fg
 from ..style import Style, StyleSpec, STATE_NAMES
 from ..window import Window
@@ -24,7 +24,7 @@ __all__ = ['StylePopup']
 
 
 class StylePopup(Popup):
-    def __init__(self, show_style: StyleSpec = None, **kwargs):
+    def __init__(self, show_style: StyleSpec = None, show_buttons: bool = False, **kwargs):
         kwargs.setdefault('bind_esc', True)
         kwargs.setdefault('scroll_y', True)
         kwargs.setdefault('title', 'Style')
@@ -32,7 +32,8 @@ class StylePopup(Popup):
         kwargs['show'] = False
         super().__init__(**kwargs)
         self.show_style = Style.get_style(show_style)
-        self._next_style = None
+        self._selected_style = None
+        self._show_buttons = show_buttons
 
     def _get_layout(self, window: Window) -> Layout:
         style = self.show_style
@@ -48,6 +49,8 @@ class StylePopup(Popup):
             [
                 Text('Style:', size=(10, 1), anchor='e', selectable=False),
                 Combo(Style.style_names(), style.name, callback=self._style_selected),
+                Button('Select', key='select', visible=self._show_buttons),
+                Button('Cancel', key='cancel', visible=self._show_buttons),
             ],
             [Text('Parent:', size=(10, 1), anchor='e', selectable=False), Text(**parent_kwargs)],
             [Text('TTK Theme:', size=(10, 1), anchor='e', selectable=False), Text(style.ttk_theme)],
@@ -63,15 +66,21 @@ class StylePopup(Popup):
     def _run(self):
         with self.window(take_focus=True) as window:
             window.run()
-            if style := self._next_style:
-                popup = self.__class__(style)
+            if style := self._selected_style:
+                popup = self.__class__(style, show_buttons=self._show_buttons)
             else:
                 return window.results
         return popup._run()
 
+    def run(self) -> Optional[str]:
+        results = super().run()
+        if (style_name := self._selected_style) and results['select']:
+            return style_name
+        return None
+
     def _style_selected(self, event: Event):
         if (choice := event.widget.get()) != self.show_style.name:
-            self._next_style = choice
+            self._selected_style = choice
             self.window.interrupt()
 
     def build_rows(self, window: Window) -> Iterator[list[Element]]:

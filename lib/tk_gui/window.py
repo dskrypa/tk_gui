@@ -19,7 +19,7 @@ from weakref import finalize
 from PIL import ImageGrab
 
 from .assets import PYTHON_LOGO
-from .config import WindowConfigProperty
+from .config import WindowConfig, WindowConfigProperty
 from .elements.menu import Menu
 from .enums import BindTargets, Anchor, Justify, Side, BindEvent, CallbackAction
 from .exceptions import DuplicateKeyError
@@ -115,7 +115,7 @@ class MotionTracker:
 
 class Window(RowContainer):
     # region Class Attrs
-    config = WindowConfigProperty()
+    config: WindowConfig = WindowConfigProperty()
     __hidden_root = None
     _tk_event_handlers: dict[str, str] = {}
     _always_bind_events: set[BindEvent] = set()
