@@ -109,6 +109,9 @@ class View(metaclass=ViewMeta):
     def init_window(self) -> Window:
         if (window_kwargs := self.window_kwargs) is None:
             window_kwargs = {}
+
+        binds = window_kwargs.setdefault('binds', {})
+        binds.update(self.__class__.event_handler_binds())
         return Window(self.get_init_layout(), title=self.title, **window_kwargs)
 
     @cached_property

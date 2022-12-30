@@ -16,8 +16,8 @@ from .._utils import normalize_underline
 from .utils import MenuMode, ContainerMixin, MenuMeta, get_current_menu_group, wrap_menu_cb
 
 if TYPE_CHECKING:
-    from ...pseudo_elements import Row
-    from ...typing import Bool, XY, EventCallback
+    from tk_gui.pseudo_elements import Row
+    from tk_gui.typing import Bool, XY, EventCallback, ProvidesEventCallback
 
 __all__ = ['Mode', 'MenuEntry', 'MenuItem', 'MenuGroup', 'Menu', 'CustomMenuItem']
 
@@ -25,6 +25,7 @@ Mode = Union['MenuMode', str, bool, None]
 
 
 class MenuEntry(ABC):
+    """An entry in a cascading menu tree, which may be a button/choice, or it may have other entries nested under it."""
     __slots__ = ('parent', 'label', '_underline', 'enabled', 'show', 'keyword', '_format_label')
 
     def __init__(
@@ -36,6 +37,18 @@ class MenuEntry(ABC):
         keyword: str = None,
         format_label: Bool = False,
     ):
+        """
+        :param label: The label to be displayed for this menu entry.
+        :param underline: The character(s) in the label to underline, or the index of the char to underline, if any.
+        :param enabled: When / whether this entry should be enabled in the menu.
+        :param show: When / whether this entry should be displayed in the menu.  Defaults to ``MenuMode.ALWAYS`` unless
+          the ``keyword`` parameter is provided.
+        :param keyword: The keyword in the context dictionary that would indicate that this entry should be shown /
+          enabled if their respective modes are set to ``MenuMode.KEYWORD`` or ``MenuMode.TRUTHY``.  The ``show``
+          parameter will default to ``MenuMode.KEYWORD`` if this parameter is provided.
+        :param format_label: Whether the label should be treated as a format string to be used with the context
+          dictionary of kwargs, or if it is a static label.  Defaults to static.
+        """
         self.label = label
         self._underline = underline
         self.enabled = MenuMode(enabled)
@@ -83,16 +96,28 @@ class MenuEntry(ABC):
     def maybe_add(
         self, menu: TkMenu, style: dict[str, Any], event: Event = None, kwargs: dict[str, Any] = None
     ) -> bool:
+        """
+        Used internally when building the TK widget(s) that represent this entry.
+
+        :param menu: The :class:`python:tkinter.Menu` widget that is being built, which this entry should be added to
+          if the configured conditions are met.
+        :param style: The style arguments to use for nested :class:`python:tkinter.Menu` sub-menus.
+        :param event: The :class:`python:tkinter.Event` that triggered this menu to be displayed.
+        :param kwargs: Keyword arguments that were provided to :meth:`Menu.show` / :meth:`Menu.popup` to provide
+          context and possibly result in items being hidden/shown, enabled/disabled, or formatted to include more info.
+        :return: True if this entry was added and should be shown, False if it was not added and should not be shown.
+        """
         raise NotImplementedError
 
 
 class MenuItem(MenuEntry):
+    """A button/choice in a menu."""
     __slots__ = ('_callback', 'use_kwargs', 'store_meta')
 
     def __init__(
         self,
         label: str,
-        callback: EventCallback,
+        callback: EventCallback | ProvidesEventCallback,
         *,
         underline: Union[str, int] = None,
         enabled: Mode = MenuMode.ALWAYS,
@@ -102,16 +127,49 @@ class MenuItem(MenuEntry):
         format_label: Bool = False,
         store_meta: Bool = False,
     ):
+        """
+        :param label: The label to be displayed for this menu item.
+        :param callback: A callback function/method that accepts a :class:`python:tkinter.Event` as a positional
+          argument, or a :class:`.Popup` or other object with a ``as_callback`` method (classmethod if a class is
+          provided).
+        :param underline: The character(s) in the label to underline, or the index of the char to underline, if any.
+        :param enabled: When / whether this item should be enabled in the menu.
+        :param show: When / whether this item should be displayed in the menu.  Defaults to ``MenuMode.ALWAYS`` unless
+          the ``keyword`` parameter is provided.
+        :param keyword: The keyword in the context dictionary that would indicate that this item should be shown /
+          enabled if their respective modes are set to ``MenuMode.KEYWORD`` or ``MenuMode.TRUTHY``.  The ``show``
+          parameter will default to ``MenuMode.KEYWORD`` if this parameter is provided.
+        :param use_kwargs: Whether the context dictionary of kwargs should be included in the arguments when the
+          callback is called.  Defaults to False.
+        :param format_label: Whether the label should be treated as a format string to be used with the context
+          dictionary of kwargs, or if it is a static label.  Defaults to static.
+        :param store_meta: Whether the result of calling the callback should be stored in a :class:`.CallbackMetadata`
+          wrapper or not.  Defaults to False.
+        """
         if show is None:
             show = MenuMode.KEYWORD if keyword else MenuMode.ALWAYS
         super().__init__(label, underline, enabled, show, keyword, format_label)
-        self._callback = callback
+        try:
+            self._callback = callback.as_callback()
+        except AttributeError:
+            self._callback = callback
         self.use_kwargs = use_kwargs
         self.store_meta = store_meta
 
     def maybe_add(
         self, menu: TkMenu, style: dict[str, Any], event: Event = None, kwargs: dict[str, Any] = None
     ) -> bool:
+        """
+        Used internally when building the TK widget(s) that represent this entry.
+
+        :param menu: The :class:`python:tkinter.Menu` widget that is being built, which this entry should be added to
+          if the configured conditions are met.
+        :param style: The style arguments to use for nested :class:`python:tkinter.Menu` sub-menus.
+        :param event: The :class:`python:tkinter.Event` that triggered this menu to be displayed.
+        :param kwargs: Keyword arguments that were provided to :meth:`Menu.show` / :meth:`Menu.popup` to provide
+          context and possibly result in items being hidden/shown, enabled/disabled, or formatted to include more info.
+        :return: True if this entry was added and should be shown, False if it was not added and should not be shown.
+        """
         if not self.show_for(event, kwargs):
             return False
 
@@ -141,11 +199,19 @@ class CustomMenuItem(MenuItem, ABC):
 
 
 class MenuGroup(ContainerMixin, MenuEntry):
+    """A group of menu entries that contains other nested entries."""
     __slots__ = ('members', 'hide_if_disabled')
 
     def __init__(
         self, label: Optional[str], underline: Union[str, int] = None, hide_if_disabled: Bool = True, **kwargs
     ):
+        """
+        :param label: The label to be displayed for this menu entry.
+        :param underline: The character(s) in the label to underline, or the index of the char to underline, if any.
+        :param hide_if_disabled: Whether this group of entries should be hidden when it is disabled or if no members
+          within the group were shown.  Defaults to True.
+        :param kwargs: Additional keyword arguments to pass thru to :meth:`MenuEntry.__init__`.
+        """
         # TODO: Add a way to define a menu more like a Window's layout?
         super().__init__(label, underline, **kwargs)
         self.members: list[Union[MenuEntry, MenuItem, MenuGroup]] = []
@@ -163,6 +229,17 @@ class MenuGroup(ContainerMixin, MenuEntry):
     def maybe_add(
         self, menu: TkMenu, style: dict[str, Any], event: Event = None, kwargs: dict[str, Any] = None
     ) -> bool:
+        """
+        Used internally when building the TK widget(s) that represent this entry.
+
+        :param menu: The :class:`python:tkinter.Menu` widget that is being built, which this entry should be added to
+          if the configured conditions are met.
+        :param style: The style arguments to use for nested :class:`python:tkinter.Menu` sub-menus.
+        :param event: The :class:`python:tkinter.Event` that triggered this menu to be displayed.
+        :param kwargs: Keyword arguments that were provided to :meth:`Menu.show` / :meth:`Menu.popup` to provide
+          context and possibly result in items being hidden/shown, enabled/disabled, or formatted to include more info.
+        :return: True if this entry was added and should be shown, False if it was not added and should not be shown.
+        """
         if not self.show_for(event, kwargs):
             return False
 
@@ -190,6 +267,11 @@ class Menu(ContainerMixin, ElementBase, metaclass=MenuMeta):
     members: Sequence[Union[MenuEntry, MenuItem, MenuGroup]]
 
     def __init__(self, members: Sequence[Union[MenuEntry, MenuItem, MenuGroup]] = None, **kwargs):
+        """
+        :param members: A sequence of menu entries that should be used as members in this menu.  Not required if this
+          menu is defined as a class with groups / items defined as class members.
+        :param kwargs: Additional keyword arguments to pass to :meth:`.ElementBase.__init__`
+        """
         super().__init__(**kwargs)
         if members is not None:
             if self.members:

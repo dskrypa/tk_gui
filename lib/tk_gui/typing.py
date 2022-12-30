@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 # fmt: off
 __all__ = [
     'Bool', 'XY', 'Key', 'HasParent', 'HasValue', 'Layout', 'Axis', 'Orientation', 'PathLike',
-    'BindCallback', 'EventCallback', 'BindTarget', 'Bindable', 'BindMap',
+    'BindCallback', 'EventCallback', 'BindTarget', 'Bindable', 'BindMap', 'ProvidesEventCallback',
     'TkFill', 'TkSide', 'TkJustify',
     'TkContainer',
 ]
@@ -84,4 +84,13 @@ class HasValue(Protocol[T_co]):
     @property
     @abstractmethod
     def value(self) -> T_co:
+        pass
+
+
+@runtime_checkable
+class ProvidesEventCallback(Protocol):
+    __slots__ = ()
+
+    @abstractmethod
+    def as_callback(self) -> EventCallback:
         pass
