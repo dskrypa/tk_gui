@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Optional, Union
 from PIL.Image import MIME
 
 from ..elements.images import AnimatedType, Image, Animation, ClockImage, SpinnerImage, get_size
+from ..event_handling import event_handler
 from ..positioning import positioner
 from ..images import as_image
 from .base import Popup
@@ -31,8 +32,6 @@ class ImagePopup(Popup):
     gui_image: Image
 
     def __init__(self, image: Union[ImageType, AnimatedType], title: str = None, **kwargs):
-        binds = kwargs.setdefault('binds', {})
-        binds['SIZE_CHANGED'] = self.handle_size_changed
         kwargs.setdefault('margins', (0, 0))
         kwargs.setdefault('bind_esc', True)
         kwargs.setdefault('keep_on_top', False)
@@ -93,6 +92,7 @@ class ImagePopup(Popup):
         # )
         return None
 
+    @event_handler('SIZE_CHANGED')
     def handle_size_changed(self, event: Event, size: XY):
         if self._empty or self._last_size == size:
             # log.debug(f'Ignoring config {event=} for {self} @ {monotonic()}')

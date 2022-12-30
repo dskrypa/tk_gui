@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from ..elements.images import ClockImage
+from ..event_handling import event_handler
 from ..popups.image import AnimatedPopup
 from ..style import Style
 from ..window import Window
@@ -37,22 +38,21 @@ class ClockView(AnimatedPopup):
         kwargs.setdefault('alpha_channel', 0.8)
         kwargs.setdefault('grab_anywhere', True)
         kwargs.setdefault('no_title_bar', True)
-        binds = kwargs.setdefault('binds', {})
-        binds.setdefault('<Button-3>', self.toggle_title)
-        binds.setdefault('<KeyPress-plus>', self.increase_size)
-        binds.setdefault('<KeyPress-minus>', self.decrease_size)
         super().__init__(None, **kwargs)
 
     def prepare_window(self) -> Window:
         return Window(self.get_layout(), title=self.title, is_popup=False, **self.window_kwargs)
 
+    @event_handler('<Button-3>')
     def toggle_title(self, event: Event):
         self.window.toggle_title_bar()
 
+    @event_handler('<KeyPress-plus>')
     def increase_size(self, event: Event):
         width, height = self.window.size
         self.window.size = (width + 10, height + 10)
 
+    @event_handler('<KeyPress-minus>')
     def decrease_size(self, event: Event):
         image = self.gui_image
         width, height = image.clock.time_size()
