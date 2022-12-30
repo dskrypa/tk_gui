@@ -49,6 +49,12 @@ class ConfigItem(Generic[T]):
     def __set_name__(self, owner: Type[WindowConfig], name: str):
         self.name = name
 
+    def __repr__(self) -> str:
+        name, default, popup_dependent, depends_on = self.name, self.default, self.popup_dependent, self.depends_on
+        return (
+            f'<{self.__class__.__name__}[{name=}, {default=}, type={self.type!r}, {popup_dependent=}, {depends_on=}]>'
+        )
+
     def get(self, instance: WindowConfig) -> Optional[T]:
         try:
             value = instance._get(self.name, type=self.type)

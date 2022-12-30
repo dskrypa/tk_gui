@@ -31,6 +31,7 @@ log = logging.getLogger(__name__)
 
 class ButtonAction(Enum):
     SUBMIT = 'submit'
+    CALLBACK = 'callback'
 
     @classmethod
     def _missing_(cls, value: str):
@@ -44,6 +45,7 @@ class Button(Interactive):
     widget: _Button
     separate: bool = False
     bind_enter: bool = False
+    callback: BindCallback = None
 
     def __init__(
         self,
@@ -52,9 +54,10 @@ class Button(Interactive):
         *,
         shortcut: str = None,
         justify_text: Union[str, Justify, None] = Justify.CENTER,
-        action: Union[ButtonAction, str] = ButtonAction.SUBMIT,
+        action: Union[ButtonAction, str] = None,
         binds: MutableMapping[str, BindCallback] = None,
         bind_enter: Bool = False,
+        cb: BindCallback = None,
         separate: Bool = False,
         focus: Bool = None,
         **kwargs,
@@ -79,7 +82,16 @@ class Button(Interactive):
         super().__init__(binds=binds, justify_text=justify_text, focus=focus, **kwargs)
         self.text = text
         self.image = image
-        self.action = ButtonAction(action)
+        if provided_cb := cb is not None:
+            self.callback = cb
+        if action is None:
+            self.action = ButtonAction.CALLBACK if provided_cb else ButtonAction.SUBMIT
+        else:
+            self.action = action = ButtonAction(action)
+            if provided_cb and action != ButtonAction.CALLBACK:
+                raise ValueError(
+                    f'Invalid {action=} - when a callback is provided, the only valid action is {ButtonAction.CALLBACK}'
+                )
         self._last_press = 0
         self._last_release = 0
         self._last_activated = 0
@@ -212,6 +224,8 @@ class Button(Interactive):
         log.debug(f'handle_activated: {event=}')
         if self.action == ButtonAction.SUBMIT:
             self.window.interrupt(event, self)
+        elif (cb := self.callback) is not None:
+            cb(event)
         else:
             log.warning(f'No action configured for button={self}')
 
