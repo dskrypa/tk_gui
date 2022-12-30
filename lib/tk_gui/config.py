@@ -10,7 +10,7 @@ import json
 import logging
 from inspect import isclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Type, Union, Optional, Callable, TypeVar, Generic
+from typing import TYPE_CHECKING, Any, Type, Union, Optional, Callable, TypeVar, Generic, Mapping
 
 from .__version__ import __title__
 
@@ -187,6 +187,13 @@ class WindowConfig:
             return self._get(key, default, type)
         except KeyError:
             return None
+
+    def update(self, data: Mapping[str, Any], ignore_none: bool = False, ignore_empty: bool = False):
+        with self:
+            for key, val in data.items():
+                if (ignore_none and val is None) or (ignore_empty and not val and val not in (None, False)):
+                    continue
+                self[key] = val
 
     def __setitem__(self, key: str, value: Any):
         try:
