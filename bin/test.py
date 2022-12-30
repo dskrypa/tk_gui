@@ -13,6 +13,7 @@ from tk_gui.elements.images import Image, Animation, SpinnerImage, ClockImage
 from tk_gui.elements.menu.menu import Menu, MenuGroup, MenuItem
 from tk_gui.elements.menu.items import CopySelection, GoogleSelection, SearchKpopFandom, SearchGenerasia, PasteClipboard
 from tk_gui.elements.menu.items import FlipNameParts, ToUpperCase, ToTitleCase, ToLowerCase, OpenFileLocation, OpenFile
+from tk_gui.elements.menu.items import CloseWindow
 from tk_gui.elements.text import Multiline, gui_log_handler
 from tk_gui.elements.rating import Rating
 from tk_gui.images.utils import ICONS_DIR
@@ -239,6 +240,7 @@ class GuiTest(Command):
             with MenuGroup('File'):
                 # MenuItem('Open', print)
                 MenuItem('Pick Color', PickColor.as_callback('#1c1e23'))
+                CloseWindow()
             with MenuGroup('Help'):
                 MenuItem('About', AboutPopup.as_callback())
 

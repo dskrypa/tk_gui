@@ -21,7 +21,7 @@ from PIL import ImageGrab
 from .assets import PYTHON_LOGO
 from .config import WindowConfigProperty
 from .elements.menu import Menu
-from .enums import BindTargets, Anchor, Justify, Side, BindEvent
+from .enums import BindTargets, Anchor, Justify, Side, BindEvent, CallbackAction
 from .exceptions import DuplicateKeyError
 from .positioning import positioner, Monitor
 from .pseudo_elements.row_container import RowContainer
@@ -928,7 +928,9 @@ class Window(RowContainer):
     def _handle_menu_callback(self, event: Event):
         result = Menu.results.pop(event.state, None)
         log.debug(f'Menu {result=}')
-        if cb := self._event_cbs.get(BindEvent.MENU_RESULT):
+        if result == CallbackAction.EXIT:
+            self.close(event)
+        elif cb := self._event_cbs.get(BindEvent.MENU_RESULT):
             cb(event, result)
 
     # endregion

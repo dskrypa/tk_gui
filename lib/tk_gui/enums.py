@@ -12,7 +12,7 @@ from typing import Type
 
 from .utils import ON_MAC
 
-__all__ = ['BindTargets', 'Anchor', 'BindEvent', 'Justify', 'Side', 'StyleState', 'ListBoxSelectMode']
+__all__ = ['BindTargets', 'Anchor', 'BindEvent', 'CallbackAction', 'Justify', 'Side', 'StyleState', 'ListBoxSelectMode']
 
 # fmt: off
 ANCHOR_ALIASES = {
@@ -65,6 +65,10 @@ class BindTargets(MissingMixin, Enum):
     EXIT = 'exit'
     INTERRUPT = 'interrupt'
     POPUP = 'popup'
+
+
+class CallbackAction(MissingMixin, Enum):
+    EXIT = 'exit'
 
 
 class Side(MissingMixin, Enum, aliases={'l': 'LEFT', 'r': 'RIGHT', 't': 'TOP', 'b': 'BOTTOM'}):

@@ -14,6 +14,7 @@ from tkinter import Event, BaseWidget, TclError, Menu as TkMenu, Entry, Text
 from typing import TYPE_CHECKING, Union, Optional, Any, Callable
 from urllib.parse import quote_plus, urlparse
 
+from tk_gui.enums import CallbackAction
 from .._utils import get_selection_pos
 from .menu import Mode, CustomMenuItem
 from .utils import MenuMode, get_text, replace_selection, flip_name_parts, get_any_text, explore, launch
@@ -22,6 +23,7 @@ if TYPE_CHECKING:
     from ...typing import Bool
 
 __all__ = [
+    'CloseWindow',
     'SelectionMenuItem', 'CopySelection', 'PasteClipboard',
     'FlipNameParts', 'ToLowerCase', 'ToTitleCase', 'ToUpperCase',
     'OpenFileLocation', 'OpenFile', 'PlayFile',
@@ -31,6 +33,16 @@ __all__ = [
 log = logging.getLogger(__name__)
 
 # TODO: Error popups
+
+
+class CloseWindow(CustomMenuItem):
+    __slots__ = ()
+
+    def __init__(self, label: str = 'Exit', *, show: Mode = MenuMode.ALWAYS, enabled: Mode = MenuMode.ALWAYS, **kwargs):
+        super().__init__(label, show=show, enabled=enabled, store_meta=False, **kwargs)
+
+    def callback(self, event: Event, **kwargs):
+        return CallbackAction.EXIT
 
 
 # region Selection Menu Items
