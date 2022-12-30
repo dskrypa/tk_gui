@@ -14,7 +14,7 @@ from contextlib import contextmanager
 from datetime import datetime
 from functools import cached_property, partial
 from tkinter import TclError, StringVar, Label, Event, Entry, BaseWidget
-from typing import TYPE_CHECKING, Optional, Union, Any
+from typing import TYPE_CHECKING, Optional, Union, Any, Sequence
 
 from ..constants import LEFT_CLICK, CTRL_LEFT_CLICK
 from ..enums import Justify, Anchor
@@ -571,3 +571,21 @@ def gui_log_handler(
 
 def _clear_selection(widget: Union[Entry, Text], event: Event = None):
     widget.selection_clear()
+
+
+def _normalize_text_ele_widths(rows: Sequence[Sequence[Union[Text, Input]]], column: int = 0):
+    # TODO: This does not work when run before the layout has been finalized
+    if not rows:
+        return rows
+
+    longest = max(map(len, (row[column].value for row in rows)))
+    for row in rows:
+        ele = row[column]
+        try:
+            height = ele.size[1]
+        except TypeError:
+            height = 1
+
+        ele.size = (longest, height)
+
+    return rows
