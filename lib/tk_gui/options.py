@@ -172,8 +172,8 @@ class ListboxOption(Option, opt_type='listbox'):
         choices = kwargs['choices']
         yield col_num, row_num, ListBox(
             choices,
-            default_values=val or choices,
-            no_scrollbar=True,
+            default=val or choices,
+            # scroll_y=False,
             select_mode=kwargs['select_mode'],
             **self.common_kwargs(disable_all),
         )
