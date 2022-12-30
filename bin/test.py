@@ -17,6 +17,7 @@ from tk_gui.elements.menu.items import CloseWindow
 from tk_gui.elements.text import Multiline, gui_log_handler
 from tk_gui.elements.rating import Rating
 from tk_gui.images.utils import ICONS_DIR
+from tk_gui.options import GuiOptions
 from tk_gui.popups import ImagePopup, AnimatedPopup, SpinnerPopup, ClockPopup, BasicPopup, Popup
 from tk_gui.popups.about import AboutPopup
 from tk_gui.popups.base import TextPromptPopup, LoginPromptPopup
@@ -42,6 +43,8 @@ class GuiTest(Command):
     def about(self):
         AboutPopup().run()
 
+    # region Image Tests
+
     @action
     def spinner(self):
         SpinnerPopup(img_size=(400, 400)).run()
@@ -59,6 +62,8 @@ class GuiTest(Command):
     @action
     def clock(self):
         ClockPopup(toggle_slim_on_click=True).run()
+
+    # endregion
 
     @action
     def popup(self):
@@ -91,6 +96,8 @@ class GuiTest(Command):
     def max_size(self):
         layout = [[Text(f'test_{i:03d}')] for i in range(100)]
         Window(layout, 'Auto Max Size Test', exit_on_esc=True).run()
+
+    # region Input Tests
 
     @action
     def pick_folder(self):
@@ -158,9 +165,14 @@ class GuiTest(Command):
         results = Window(layout, 'Slider Test', exit_on_esc=True).run().results
         print(f'Results: {results}')
 
+    # endregion
+
+    # region Test Popups
+
     @action
     def style(self):
-        StylePopup().run()
+        results = StylePopup(show_buttons=True).run()
+        print(f'{results=}')
 
     @action
     def popup_warning(self):
@@ -194,11 +206,14 @@ class GuiTest(Command):
         user, pw = LoginPromptPopup('Enter your login info').run()
         print(f'{user=}, {pw=}')
 
+    # endregion
+
     @action
-    def menu_handler_method(self):
+    def menu_handler_methods(self):
         class MenuBar(Menu):
             with MenuGroup('File'):
                 MenuItem('Select File')
+                MenuItem('Settings')
                 CloseWindow()
             with MenuGroup('Help'):
                 MenuItem('About', AboutPopup)
@@ -213,7 +228,24 @@ class GuiTest(Command):
                     path_str = path.as_posix()
                 except AttributeError:
                     path_str = ''
-                self.window['test_input'].update(path_str)
+                self.window['test_input'].update(path_str)  # noqa
+
+            @menu['File']['Settings'].callback
+            def settings(self, event):
+                config = self.window.config
+                options = GuiOptions(submit='Save', title=None)
+                with options.next_row() as options:
+                    options.add_bool('remember_pos', 'Remember Last Window Position', config.remember_position)
+                    options.add_bool('remember_size', 'Remember Last Window Size', config.remember_size)
+                with options.next_row() as options:
+                    options.add_popup(
+                        'style', 'Style', StylePopup, default=config.style, popup_kwargs={'show_buttons': True}
+                    )
+                with options.next_row() as options:
+                    options.add_directory('output_dir', 'Output Directory')
+
+                result = options.run_popup()
+                return result
 
             def get_init_layout(self):
                 return [[self.menu], [Input(key='test_input', size=(40, 1))]]
