@@ -339,7 +339,34 @@ class Link(Text):
         super().__init__(value, link=link, link_bind=link_bind, **kwargs)
 
 
-class Input(TextValueMixin, Interactive, move_cursor=True):
+class InteractiveText(Interactive, ABC):
+    _disabled_state: str
+
+    def __init_subclass__(cls, disabled_state: str, **kwargs):  # noqa
+        super().__init_subclass__(**kwargs)
+        cls._disabled_state = disabled_state
+
+    def disable(self):
+        if self.disabled:
+            return
+        self._update_state(True)
+
+    def enable(self):
+        if not self.disabled:
+            return
+        self._update_state(False)
+
+    def _update_state(self, disabled: bool):
+        self.widget['state'] = self._disabled_state if disabled else 'normal'
+        self.disabled = disabled
+        self._refresh_colors()
+
+    @abstractmethod
+    def _refresh_colors(self):
+        raise NotImplementedError
+
+
+class Input(TextValueMixin, InteractiveText, disabled_state='readonly', move_cursor=True):
     widget: Entry
     password_char: Optional[str] = None
 
@@ -407,25 +434,10 @@ class Input(TextValueMixin, Interactive, move_cursor=True):
 
     # region Update State
 
-    def disable(self):
-        if self.disabled:
-            return
-        self._update_state(True)
-
-    def enable(self):
-        if not self.disabled:
-            return
-        self._update_state(False)
-
     def validated(self, valid: bool):
         if self.valid != valid:
             self.valid = valid
             self._refresh_colors()
-
-    def _update_state(self, disabled: bool):
-        self.disabled = disabled
-        self.widget['state'] = 'readonly' if disabled else 'normal'
-        self._refresh_colors()
 
     def _refresh_colors(self):
         bg_key = 'readonlybackground' if self.disabled else 'bg'
@@ -440,7 +452,7 @@ class Input(TextValueMixin, Interactive, move_cursor=True):
             webbrowser.open(value)
 
 
-class Multiline(Interactive):
+class Multiline(InteractiveText, disabled_state='disabled'):
     widget: ScrollableText
 
     def __init__(
@@ -542,6 +554,11 @@ class Multiline(Interactive):
     @cached_property
     def widgets(self) -> list[BaseWidget]:
         return self.widget.widgets
+
+    def _refresh_colors(self):
+        kwargs = self.style.get_map('text', self.style_state, fg='fg', bg='bg')
+        log.debug(f'Refreshing colors for {self} with {self.style_state=}: {kwargs}')
+        self.widget.configure(**kwargs)
 
 
 # region Log to Element Handling

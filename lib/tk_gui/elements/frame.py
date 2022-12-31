@@ -113,6 +113,30 @@ class InteractiveRowFrame(InteractiveMixin, RowFrame, ABC):
         self.init_interactive_from_kwargs(kwargs)
         super().__init__(**kwargs)
 
+    def enable(self):
+        if not self.disabled:
+            return
+
+        for ele in self.elements:
+            try:
+                ele.enable()  # noqa
+            except AttributeError:
+                pass
+
+        self.disabled = False
+
+    def disable(self):
+        if self.disabled:
+            return
+
+        for ele in self.elements:
+            try:
+                ele.disable()  # noqa
+            except AttributeError:
+                pass
+
+        self.disabled = True
+
 
 class Frame(FrameMixin, Element, RowContainer):
     def __init__(self, layout: Layout = None, **kwargs):
@@ -138,10 +162,36 @@ class Frame(FrameMixin, Element, RowContainer):
         super().pack_rows(debug)
 
 
-class InteractiveFrame(InteractiveMixin, Frame):
+class InteractiveFrame(InteractiveMixin, Frame, ABC):
     def __init__(self, layout: Layout = None, **kwargs):
         self.init_interactive_from_kwargs(kwargs)
         super().__init__(layout, **kwargs)
+
+    def enable(self):
+        if not self.disabled:
+            return
+
+        for row in self.rows:
+            for ele in row.elements:
+                try:
+                    ele.enable()  # noqa
+                except AttributeError:
+                    pass
+
+        self.disabled = False
+
+    def disable(self):
+        if self.disabled:
+            return
+
+        for row in self.rows:
+            for ele in row.elements:
+                try:
+                    ele.disable()  # noqa
+                except AttributeError:
+                    pass
+
+        self.disabled = True
 
 
 class ScrollFrame(Element, RowContainer):

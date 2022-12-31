@@ -21,7 +21,7 @@ from ..pseudo_elements.scroll import ScrollableListbox
 from ..typing import Bool, T, BindTarget, BindCallback
 from ..utils import max_line_len
 from ._utils import normalize_underline
-from .element import Interactive
+from .element import Interactive, DisableableMixin
 from .exceptions import NoActiveGroup, BadGroupCombo
 
 if TYPE_CHECKING:
@@ -38,7 +38,7 @@ B = TypeVar('B')
 # region Radio
 
 
-class Radio(Interactive, Generic[T]):
+class Radio(DisableableMixin, Interactive, Generic[T]):
     widget: Radiobutton
 
     def __init__(
@@ -111,6 +111,8 @@ class Radio(Interactive, Generic[T]):
             kwargs['width'], kwargs['height'] = self.size
         except TypeError:
             pass
+        if self.disabled:
+            kwargs['state'] = self._disabled_state
 
         self.widget = Radiobutton(row.frame, **kwargs)
         self.pack_widget()
@@ -210,7 +212,7 @@ def get_current_radio_group(silent: bool = False) -> Optional[RadioGroup]:
 # region CheckBox
 
 
-class CheckBox(Interactive):
+class CheckBox(DisableableMixin, Interactive):
     widget: Checkbutton
     tk_var: Optional[BooleanVar] = None
     _values: Optional[tuple[B, A]] = None
@@ -276,6 +278,9 @@ class CheckBox(Interactive):
             kwargs['width'], kwargs['height'] = self.size
         except TypeError:
             pass
+        if self.disabled:
+            kwargs['state'] = self._disabled_state
+
         self.widget = Checkbutton(row.frame, **kwargs)
         self.pack_widget()
 
@@ -301,7 +306,7 @@ def make_checkbox_grid(rows: list[Sequence[CheckBox]]):
 # endregion
 
 
-class Combo(Interactive):
+class Combo(DisableableMixin, Interactive, disabled_state='disable', enabled_state='enable'):
     """A form element that provides a drop down list of items to select.  Only 1 item may be selected."""
     widget: Combobox
     tk_var: Optional[StringVar] = None
@@ -311,14 +316,14 @@ class Combo(Interactive):
         choices: Collection[str],
         default: str = None,
         *,
-        # read_only: Bool = False,
+        read_only: Bool = False,
         callback: BindTarget = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
         self.choices = choices
         self.default = default
-        # self.read_only = read_only  # TODO: Handle
+        self.read_only = read_only
         self._callback = callback
 
     @property
@@ -365,6 +370,11 @@ class Combo(Interactive):
         except TypeError:
             kwargs['width'] = max_line_len(self.choices) + 1
 
+        if self.disabled:
+            kwargs['state'] = self._disabled_state
+        elif self.read_only:
+            kwargs['state'] = 'readonly'
+
         self.widget = combo_box = Combobox(row.frame, **kwargs)
         fg, bg = style.combo.fg[state], style.combo.bg[state]
         if fg and bg:  # This sets colors for drop-down formatting
@@ -379,8 +389,14 @@ class Combo(Interactive):
         if (callback := self._callback) is not None:
             combo_box.bind('<<ComboboxSelected>>', self.normalize_callback(callback))
 
+    def enable(self):
+        if not self.disabled:
+            return
+        self.widget['state'] = 'readonly' if self.read_only else self._enabled_state
+        self.disabled = False
 
-class ListBox(Interactive):
+
+class ListBox(DisableableMixin, Interactive):
     widget: ScrollableListbox
     callback: Optional[BindCallback] = None
 
@@ -404,6 +420,8 @@ class ListBox(Interactive):
         self._callback = callback
         self._prev_selection: Optional[tuple[int]] = None
         self._last_selection: Optional[tuple[int]] = None
+
+    # region Selection Methods
 
     @property
     def value(self) -> list[str]:
@@ -462,6 +480,8 @@ class ListBox(Interactive):
         else:
             list_box.selection_clear(0, len(self.choices))
 
+    # endregion
+
     @property
     def style_config(self) -> dict[str, Any]:
         style, state = self.style, self.style_state
@@ -483,6 +503,8 @@ class ListBox(Interactive):
             kwargs['width'], kwargs['height'] = self.size
         except TypeError:
             kwargs['width'] = max_line_len(self.choices) + 1
+        if self.disabled:
+            kwargs['state'] = self._disabled_state
 
         """
         activestyle: Literal["dotbox", "none", "underline"]

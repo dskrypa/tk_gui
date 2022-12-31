@@ -18,7 +18,7 @@ from PIL.ImageTk import PhotoImage
 
 from ..enums import Justify
 from ..images import as_image, scale_image
-from .element import Interactive
+from .element import Interactive, DisableableMixin
 
 if TYPE_CHECKING:
     from PIL.Image import Image as PILImage
@@ -41,7 +41,7 @@ class ButtonAction(Enum):
             return None
 
 
-class Button(Interactive):
+class Button(DisableableMixin, Interactive):
     widget: _Button
     separate: bool = False
     bind_enter: bool = False
@@ -115,6 +115,12 @@ class Button(Interactive):
         #     state = self.style_state
         #     tw, th = style.text_size(text, layer='button', state=state)
         #     if th <= height and tw < width:
+
+    @property
+    def value(self) -> bool:
+        return bool(self._last_activated)
+
+    # region Packing
 
     def _pack_size(self) -> XY:
         # Width is measured in pixels, but height is measured in characters
@@ -193,6 +199,8 @@ class Button(Interactive):
             kwargs['highlightthickness'] = 0
         if width:
             kwargs['wraplength'] = width * self.style.char_width('button', self.style_state)
+        if self.disabled:
+            kwargs['state'] = self._disabled_state
 
         self.widget = button = _Button(row.frame, **kwargs)
         if image:
@@ -200,15 +208,15 @@ class Button(Interactive):
 
         self.pack_widget()
 
+    # endregion
+
+    # region Event Handling
+
     def _bind(self, event_pat: str, cb: BindCallback):
         super()._bind(event_pat, cb)
         if self.bind_enter and event_pat == '<Return>' and event_pat not in self.window._bound_for_events:
             self.window.bind(event_pat, cb)
             self.window._bound_for_events.add(event_pat)
-
-    @property
-    def value(self) -> bool:
-        return bool(self._last_activated)
 
     def handle_press(self, event: Event):
         self._last_press = monotonic()
@@ -228,6 +236,8 @@ class Button(Interactive):
             cb(event)
         else:
             log.warning(f'No action configured for button={self}')
+
+    # endregion
 
 
 def OK(text: str = 'OK', bind_enter: Bool = True, **kwargs) -> Button:

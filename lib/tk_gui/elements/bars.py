@@ -13,7 +13,7 @@ from tkinter import Scale, IntVar, DoubleVar
 from tkinter.ttk import Separator as TtkSeparator, Progressbar
 from typing import TYPE_CHECKING, Iterable, Iterator, Union, Any
 
-from .element import ElementBase, Element, Interactive
+from .element import ElementBase, Element, Interactive, DisableableMixin
 
 if TYPE_CHECKING:
     from ..pseudo_elements import Row
@@ -130,7 +130,7 @@ class ProgressBar(Element):
             self.widget['value'] = self.max_value
 
 
-class Slider(Interactive):
+class Slider(DisableableMixin, Interactive):
     widget: Scale
     tk_var: Union[IntVar, DoubleVar]
 
@@ -158,8 +158,11 @@ class Slider(Interactive):
         self._callback = callback
 
     @property
-    def value(self) -> float:
-        return self.tk_var.get()
+    def value(self) -> float | None:
+        try:
+            return self.tk_var.get()
+        except AttributeError:  # The tk_var has not been initialized yet
+            return self.default
 
     @property
     def style_config(self) -> dict[str, Any]:
@@ -199,6 +202,8 @@ class Slider(Interactive):
             pass
         if not self.show_values:
             kwargs['showvalue'] = 0
+        if self.disabled:
+            kwargs['state'] = 'disabled'
 
         """
         bigincrement:
