@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any, Callable, Optional, Collection, Iterator,
 
 from .elements.choices import Combo, ListBox, CheckBox, make_checkbox_grid
 from .elements import Text, Element, Button, Input, Submit, Frame
-# from .elements.text import normalize_text_ele_widths
+from .elements.text import normalize_text_ele_widths
 from .popups import PickFolder, Popup
 from .views.view import View
 
@@ -421,9 +421,8 @@ class GuiOptions:
                 row_sets = [layout]
 
             for row_set in row_sets:
-                # TODO
-                # if self.align_text and (rows_with_text := [r for r in row_set if r and isinstance(r[0], Text)]):
-                #     normalize_text_ele_widths(rows_with_text)  # noqa
+                if self.align_text and (rows_with_text := [r for r in row_set if r and isinstance(r[0], Text)]):
+                    normalize_text_ele_widths(rows_with_text)  # noqa
                 if self.align_checkboxes:
                     if box_rows := [r for r in row_set if r and all(isinstance(e, CheckBox) for e in r)]:
                         log.info(f'Processing checkboxes into grid: {box_rows}')

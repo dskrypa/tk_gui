@@ -27,7 +27,7 @@ if TYPE_CHECKING:
     from ..pseudo_elements import Row
     from ..typing import Bool, XY, BindTarget
 
-__all__ = ['Text', 'Link', 'Input', 'Multiline', 'GuiTextHandler', 'gui_log_handler']
+__all__ = ['Text', 'Link', 'Input', 'Multiline', 'GuiTextHandler', 'gui_log_handler', 'normalize_text_ele_widths']
 log = logging.getLogger(__name__)
 
 _Link = Union[bool, str, 'BindTarget', None]
@@ -107,10 +107,59 @@ class CallbackLink(LinkTarget):
 # endregion
 
 
-class Text(Element):
+class TextValueMixin:
+    string_var: Optional[StringVar] = None
+    widget: Union[Label, Entry]
+    size: XY
+    _value: str
+    _move_cursor: bool = False
+
+    def __init_subclass__(cls, move_cursor: bool = False, **kwargs):
+        super().__init_subclass__(**kwargs)
+        if move_cursor:
+            cls._move_cursor = move_cursor
+
+    @property
+    def value(self) -> str:
+        try:
+            return self.string_var.get()
+        except AttributeError:  # The element has not been packed yet, so string_var is None
+            return self._value
+
+    @value.setter
+    def value(self, value: Any):
+        value = str(value)
+        self._value = value
+        try:
+            self.string_var.set(value)
+        except AttributeError:  # The element has not been packed yet, so string_var is None
+            pass
+        else:
+            if self._move_cursor:
+                self.widget.icursor(tkc.END)
+
+    def init_string_var(self):
+        self.string_var = StringVar()
+        self.string_var.set(self._value)
+
+    @property
+    def expected_width(self) -> int:
+        try:
+            return self.size[0]
+        except TypeError:
+            return len(self.value)
+
+    @property
+    def expected_height(self) -> int:
+        try:
+            return self.size[1]
+        except TypeError:
+            return 1
+
+
+class Text(TextValueMixin, Element):
     __link: Optional[LinkTarget] = None
     widget: Union[Label, Entry]
-    string_var: Optional[StringVar] = None
 
     def __init__(
         self,
@@ -130,7 +179,7 @@ class Text(Element):
             if not selectable:
                 anchor = Justify.LEFT.as_anchor()
         super().__init__(justify_text=justify, anchor=anchor, **kwargs)
-        self._value = str(value)
+        self.value = value
         self.link = (link_bind, link)
         self._selectable = selectable
         self._auto_size = auto_size
@@ -171,9 +220,7 @@ class Text(Element):
         }
 
     def pack_into(self, row: Row, column: int):
-        self.string_var = StringVar()
-        self.string_var.set(self._value)
-
+        self.init_string_var()
         if self._selectable:
             self._pack_entry(row)
         else:
@@ -220,14 +267,9 @@ class Text(Element):
 
     def update(self, value: Any = None, link: Union[bool, str] = None):
         if value is not None:
-            self._value = str(value)
-            self.string_var.set(self._value)
+            self.value = value
         if link is not None:
             self.update_link(link)
-
-    @property
-    def value(self):
-        return self.string_var.get()
 
     @property
     def tooltip_text(self) -> str:
@@ -297,9 +339,8 @@ class Link(Text):
         super().__init__(value, link=link, link_bind=link_bind, **kwargs)
 
 
-class Input(Interactive):
+class Input(TextValueMixin, Interactive, move_cursor=True):
     widget: Entry
-    string_var: Optional[StringVar] = None
     password_char: Optional[str] = None
 
     def __init__(
@@ -313,15 +354,11 @@ class Input(Interactive):
         **kwargs
     ):
         super().__init__(justify_text=justify_text, **kwargs)
-        self._value = str(value)
+        self.value = value
         self._link = link or link is None
         self._callback = callback
         if password_char:
             self.password_char = password_char
-
-    @property
-    def value(self) -> str:
-        return self.string_var.get()
 
     @property
     def style_config(self) -> dict[str, Any]:
@@ -335,8 +372,7 @@ class Input(Interactive):
         }
 
     def pack_into(self, row: Row, column: int):
-        self.string_var = StringVar()
-        self.string_var.set(self._value)
+        self.init_string_var()
         kwargs = {
             'textvariable': self.string_var,
             'show': self.password_char,
@@ -364,9 +400,7 @@ class Input(Interactive):
         if disabled is not None:
             self._update_state(disabled)
         if value is not None:
-            self._value = str(value)
-            self.string_var.set(self._value)
-            self.widget.icursor(tkc.END)
+            self.value = value
         if password_char is not None:
             self.widget.configure(show=password_char)
             self.password_char = password_char
@@ -573,19 +607,16 @@ def _clear_selection(widget: Union[Entry, Text], event: Event = None):
     widget.selection_clear()
 
 
-def _normalize_text_ele_widths(rows: Sequence[Sequence[Union[Text, Input]]], column: int = 0):
-    # TODO: This does not work when run before the layout has been finalized
+def normalize_text_ele_widths(rows: Sequence[Sequence[Union[Text, Input]]], column: int = 0):
     if not rows:
         return rows
 
-    longest = max(map(len, (row[column].value for row in rows)))
+    longest = max(row[column].expected_width for row in rows)
+    if longest < 1:
+        return rows
+
     for row in rows:
         ele = row[column]
-        try:
-            height = ele.size[1]
-        except TypeError:
-            height = 1
-
-        ele.size = (longest, height)
+        ele.size = (longest, ele.expected_height)
 
     return rows
