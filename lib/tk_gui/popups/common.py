@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Optional
 
 from ..elements.buttons import OK
 from ..images import image_path
-from .base import BasicPopup, BoolPopup
+from .base import BasicPopup, BoolPopup, TextPromptPopup
 
 if TYPE_CHECKING:
     from ..typing import Bool, TkSide
@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 __all__ = [
     'popup_ok', 'popup_error', 'popup_warning', 'popup_input_invalid',
     'popup_yes_no', 'popup_no_yes', 'popup_ok_cancel', 'popup_cancel_ok',
+    'popup_get_text',
 ]
 log = logging.getLogger(__name__)
 
@@ -57,3 +58,10 @@ def popup_input_invalid(text: str = None, title: str = 'Invalid Input', logger: 
         logger = log
     logger.debug(f'Received invalid input - {text}' if text else 'Received invalid input')
     popup_ok(text, title=title, **kwargs)
+
+
+def popup_get_text(
+    text: str, title: str = None, *, bind_esc: Bool = False, button_text: str = 'Submit', **kwargs
+) -> Optional[str]:
+    """A popup with a prompt and a text input field."""
+    return TextPromptPopup(text, title=title, bind_esc=bind_esc, button_text=button_text, **kwargs).run()

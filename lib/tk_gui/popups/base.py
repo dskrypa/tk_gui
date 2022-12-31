@@ -201,12 +201,13 @@ class TextPromptPopup(BasicPopup):
     input_key = 'input'
 
     def __init__(self, text: str, button_text: str = 'Submit', **kwargs):
+        # TODO: Add option to include a `cancel` button
         button = Button(button_text, side='right', bind_enter=True, focus=False)
         super().__init__(text, button=button, **kwargs)
 
     def get_layout(self) -> list[list[Element]]:
         layout = super().get_layout()
-        layout.insert(1, [Input(key=self.input_key)])
+        layout.insert(1, [Input(key=self.input_key, focus=True)])
         return layout
 
     def run(self) -> Optional[str]:
@@ -219,6 +220,7 @@ class LoginPromptPopup(BasicPopup):
     pw_key = 'password'
 
     def __init__(self, text: str, button_text: str = 'Submit', password_char: str = '\u2b24', **kwargs):
+        # TODO: Add option to include a `cancel` button
         button = Button(button_text, side='right', bind_enter=True, focus=False)
         super().__init__(text, button=button, **kwargs)
         self.password_char = password_char
