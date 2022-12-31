@@ -97,7 +97,7 @@ class MenuEntry(ABC):
 
     @abstractmethod
     def maybe_add(
-        self, menu: TkMenu, style: dict[str, Any], event: Event = None, kwargs: dict[str, Any] = None, cb_inst = None
+        self, menu: TkMenu, style: dict[str, Any], event: Event | None, kwargs: dict[str, Any] | None, cb_inst=None
     ) -> bool:
         """
         Used internally when building the TK widget(s) that represent this entry.
@@ -172,7 +172,7 @@ class MenuItem(MenuEntry):
         return func
 
     def maybe_add(
-        self, menu: TkMenu, style: dict[str, Any], event: Event = None, kwargs: dict[str, Any] = None, cb_inst = None
+        self, menu: TkMenu, style: dict[str, Any], event: Event | None, kwargs: dict[str, Any] | None, cb_inst=None
     ) -> bool:
         """
         Used internally when building the TK widget(s) that represent this entry.
@@ -254,7 +254,7 @@ class MenuGroup(ContainerMixin, MenuEntry):
         return any(member.enabled_for(event, kwargs) for member in self.members)
 
     def maybe_add(
-        self, menu: TkMenu, style: dict[str, Any], event: Event = None, kwargs: dict[str, Any] = None, cb_inst = None
+        self, menu: TkMenu, style: dict[str, Any], event: Event | None, kwargs: dict[str, Any] | None, cb_inst=None
     ) -> bool:
         """
         Used internally when building the TK widget(s) that represent this entry.

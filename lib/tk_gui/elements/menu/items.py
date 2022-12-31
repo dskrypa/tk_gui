@@ -55,10 +55,13 @@ class SelectionMenuItem(CustomMenuItem, ABC):
         kwargs['use_kwargs'] = True
         super().__init__(*args, enabled=enabled, keyword=keyword, **kwargs)
 
-    def maybe_add_selection(self, event: Event, kwargs: dict[str, Any]):
-        if self.keyword in kwargs:
+    def maybe_add_selection(self, event: Event | None, kwargs: dict[str, Any] | None):
+        if kwargs is None or self.keyword in kwargs:
             return
-        widget: BaseWidget = event.widget
+        try:
+            widget: BaseWidget = event.widget
+        except AttributeError:
+            return
         try:
             if widget != widget.selection_own_get():
                 return
@@ -68,9 +71,11 @@ class SelectionMenuItem(CustomMenuItem, ABC):
             # log.debug(f'Error getting selection: {e}')
             pass
 
-    def maybe_add(self, menu: TkMenu, style: dict[str, Any], event: Event, kwargs: dict[str, Any]) -> bool:  # noqa
+    def maybe_add(
+        self, menu: TkMenu, style: dict[str, Any], event: Event, kwargs: dict[str, Any] | None, cb_inst=None
+    ) -> bool:
         self.maybe_add_selection(event, kwargs)
-        return super().maybe_add(menu, style, event, kwargs)
+        return super().maybe_add(menu, style, event, kwargs, cb_inst)
 
 
 class CopySelection(SelectionMenuItem):
