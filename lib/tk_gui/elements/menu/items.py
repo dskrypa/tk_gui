@@ -78,7 +78,28 @@ class SelectionMenuItem(CustomMenuItem, ABC):
         return super().maybe_add(menu, style, event, kwargs, cb_inst)
 
 
-class CopySelection(SelectionMenuItem):
+class SelectionOrFullMenuItem(SelectionMenuItem, ABC):
+    __slots__ = ()
+
+    def maybe_add_selection(self, event: Event | None, kwargs: dict[str, Any] | None):
+        if kwargs is None or self.keyword in kwargs:
+            return
+        try:
+            widget: BaseWidget = event.widget
+        except AttributeError:
+            return
+        try:
+            if widget == widget.selection_own_get() and (selection := widget.selection_get()):
+                kwargs[self.keyword] = selection
+            else:
+                element = self.root_menu.window[widget]
+                if value := element.value:
+                    kwargs[self.keyword] = value
+        except (TclError, AttributeError, KeyError):
+            pass
+
+
+class CopySelection(SelectionOrFullMenuItem):
     __slots__ = ()
 
     def __init__(self, label: str = 'Copy', *, underline: Union[str, int] = 0, show: Mode = MenuMode.ALWAYS, **kwargs):
@@ -89,6 +110,7 @@ class CopySelection(SelectionMenuItem):
             widget: BaseWidget = event.widget
             widget.clipboard_clear()
             widget.clipboard_append(selection)
+            return selection  # provides confirmation of what was copied
 
 
 class PasteClipboard(SelectionMenuItem):
@@ -284,7 +306,7 @@ class ToTitleCase(_UpdateTextMenuItem, update_func=str.title):
 # region Search Engines
 
 
-class SearchSelection(SelectionMenuItem, ABC):
+class SearchSelection(SelectionOrFullMenuItem, ABC):
     __slots__ = ('quote',)
     title: str
     url_fmt: str

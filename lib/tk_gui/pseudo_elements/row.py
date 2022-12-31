@@ -67,8 +67,18 @@ class RowBase(ABC):
 
     @cached_property
     def widget_element_map(self) -> dict[BaseWidget, Union[RowBase, ElementBase]]:
-        widget_ele_map = {w: ele for ele in self.elements for w in ele.widgets}
-        widget_ele_map[self.frame] = self
+        widget_ele_map = {self.frame: self}
+        setdefault = widget_ele_map.setdefault
+        for ele in self.elements:
+            try:
+                nested_map = ele.widget_element_map  # noqa
+            except AttributeError:
+                for widget in ele.widgets:
+                    setdefault(widget, ele)
+            else:
+                widget_ele_map.update(nested_map)
+                setdefault(ele.widget, ele)
+
         return widget_ele_map
 
     @cached_property

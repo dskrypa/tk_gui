@@ -130,13 +130,32 @@ class RowContainer(ABC):
             widgets.append(self.widget)
         return widgets
 
+    def __iter_widget_eles(self):
+        for row in self.rows:
+            for widget, ele in row.widget_element_map.items():
+                yield widget, ele, ele
+
+        try:
+            widgets = self.widget.widgets
+        except AttributeError:
+            widgets = (self.widget,)
+
+        for widget in widgets:
+            yield widget, self, widget
+
     @cached_property
     def widget_element_map(self) -> dict[BaseWidget, Union[RowBase, ElementBase, RowContainer]]:
-        widget_ele_map = {w: ele for row in self.rows for w, ele in row.widget_element_map.items()}
-        try:
-            widget_ele_map.update({widget: self for widget in self.widget.widgets})
-        except AttributeError:
-            widget_ele_map[self.widget] = self
+        widget_ele_map = {}
+        setdefault = widget_ele_map.setdefault
+        for widget, ele, maybe_has_map in self.__iter_widget_eles():
+            setdefault(widget, ele)
+            try:
+                nested_map = maybe_has_map.widget_element_map
+            except AttributeError:
+                pass
+            else:
+                widget_ele_map.update(nested_map)
+
         return widget_ele_map
 
     @cached_property
