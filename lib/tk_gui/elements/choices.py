@@ -13,7 +13,7 @@ from functools import cached_property
 from itertools import count
 from tkinter import Radiobutton, Checkbutton, BooleanVar, IntVar, StringVar, Event, TclError, BaseWidget
 from tkinter.ttk import Combobox
-from typing import TYPE_CHECKING, Optional, Union, Any, MutableMapping, Generic, Collection, TypeVar, Sequence
+from typing import TYPE_CHECKING, Optional, Union, Any, MutableMapping, Generic, Collection, TypeVar, Sequence, Iterable
 from weakref import WeakValueDictionary
 
 from ..enums import ListBoxSelectMode
@@ -431,6 +431,27 @@ class ListBox(Interactive):
         self._last_selection = self.widget.inner_widget.curselection()
         if (cb := self.callback) is not None:
             cb(event)
+
+    def get_selection_indices(self) -> list[int]:
+        return self.widget.inner_widget.curselection()
+
+    def set_selection_indices(self, index_or_indices: int | Iterable[int]):
+        if isinstance(index_or_indices, int):
+            index_or_indices = (index_or_indices,)
+
+        list_box = self.widget.inner_widget
+        for i in index_or_indices:
+            list_box.selection_set(i)
+
+    def append_choice(self, value: str, select: Bool = False, resize: Bool = True):
+        list_box = self.widget.inner_widget
+        list_box.insert(tkc.END, value)
+        self.choices = (*self.choices, value)
+        num_choices = len(self.choices)
+        if select:
+            list_box.selection_set(num_choices - 1)
+        if resize and num_choices != list_box.cget('height'):
+            list_box.configure(height=num_choices)
 
     def reset(self, default: Bool = True):
         list_box = self.widget.inner_widget
