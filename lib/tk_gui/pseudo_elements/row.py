@@ -50,6 +50,15 @@ class RowBase(ABC):
     @property
     @abstractmethod
     def elements(self) -> Sequence[Element]:
+        """
+        Intended to be overridden by subclasses to provide a standardized way of defining custom element members for
+        compound elements.
+
+        See :class:`.RowFrame` and :class:`.InteractiveRowFrame` for the higher level classes intended to be extended
+        for this purpose.
+
+        See :meth:`.Frame.get_custom_layout` for the equivalent method for multi-row compound elements.
+        """
         raise NotImplementedError
 
     @cached_property
@@ -109,10 +118,10 @@ class RowBase(ABC):
 
 class Row(RowBase):
     ignore_grab: bool = False
-    frame: Optional[Frame] = None
-    expand: Optional[bool] = None   # Set to True only for Column elements
-    fill: Optional[bool] = None     # Changes for Column, Separator, StatusBar
-    elements: tuple[Element, ...] = ()
+    frame: Optional[Frame] = None       # This satisfies the abstract property req while letting it be assigned in pack
+    expand: Optional[bool] = None       # Set to True only for Column elements
+    fill: Optional[bool] = None         # Changes for Column, Separator, StatusBar
+    elements: tuple[Element, ...] = ()  # This satisfies the abstract property req while letting it be assigned in init
 
     def __init__(self, parent: RowContainer, elements: Iterable[Element], num: int):
         self.num = num

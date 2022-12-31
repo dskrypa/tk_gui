@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from ..typing import Layout, Bool
     from ..pseudo_elements.row import Row
 
-__all__ = ['RowFrame', 'InteractiveRowFrame', 'Frame', 'ScrollFrame']
+__all__ = ['RowFrame', 'InteractiveRowFrame', 'Frame', 'InteractiveFrame', 'ScrollFrame']
 log = logging.getLogger(__name__)
 
 TkFrameType = Type[Union[TkFrame, LabelFrame]]
@@ -119,6 +119,29 @@ class Frame(FrameMixin, Element, RowContainer):
         self.init_frame_from_kwargs(kwargs)
         self.init_container_from_kwargs(layout, kwargs=kwargs)
         Element.__init__(self, **kwargs)
+
+    def get_custom_layout(self) -> Layout:  # noqa
+        """
+        Intended to be overridden by subclasses to provide a standardized way of defining additional rows / a custom
+        layout for compound elements.
+
+        See :class:`InteractiveFrame` for the interactive version of this class.
+
+        For single-row compound elements, the classes intended to be extended for this purpose are :class:`.RowFrame`
+        and :class:`.InteractiveRowFrame`, and the equivalent method to this one is :meth:`.RowBase.elements`.
+        """
+        return []
+
+    def pack_rows(self, debug: Bool = False):
+        if layout := self.get_custom_layout():
+            self.add_rows(layout)
+        super().pack_rows(debug)
+
+
+class InteractiveFrame(InteractiveMixin, Frame):
+    def __init__(self, layout: Layout = None, **kwargs):
+        self.init_interactive_from_kwargs(kwargs)
+        super().__init__(layout, **kwargs)
 
 
 class ScrollFrame(Element, RowContainer):
