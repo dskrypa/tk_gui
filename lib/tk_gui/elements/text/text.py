@@ -94,6 +94,7 @@ class Text(TextValueMixin, Element):
         link_bind: str = None,
         selectable: Bool = True,
         auto_size: Bool = True,
+        use_input_style: Bool = False,
         **kwargs,
     ):
         self._tooltip_text = kwargs.pop('tooltip', None)
@@ -106,6 +107,7 @@ class Text(TextValueMixin, Element):
         self.link = (link_bind, link)
         self._selectable = selectable
         self._auto_size = auto_size
+        self._use_input_style = use_input_style
 
     @property
     def pad_kw(self) -> dict[str, int]:
@@ -137,10 +139,20 @@ class Text(TextValueMixin, Element):
 
     @property
     def style_config(self) -> dict[str, Any]:
-        return {
-            **self.style.get_map('text', bd='border_width', fg='fg', bg='bg', font='font', relief='relief'),
-            **self._style_config,
-        }
+        style = self.style
+        if self._use_input_style:
+            return {
+                'highlightthickness': 0,
+                **style.get_map('input', bd='border_width', fg='fg', bg='bg', font='font', relief='relief'),
+                **style.get_map('input', 'disabled', readonlybackground='bg'),
+                **style.get_map('insert', insertbackground='bg'),  # Insert cursor (vertical line) color
+                **self._style_config,
+            }
+        else:
+            return {
+                **style.get_map('text', bd='border_width', fg='fg', bg='bg', font='font', relief='relief'),
+                **self._style_config,
+            }
 
     def pack_into(self, row: Row, column: int):
         self.init_string_var()
