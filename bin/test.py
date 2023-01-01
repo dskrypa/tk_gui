@@ -12,7 +12,7 @@ from tk_gui.elements.bars import HorizontalSeparator, VerticalSeparator, Progres
 from tk_gui.elements.images import Image, Animation, SpinnerImage, ClockImage
 from tk_gui.elements.menu.menu import Menu, MenuGroup, MenuItem, MenuProperty
 from tk_gui.elements.menu.items import CopySelection, GoogleSelection, SearchKpopFandom, SearchGenerasia, PasteClipboard
-from tk_gui.elements.menu.items import FlipNameParts, ToUpperCase, ToTitleCase, ToLowerCase, OpenFileLocation, OpenFile
+from tk_gui.elements.menu.items import ToUpperCase, ToTitleCase, ToLowerCase, OpenFileLocation, OpenFile
 from tk_gui.elements.menu.items import CloseWindow
 from tk_gui.elements.text import Multiline, gui_log_handler
 from tk_gui.elements.rating import Rating
@@ -278,7 +278,6 @@ class GuiTest(Command):
             CopySelection()
             PasteClipboard()
             with MenuGroup('Update'):
-                FlipNameParts()
                 ToLowerCase()
                 ToUpperCase()
                 ToTitleCase()

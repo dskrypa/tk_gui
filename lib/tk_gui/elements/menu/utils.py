@@ -13,7 +13,6 @@ from enum import Enum
 from tkinter import Event, Entry, Text, BaseWidget, TclError, StringVar
 from typing import TYPE_CHECKING, Optional, Union, Any, Mapping, Iterator, Sequence
 
-# from music.text.extraction import split_enclosed  # TODO: Resolve
 from .._utils import get_top_level
 from ..exceptions import NoActiveGroup
 
@@ -222,17 +221,6 @@ def replace_selection(widget: Union[Entry, Text], text: str, first: Union[str, i
     except AttributeError:
         widget.delete(first, last)
         widget.insert(first, text)
-
-
-def flip_name_parts(text: str) -> str:
-    # TODO: Implement
-    return text
-    # try:
-    #     a, b = split_enclosed(text, maxsplit=1)
-    # except ValueError:
-    #     return text
-    # else:
-    #     return f'{b} ({a})'
 
 
 # endregion

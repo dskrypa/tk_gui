@@ -17,7 +17,7 @@ from urllib.parse import quote_plus, urlparse
 from tk_gui.enums import CallbackAction
 from tk_gui.elements._utils import get_selection_pos, explore, launch
 from .menu import Mode, CustomMenuItem
-from .utils import MenuMode, get_text, replace_selection, flip_name_parts, get_any_text
+from .utils import MenuMode, get_text, replace_selection, get_any_text
 
 if TYPE_CHECKING:
     from ...typing import Bool
@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 __all__ = [
     'CloseWindow',
     'SelectionMenuItem', 'CopySelection', 'PasteClipboard',
-    'FlipNameParts', 'ToLowerCase', 'ToTitleCase', 'ToUpperCase',
+    'UpdateTextMenuItem', 'ToLowerCase', 'ToTitleCase', 'ToUpperCase',
     'OpenFileLocation', 'OpenFile', 'PlayFile',
     'SearchSelection', 'GoogleSelection', 'GoogleTranslate', 'SearchWikipedia',
     'SearchKpopFandom', 'SearchGenerasia', 'SearchDramaWiki',
@@ -226,16 +226,39 @@ class PlayFile(OpenFile):
 # region Text Manipulation
 
 
-class _UpdateTextMenuItem(SelectionMenuItem, ABC):
+class UpdateTextMenuItem(SelectionMenuItem, ABC):
+    """
+    Abstract base class for menu items that act on text selected in a given widget.  To define a new menu item that
+    uses this functionality, this class should be extended, with the ``update_func`` class init parameter provided.
+
+    See :class:`ToUpperCase`, :class:`ToLowerCase`, and :class:`ToTitleCase` for examples of how to do so.
+
+    """
     __slots__ = ()
 
     _update_func: Optional[Callable[[str], str]] = None
+    _default_label: str = None
 
-    def __init_subclass__(cls, update_func: Callable[[str], str] = None):  # noqa
+    def __init_subclass__(cls, update_func: Callable[[str], str] = None, label: str = None, **kwargs):
+        """
+        :param update_func: Function that accepts a single str parameter and returns the str that should replace the
+          provided text.
+        :param label: The default label to use for this menu item.  It may be overridden at the instance level.
+        """
+        super().__init_subclass__(**kwargs)
         if update_func is not None:
             cls._update_func = update_func
+        if label is not None:
+            cls._default_label = label
 
-    def __init__(self, label: str, *, show: Mode = MenuMode.ALWAYS, enabled: Mode = MenuMode.ALWAYS, **kwargs):
+    def __init__(self, label: str = None, *, show: Mode = MenuMode.ALWAYS, enabled: Mode = MenuMode.ALWAYS, **kwargs):
+        if label is None:
+            label = self._default_label
+        if label is None:
+            raise TypeError(
+                f'{self.__class__.__name__} requires a label to be initialized, but no label was provided,'
+                ' and no default label was defined for this class'
+            )
         super().__init__(label, show=show, enabled=enabled, store_meta=True, **kwargs)
 
     def show_for(self, event: Event = None, kwargs: dict[str, Any] = None) -> bool:
@@ -277,32 +300,16 @@ class _UpdateTextMenuItem(SelectionMenuItem, ABC):
             pass
 
 
-class FlipNameParts(_UpdateTextMenuItem, update_func=flip_name_parts):
+class ToUpperCase(UpdateTextMenuItem, update_func=str.upper, label='Change case: Upper'):
     __slots__ = ()
 
-    def __init__(self, label: str = 'Flip name parts', **kwargs):
-        super().__init__(label, **kwargs)
 
-
-class ToUpperCase(_UpdateTextMenuItem, update_func=str.upper):
+class ToLowerCase(UpdateTextMenuItem, update_func=str.lower, label='Change case: Lower'):
     __slots__ = ()
 
-    def __init__(self, label: str = 'Change case: Upper', **kwargs):
-        super().__init__(label, **kwargs)
 
-
-class ToLowerCase(_UpdateTextMenuItem, update_func=str.lower):
+class ToTitleCase(UpdateTextMenuItem, update_func=str.title, label='Change case: Title'):
     __slots__ = ()
-
-    def __init__(self, label: str = 'Change case: Lower', **kwargs):
-        super().__init__(label, **kwargs)
-
-
-class ToTitleCase(_UpdateTextMenuItem, update_func=str.title):
-    __slots__ = ()
-
-    def __init__(self, label: str = 'Change case: Title', **kwargs):
-        super().__init__(label, **kwargs)
 
 
 # endregion
