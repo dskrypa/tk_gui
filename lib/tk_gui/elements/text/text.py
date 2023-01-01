@@ -142,7 +142,6 @@ class Text(TextValueMixin, Element):
         style, state = self.style, StyleState.DISABLED
         if self._use_input_style:
             return {
-                'highlightthickness': 0,
                 **style.get_map('input', state, bd='border_width', fg='fg', bg='bg', font='font', relief='relief'),
                 **style.get_map('input', 'disabled', readonlybackground='bg'),
                 **style.get_map('insert', state, insertbackground='bg'),  # Insert cursor (vertical line) color
@@ -190,10 +189,11 @@ class Text(TextValueMixin, Element):
             'justify': self.justify_text.value,
             'state': 'readonly',
             'takefocus': int(self.allow_focus),
-            **self.style.get_map('text', readonlybackground='bg'),
             **self.style_config,
         }
-        kwargs.setdefault('relief', 'flat')
+        if not self._use_input_style:
+            kwargs.update(self.style.get_map('text', readonlybackground='bg'))
+            kwargs.setdefault('relief', 'flat')
         try:
             kwargs['width'] = self._init_size(kwargs.get('font'))[0]
         except TypeError:
