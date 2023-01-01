@@ -273,7 +273,7 @@ class GuiTest(Command):
         #     [Multiline('\n'.join(map(chr, range(97, 123))), size=(40, 10))],
         # ]
 
-        class RightClickMenu(Menu):
+        class BaseRightClickMenu(Menu):
             MenuItem('Test A', print)
             CopySelection()
             PasteClipboard()
@@ -281,6 +281,8 @@ class GuiTest(Command):
                 ToLowerCase()
                 ToUpperCase()
                 ToTitleCase()
+
+        class RightClickMenu(BaseRightClickMenu):
             with MenuGroup('Search'):
                 GoogleSelection()
                 SearchKpopFandom()

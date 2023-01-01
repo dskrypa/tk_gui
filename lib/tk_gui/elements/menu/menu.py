@@ -6,7 +6,9 @@ Tkinter GUI menus
 
 from __future__ import annotations
 
+import logging
 from abc import ABC, abstractmethod
+from copy import copy
 from functools import partial
 from itertools import count
 from tkinter import Event, BaseWidget, Menu as TkMenu
@@ -22,14 +24,23 @@ if TYPE_CHECKING:
     from tk_gui.typing import Bool, XY, EventCallback, ProvidesEventCallback
 
 __all__ = ['Mode', 'MenuEntry', 'MenuItem', 'MenuGroup', 'Menu', 'CustomMenuItem', 'MenuProperty']
+log = logging.getLogger(__name__)
 
 Mode = Union['MenuMode', str, bool, None]
 M = TypeVar('M', bound='Menu')
+T = TypeVar('T')
 
 
 class MenuEntry(ABC):
     """An entry in a cascading menu tree, which may be a button/choice, or it may have other entries nested under it."""
+
     __slots__ = ('parent', 'label', '_underline', 'enabled', 'show', 'keyword', '_format_label')
+
+    parent: MenuGroup | Menu | None
+    label: str | None
+    enabled: MenuMode
+    show: MenuMode
+    keyword: str | None
 
     def __init__(
         self,
@@ -71,6 +82,11 @@ class MenuEntry(ABC):
     def __repr__(self) -> str:
         underline, enabled, show = self._underline, self.enabled, self.show
         return f'<{self.__class__.__name__}({self.label!r}, {underline=}, {enabled=}, {show=})>'
+
+    def copy(self: T) -> T:
+        clone = copy(self)
+        clone.parent = None
+        return clone
 
     @property
     def root_menu(self) -> Optional[Menu]:
@@ -209,6 +225,7 @@ class MenuItem(MenuEntry):
         label = self.format_label(kwargs)
         menu.add_command(label=label, underline=self.underline, command=callback)
         if not self.enabled_for(event, kwargs):
+            # log.debug(f'NOT enabled for {event=}, {kwargs=}: {self}')
             menu.entryconfigure(label, state='disabled')
 
         return True
@@ -216,9 +233,26 @@ class MenuItem(MenuEntry):
 
 class CustomMenuItem(MenuItem, ABC):
     __slots__ = ()
+    _default_keyword: str = None
+    _default_label: str = None
 
-    def __init__(self, label: str, **kwargs):
-        super().__init__(label, self.callback, **kwargs)
+    def __init_subclass__(cls, keyword: str = None, label: str = None, **kwargs):
+        """
+        :param keyword: The default keyword to use for this menu item.  It may be overridden at the instance level.
+        :param label: The default label to use for this menu item.  It may be overridden at the instance level.
+        """
+        super().__init_subclass__(**kwargs)
+        if keyword:
+            cls._default_keyword = keyword
+        if label:
+            cls._default_label = label
+
+    def __init__(self, label: str, *, keyword: str = None, **kwargs):
+        if keyword is None:
+            keyword = self._default_keyword
+        if label is None:
+            label = self._default_label
+        super().__init__(label, self.callback, keyword=keyword, **kwargs)
 
     @abstractmethod
     def callback(self, event: Event, **kwargs) -> Any:
@@ -270,6 +304,7 @@ class MenuGroup(ContainerMixin, MenuEntry):
         :return: True if this entry was added and should be shown, False if it was not added and should not be shown.
         """
         if not self.show_for(event, kwargs):
+            # log.debug(f'Not showing menu group={self!r}')
             return False
 
         sub_menu = TkMenu(menu, tearoff=0, **style)
@@ -277,6 +312,7 @@ class MenuGroup(ContainerMixin, MenuEntry):
         for member in self.members:
             added_any |= member.maybe_add(sub_menu, style, event, kwargs, cb_inst)
 
+        # log.debug(f'maybe_add: {added_any=} for group={self!r}')
         cascade_kwargs = {'label': self.format_label(kwargs)}
         if not added_any or not self.enabled_for(event, kwargs):
             if self.hide_if_disabled:
@@ -341,6 +377,7 @@ class Menu(ContainerMixin, ElementBase, metaclass=MenuMeta):
         cb_inst = self.cb_inst
         for member in self.members:
             member.maybe_add(menu, style, event, kwargs, cb_inst)
+            # log.debug(f'Menu.prepare: {added=} for {member=}')
 
         return menu
 

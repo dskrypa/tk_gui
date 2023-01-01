@@ -35,10 +35,10 @@ log = logging.getLogger(__name__)
 # TODO: Error popups
 
 
-class CloseWindow(CustomMenuItem):
+class CloseWindow(CustomMenuItem, label='Exit'):
     __slots__ = ()
 
-    def __init__(self, label: str = 'Exit', *, show: Mode = MenuMode.ALWAYS, enabled: Mode = MenuMode.ALWAYS, **kwargs):
+    def __init__(self, label: str = None, *, show: Mode = MenuMode.ALWAYS, enabled: Mode = MenuMode.ALWAYS, **kwargs):
         super().__init__(label, show=show, enabled=enabled, store_meta=False, **kwargs)
 
     def callback(self, event: Event, **kwargs):
@@ -48,30 +48,36 @@ class CloseWindow(CustomMenuItem):
 # region Selection Menu Items
 
 
-class SelectionMenuItem(CustomMenuItem, ABC):
+class SelectionMenuItem(CustomMenuItem, ABC, keyword='selection'):
     __slots__ = ()
 
-    def __init__(self, *args, enabled: Mode = MenuMode.TRUTHY, keyword: str = 'selection', **kwargs):
+    def __init__(self, *args, enabled: Mode = MenuMode.TRUTHY, **kwargs):
         kwargs['use_kwargs'] = True
-        super().__init__(*args, enabled=enabled, keyword=keyword, **kwargs)
+        super().__init__(*args, enabled=enabled, **kwargs)
 
-    def maybe_add_selection(self, event: Event | None, kwargs: dict[str, Any] | None):
-        if kwargs is None or self.keyword in kwargs:
-            return
+    def get_widget(self, event: Event | None, kwargs: dict[str, Any]) -> BaseWidget:
+        try:
+            if self.keyword in kwargs:
+                # log.debug(f'get_widget: skipping {keyword=} - {kwargs=}')
+                raise _SkipSelection
+        except TypeError:  # kwargs is None
+            raise _SkipSelection from None
 
         try:
             widget: BaseWidget = event.widget
         except AttributeError:
+            raise _SkipSelection from None
+        else:
+            return widget
+
+    def maybe_add_selection(self, event: Event | None, kwargs: dict[str, Any] | None):
+        try:
+            widget = self.get_widget(event, kwargs)
+        except _SkipSelection:
             return
 
-        try:
-            if widget != widget.selection_own_get():
-                return
-            kwargs[self.keyword] = widget.selection_get()
-        # except TclError as e:  # When no selection exists
-        except TclError:
-            # log.debug(f'Error getting selection: {e}')
-            pass
+        if selection := _get_selection(widget):
+            kwargs[self.keyword] = selection
 
     def maybe_add(
         self, menu: TkMenu, style: dict[str, Any], event: Event, kwargs: dict[str, Any] | None, cb_inst=None
@@ -80,32 +86,42 @@ class SelectionMenuItem(CustomMenuItem, ABC):
         return super().maybe_add(menu, style, event, kwargs, cb_inst)
 
 
-class SelectionOrFullMenuItem(SelectionMenuItem, ABC):
+class SelectionOrFullMenuItem(SelectionMenuItem, ABC, keyword='permissive_selection'):
     __slots__ = ()
 
     def maybe_add_selection(self, event: Event | None, kwargs: dict[str, Any] | None):
-        if kwargs is None or self.keyword in kwargs:
+        try:
+            widget = self.get_widget(event, kwargs)
+        except _SkipSelection:
+            return
+
+        # TODO: Add handling for things like table (Treeview) cells/rows?
+        if selection := _get_selection(widget):
+            kwargs[self.keyword] = selection
+            # log.debug(f'maybe_add_selection: found {selection=}')
             return
 
         try:
-            widget: BaseWidget = event.widget
-        except AttributeError:
-            return
-
-        try:
-            if widget == widget.selection_own_get() and (selection := widget.selection_get()):
-                kwargs[self.keyword] = selection
-            elif text := get_any_text(widget):
+            if text := get_any_text(widget):
                 kwargs[self.keyword] = text
-            # TODO: Add handling for things like table (Treeview) cells/rows?
+                # log.debug(f'maybe_add_selection: found full {text=}')
         except (TclError, AttributeError, KeyError):
+            # log.debug(f'Could not add selection due to: {e}')
             pass
 
 
-class CopySelection(SelectionOrFullMenuItem):
+def _get_selection(widget: BaseWidget) -> Optional[str]:
+    try:
+        if widget == widget.selection_own_get():
+            return widget.selection_get()
+    except TclError:
+        return None
+
+
+class CopySelection(SelectionOrFullMenuItem, label='Copy'):
     __slots__ = ()
 
-    def __init__(self, label: str = 'Copy', *, underline: Union[str, int] = 0, show: Mode = MenuMode.ALWAYS, **kwargs):
+    def __init__(self, label: str = None, *, underline: Union[str, int] = 0, show: Mode = MenuMode.ALWAYS, **kwargs):
         super().__init__(label, underline=underline, show=show, store_meta=True, **kwargs)
 
     def callback(self, event: Event, **kwargs):
@@ -116,12 +132,12 @@ class CopySelection(SelectionOrFullMenuItem):
             return selection  # provides confirmation of what was copied
 
 
-class PasteClipboard(CustomMenuItem):
+class PasteClipboard(CustomMenuItem, label='Paste'):
     __slots__ = ()
 
     def __init__(
         self,
-        label: str = 'Paste',
+        label: str = None,
         *,
         underline: Union[str, int] = 0,
         show: Mode = MenuMode.ALWAYS,
@@ -167,7 +183,7 @@ class PasteClipboard(CustomMenuItem):
 class _PathMenuItem(SelectionMenuItem, ABC):
     __slots__ = ()
 
-    def __init__(self, label: str, *, show: Mode = MenuMode.ALWAYS, enabled: Mode = MenuMode.ALWAYS, **kwargs):
+    def __init__(self, label: str = None, *, show: Mode = MenuMode.ALWAYS, enabled: Mode = MenuMode.ALWAYS, **kwargs):
         super().__init__(label, show=show, enabled=enabled, store_meta=True, **kwargs)
 
     @classmethod
@@ -191,33 +207,24 @@ class _PathMenuItem(SelectionMenuItem, ABC):
         return self.get_path(event, kwargs) is not None
 
 
-class OpenFileLocation(_PathMenuItem):
+class OpenFileLocation(_PathMenuItem, label='Open in File Manager'):
     __slots__ = ()
-
-    def __init__(self, label: str = 'Open in File Manager', **kwargs):
-        super().__init__(label, **kwargs)
 
     def callback(self, event: Event, **kwargs):
         if path := self.get_path(event, kwargs):
             explore(path)
 
 
-class OpenFile(_PathMenuItem):
+class OpenFile(_PathMenuItem, label='Open File'):
     __slots__ = ()
-
-    def __init__(self, label: str = 'Open File', **kwargs):
-        super().__init__(label, **kwargs)
 
     def callback(self, event: Event, **kwargs):
         if path := self.get_path(event, kwargs):
             launch(path)
 
 
-class PlayFile(OpenFile):
+class PlayFile(OpenFile, label='Play File'):
     __slots__ = ()
-
-    def __init__(self, label: str = 'Play File', **kwargs):
-        super().__init__(label, **kwargs)
 
 
 # endregion
@@ -237,28 +244,17 @@ class UpdateTextMenuItem(SelectionMenuItem, ABC):
     __slots__ = ()
 
     _update_func: Optional[Callable[[str], str]] = None
-    _default_label: str = None
 
-    def __init_subclass__(cls, update_func: Callable[[str], str] = None, label: str = None, **kwargs):
+    def __init_subclass__(cls, update_func: Callable[[str], str] = None, **kwargs):
         """
         :param update_func: Function that accepts a single str parameter and returns the str that should replace the
           provided text.
-        :param label: The default label to use for this menu item.  It may be overridden at the instance level.
         """
         super().__init_subclass__(**kwargs)
         if update_func is not None:
             cls._update_func = update_func
-        if label is not None:
-            cls._default_label = label
 
     def __init__(self, label: str = None, *, show: Mode = MenuMode.ALWAYS, enabled: Mode = MenuMode.ALWAYS, **kwargs):
-        if label is None:
-            label = self._default_label
-        if label is None:
-            raise TypeError(
-                f'{self.__class__.__name__} requires a label to be initialized, but no label was provided,'
-                ' and no default label was defined for this class'
-            )
         super().__init__(label, show=show, enabled=enabled, store_meta=True, **kwargs)
 
     def show_for(self, event: Event = None, kwargs: dict[str, Any] = None) -> bool:
@@ -390,3 +386,7 @@ class SearchDramaWiki(SearchSelection, title='DramaWiki', url='https://wiki.d-ad
 
 
 # endregion
+
+
+class _SkipSelection(Exception):
+    """Internal exception for selection-based menu items"""

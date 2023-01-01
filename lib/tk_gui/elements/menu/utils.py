@@ -9,9 +9,10 @@ from __future__ import annotations
 import logging
 from abc import ABCMeta
 from contextvars import ContextVar
+from copy import copy
 from enum import Enum
 from tkinter import Event, Entry, Text, BaseWidget, TclError, StringVar
-from typing import TYPE_CHECKING, Optional, Union, Any, Mapping, Iterator, Sequence
+from typing import TYPE_CHECKING, Optional, Union, Any, Mapping, Iterator, Sequence, TypeVar
 
 from .._utils import get_top_level
 from ..exceptions import NoActiveGroup
@@ -24,6 +25,7 @@ __all__ = ['MenuMode', 'CallbackMetadata']
 log = logging.getLogger(__name__)
 
 _menu_group_stack = ContextVar('tk_gui.elements.menu.stack', default=[])
+T = TypeVar('T')
 
 
 class MenuMode(Enum):
@@ -80,6 +82,12 @@ class ContainerMixin:
 
     def __iter__(self) -> Iterator[Union[MenuEntry, MenuItem, MenuGroup]]:
         yield from self.members
+
+    def copy(self: T) -> T:
+        clone = copy(self)
+        for member in clone.members:
+            member.parent = clone
+        return clone
 
 
 def find_member(
@@ -139,7 +147,8 @@ class MenuMeta(ABCMeta, type):
         container = mcs._containers.pop((name, bases))
         container.__exit__()
         cls = super().__new__(mcs, name, bases, namespace)
-        cls.members = container.members
+        members = [m.copy() for mems in (base.members for base in bases if isinstance(base, mcs)) for m in mems]  # noqa
+        cls.members = members + container.members
         del container
         return cls
 
