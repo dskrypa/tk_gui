@@ -86,16 +86,18 @@ class View(HandlesEvents):
         return None
 
     @classmethod
-    def run_all(cls, view: View = None) -> Optional[dict[Key, Any]]:
+    def run_all(cls, view: View = None, *args, **kwargs) -> Optional[dict[Key, Any]]:
         """
         Call the :meth:`.run` method for the specified view (or initialize this class and call it for this class, if no
         view object is provided), and on each subsequent view, if any view is returned by :meth:`.get_next_view`.
 
         :param view: The first :class:`View` to run.
+        :param args: Positional arguments with which this View should be initialized if no ``view`` was provided.
+        :param kwargs: Keyword arguments with which this View should be initialized if no ``view`` was provided.
         :return: The results from the last View that ran.
         """
         if view is None:
-            view = cls()
+            view = cls(*args, **kwargs)
 
         results = None
         while view is not None:
