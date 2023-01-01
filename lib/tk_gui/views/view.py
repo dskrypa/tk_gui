@@ -66,6 +66,7 @@ class View(HandlesEvents):
         window = self.window
         if layout := self.get_layout():
             window.add_rows(layout)
+            # TODO: Need to trigger an update after this or something
         if parent := self.parent:
             if isinstance(parent, View):
                 parent = parent.window
@@ -76,6 +77,33 @@ class View(HandlesEvents):
         with self.window(take_focus=True) as window:
             window.run()
             return window.results
+
+    def get_next_view(self) -> View | None:
+        """
+        Intended to be overwritten by subclasses.  If another view should be run after this one exits, this method
+        should return that view.
+        """
+        return None
+
+    @classmethod
+    def run_all(cls, view: View = None) -> Optional[dict[Key, Any]]:
+        """
+        Call the :meth:`.run` method for the specified view (or initialize this class and call it for this class, if no
+        view object is provided), and on each subsequent view, if any view is returned by :meth:`.get_next_view`.
+
+        :param view: The first :class:`View` to run.
+        :return: The results from the last View that ran.
+        """
+        if view is None:
+            view = cls()
+
+        results = None
+        while view is not None:
+            results = view.run()
+            view = view.get_next_view()
+            log.debug(f'Next {view=}')
+
+        return results
 
 
 class TestView(View, title='Test'):
