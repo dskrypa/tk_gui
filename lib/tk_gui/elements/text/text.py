@@ -252,16 +252,26 @@ class Text(TextValueMixin, Element):
             self._disable_link(old.bind)
 
     def _enable_link(self):
-        widget = self.widget
-        widget.bind(self.__link.bind, self._open_link)
-        link_style = self.style.link
-        widget.configure(cursor='hand2', fg=link_style.fg.default, font=link_style.font.default)
+        widget, link = self.widget, self.__link
+        widget.bind(link.bind, self._open_link)
+        if link.use_link_style:
+            link_style = self.style.link
+            widget.configure(cursor='hand2', fg=link_style.fg.default, font=link_style.font.default)
+        else:
+            widget.configure(cursor='hand2')
 
     def _disable_link(self, link_bind: str):
-        widget = self.widget
+        widget, link = self.widget, self.__link
         widget.unbind(link_bind)
-        text_style = self.style.text
-        widget.configure(cursor='', fg=text_style.fg.default, font=text_style.font.default)
+        if link.use_link_style:
+            if self._use_input_style:
+                input_style = self.style.input
+                widget.configure(cursor='', fg=input_style.fg.disabled, font=input_style.font.disabled)
+            else:
+                text_style = self.style.text
+                widget.configure(cursor='', fg=text_style.fg.default, font=text_style.font.default)
+        else:
+            widget.configure(cursor='')
 
     def _open_link(self, event: Event):
         if not (link := self.link) or self.should_ignore(event):

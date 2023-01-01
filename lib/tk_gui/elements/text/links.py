@@ -25,11 +25,12 @@ _Link = Union[bool, str, 'BindTarget', Path, None]
 
 
 class LinkTarget(ABC):
-    __slots__ = ('bind', '_tooltip')
+    __slots__ = ('bind', '_tooltip', 'use_link_style')
 
-    def __init__(self, bind: str, tooltip: str = None):
+    def __init__(self, bind: str, tooltip: str = None, use_link_style: Bool = True):
         self.bind = bind
         self._tooltip = tooltip
+        self.use_link_style = use_link_style
 
     @property
     def tooltip(self) -> Optional[str]:
@@ -40,7 +41,9 @@ class LinkTarget(ABC):
         raise NotImplementedError
 
     @classmethod
-    def new(cls, value: _Link, bind: str = None, tooltip: str = None, text: str = None) -> Optional[LinkTarget]:
+    def new(
+        cls, value: _Link, bind: str = None, tooltip: str = None, text: str = None, use_link_style: Bool = True
+    ) -> Optional[LinkTarget]:
         if not value:
             return None
         elif isinstance(value, LinkTarget):
@@ -50,7 +53,7 @@ class LinkTarget(ABC):
 
         if isinstance(value, str):
             if value.startswith(('http://', 'https://')):
-                return UrlLink(value, bind, tooltip, url_in_tooltip=value != text)
+                return UrlLink(value, bind, tooltip, use_link_style, url_in_tooltip=value != text)
 
             path = Path(value)
             try:
@@ -58,21 +61,28 @@ class LinkTarget(ABC):
             except OSError:
                 exists = False
             if exists:
-                return PathLink(path, bind, tooltip, path_in_tooltip=path.as_posix() != text)
+                return PathLink(path, bind, tooltip, use_link_style, path_in_tooltip=path.as_posix() != text)
 
             log.debug(f'Ignoring invalid url={value!r}')
             return None
         elif isinstance(value, Path):
-            return PathLink(value, bind, tooltip, path_in_tooltip=value.as_posix() != text)
+            return PathLink(value, bind, tooltip, use_link_style, path_in_tooltip=value.as_posix() != text)
         else:
-            return CallbackLink(value, bind, tooltip)
+            return CallbackLink(value, bind, tooltip, use_link_style)
 
 
 class UrlLink(LinkTarget):
     __slots__ = ('url', 'url_in_tooltip')
 
-    def __init__(self, url: str = None, bind: str = None, tooltip: str = None, url_in_tooltip: Bool = False):
-        super().__init__(CTRL_LEFT_CLICK if not bind and url else bind, tooltip)
+    def __init__(
+        self,
+        url: str = None,
+        bind: str = None,
+        tooltip: str = None,
+        use_link_style: Bool = True,
+        url_in_tooltip: Bool = False,
+    ):
+        super().__init__(CTRL_LEFT_CLICK if not bind and url else bind, tooltip, use_link_style)
         self.url = url
         self.url_in_tooltip = url_in_tooltip
 
@@ -102,10 +112,11 @@ class PathLink(LinkTarget):
         path: str | Path = None,
         bind: str = None,
         tooltip: str = None,
+        use_link_style: Bool = True,
         path_in_tooltip: Bool = False,
         in_file_manager: Bool = True,
     ):
-        super().__init__(CTRL_LEFT_CLICK if not bind and path else bind, tooltip)
+        super().__init__(CTRL_LEFT_CLICK if not bind and path else bind, tooltip, use_link_style)
         self.path = Path(path).expanduser() if not isinstance(path, Path) else path
         self.path_in_tooltip = path_in_tooltip
         self.in_file_manager = in_file_manager
@@ -144,8 +155,8 @@ class PathLink(LinkTarget):
 class CallbackLink(LinkTarget):
     __slots__ = ('callback',)
 
-    def __init__(self, callback: BindTarget, bind: str = None, tooltip: str = None):
-        super().__init__(bind or LEFT_CLICK, tooltip)
+    def __init__(self, callback: BindTarget, bind: str = None, tooltip: str = None, use_link_style: Bool = True):
+        super().__init__(bind or LEFT_CLICK, tooltip, use_link_style)
         self.callback = callback
 
     def open(self, event: Event):
