@@ -58,10 +58,12 @@ class SelectionMenuItem(CustomMenuItem, ABC):
     def maybe_add_selection(self, event: Event | None, kwargs: dict[str, Any] | None):
         if kwargs is None or self.keyword in kwargs:
             return
+
         try:
             widget: BaseWidget = event.widget
         except AttributeError:
             return
+
         try:
             if widget != widget.selection_own_get():
                 return
@@ -84,17 +86,18 @@ class SelectionOrFullMenuItem(SelectionMenuItem, ABC):
     def maybe_add_selection(self, event: Event | None, kwargs: dict[str, Any] | None):
         if kwargs is None or self.keyword in kwargs:
             return
+
         try:
             widget: BaseWidget = event.widget
         except AttributeError:
             return
+
         try:
             if widget == widget.selection_own_get() and (selection := widget.selection_get()):
                 kwargs[self.keyword] = selection
-            else:
-                element = self.root_menu.window[widget]
-                if value := element.value:
-                    kwargs[self.keyword] = value
+            elif text := get_any_text(widget):
+                kwargs[self.keyword] = text
+            # TODO: Add handling for things like table (Treeview) cells/rows?
         except (TclError, AttributeError, KeyError):
             pass
 
@@ -113,7 +116,7 @@ class CopySelection(SelectionOrFullMenuItem):
             return selection  # provides confirmation of what was copied
 
 
-class PasteClipboard(SelectionMenuItem):
+class PasteClipboard(CustomMenuItem):
     __slots__ = ()
 
     def __init__(
@@ -178,6 +181,8 @@ class _PathMenuItem(SelectionMenuItem, ABC):
         if selection := kwargs.get(self.keyword):
             if path := self._normalize(selection):
                 return path
+        # The below works with `SelectionMenuItem` in some cases where omitting the below and
+        # using `SelectionOrFullMenuItem` does not work
         if text := get_any_text(event.widget):
             return self._normalize(text)
         return None
