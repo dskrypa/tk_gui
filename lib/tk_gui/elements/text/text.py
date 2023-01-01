@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Optional, Union, Any
 from tk_gui.constants import LEFT_CLICK
 from tk_gui.enums import Justify, Anchor
 from tk_gui.pseudo_elements.scroll import ScrollableText
-from tk_gui.style import Style, Font
+from tk_gui.style import Style, Font, StyleState
 from tk_gui.utils import max_line_len
 from ..element import Element, Interactive
 from .links import LinkTarget, _Link
@@ -139,13 +139,13 @@ class Text(TextValueMixin, Element):
 
     @property
     def style_config(self) -> dict[str, Any]:
-        style = self.style
+        style, state = self.style, StyleState.DISABLED
         if self._use_input_style:
             return {
                 'highlightthickness': 0,
-                **style.get_map('input', bd='border_width', fg='fg', bg='bg', font='font', relief='relief'),
+                **style.get_map('input', state, bd='border_width', fg='fg', bg='bg', font='font', relief='relief'),
                 **style.get_map('input', 'disabled', readonlybackground='bg'),
-                **style.get_map('insert', insertbackground='bg'),  # Insert cursor (vertical line) color
+                **style.get_map('insert', state, insertbackground='bg'),  # Insert cursor (vertical line) color
                 **self._style_config,
             }
         else:
