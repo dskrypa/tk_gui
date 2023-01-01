@@ -10,101 +10,24 @@ import logging
 import tkinter.constants as tkc
 import webbrowser
 from abc import ABC, abstractmethod
-from contextlib import contextmanager
-from datetime import datetime
 from functools import cached_property, partial
-from tkinter import TclError, StringVar, Label, Event, Entry, BaseWidget
-from typing import TYPE_CHECKING, Optional, Union, Any, Sequence
+from tkinter import StringVar, Label, Event, Entry, BaseWidget
+from typing import TYPE_CHECKING, Optional, Union, Any
 
-from ..constants import LEFT_CLICK, CTRL_LEFT_CLICK
-from ..enums import Justify, Anchor
-from ..pseudo_elements.scroll import ScrollableText
-from ..style import Style, Font
-from ..utils import max_line_len
-from .element import Element, Interactive
+from tk_gui.constants import LEFT_CLICK
+from tk_gui.enums import Justify, Anchor
+from tk_gui.pseudo_elements.scroll import ScrollableText
+from tk_gui.style import Style, Font
+from tk_gui.utils import max_line_len
+from ..element import Element, Interactive
+from .links import LinkTarget, _Link
 
 if TYPE_CHECKING:
-    from ..pseudo_elements import Row
-    from ..typing import Bool, XY, BindTarget
+    from tk_gui.pseudo_elements import Row
+    from tk_gui.typing import Bool, XY, BindTarget
 
-__all__ = ['Text', 'Link', 'Input', 'Multiline', 'GuiTextHandler', 'gui_log_handler', 'normalize_text_ele_widths']
+__all__ = ['Text', 'Link', 'Input', 'Multiline']
 log = logging.getLogger(__name__)
-
-_Link = Union[bool, str, 'BindTarget', None]
-
-# region Link Targets
-
-
-class LinkTarget(ABC):
-    __slots__ = ('bind', '_tooltip')
-
-    def __init__(self, bind: str, tooltip: str = None):
-        self.bind = bind
-        self._tooltip = tooltip
-
-    @property
-    def tooltip(self) -> Optional[str]:
-        return self._tooltip
-
-    @abstractmethod
-    def open(self, event: Event):
-        raise NotImplementedError
-
-    @classmethod
-    def new(cls, value: _Link, bind: str = None, tooltip: str = None, text: str = None) -> Optional[LinkTarget]:
-        if not value:
-            return None
-        elif isinstance(value, LinkTarget):
-            return value
-        elif value is True:
-            value = text
-
-        if isinstance(value, str):
-            if value.startswith(('http://', 'https://')):
-                return UrlLink(value, bind, tooltip, url_in_tooltip=value != text)
-            else:
-                log.debug(f'Ignoring invalid url={value!r}')
-                return None
-        else:
-            return CallbackLink(value, bind, tooltip)
-
-
-class UrlLink(LinkTarget):
-    __slots__ = ('url', 'url_in_tooltip')
-
-    def __init__(self, url: str = None, bind: str = None, tooltip: str = None, url_in_tooltip: bool = False):
-        super().__init__(CTRL_LEFT_CLICK if not bind and url else bind, tooltip)
-        self.url = url
-        self.url_in_tooltip = url_in_tooltip
-
-    @property
-    def tooltip(self) -> str:
-        tooltip = self._tooltip
-        if not (url := self.url):
-            return tooltip
-
-        link_text = url if self.url_in_tooltip else 'link'
-        prefix = f'{tooltip}; open' if tooltip else 'Open'
-        suffix = ' with ctrl + click' if self.bind == CTRL_LEFT_CLICK else ''
-        return f'{prefix} {link_text} in a browser{suffix}'
-
-    def open(self, event: Event):
-        if url := self.url:
-            webbrowser.open(url)
-
-
-class CallbackLink(LinkTarget):
-    __slots__ = ('callback',)
-
-    def __init__(self, callback: BindTarget, bind: str = None, tooltip: str = None):
-        super().__init__(bind or LEFT_CLICK, tooltip)
-        self.callback = callback
-
-    def open(self, event: Event):
-        self.callback(event)
-
-
-# endregion
 
 
 class TextValueMixin:
@@ -164,7 +87,7 @@ class Text(TextValueMixin, Element):
     def __init__(
         self,
         value: Any = '',
-        link: Union[bool, str, BindTarget] = None,
+        link: _Link | LinkTarget = None,
         *,
         justify: Union[str, Justify] = None,
         anchor: Union[str, Anchor] = None,
@@ -291,15 +214,17 @@ class Text(TextValueMixin, Element):
 
     @link.setter
     def link(self, value: Union[LinkTarget, _Link, tuple[Optional[str], _Link]]):
-        if isinstance(value, LinkTarget):
-            self.__link = value
-            return
-        elif isinstance(value, tuple):
+        if isinstance(value, tuple):
             bind, value = value
         else:
             bind = getattr(self.__link, 'bind', None)
 
-        self.__link = LinkTarget.new(value, bind, self._tooltip_text, self._value)
+        if isinstance(value, LinkTarget):
+            if bind is not None:
+                raise TypeError(f'The link={value!r} should be initialized with {bind=} instead of providing both')
+            self.__link = value
+        else:
+            self.__link = LinkTarget.new(value, bind, self._tooltip_text, self._value)
 
     def update_link(self, link: Union[bool, str, BindTarget]):
         old = self.__link
@@ -561,79 +486,5 @@ class Multiline(InteractiveText, disabled_state='disabled'):
         self.widget.configure(**kwargs)
 
 
-# region Log to Element Handling
-
-
-class GuiTextHandler(logging.Handler):
-    def __init__(self, element: Multiline, level: int = logging.NOTSET):
-        super().__init__(level)
-        self.element = element
-
-    def emit(self, record):
-        try:
-            msg = self.format(record)
-            self.element.write(msg + '\n', append=True)
-        except RecursionError:  # See issue 36272
-            raise
-        except TclError:
-            pass  # The element was most likely destroyed
-        except Exception:  # noqa
-            self.handleError(record)
-
-
-class DatetimeFormatter(logging.Formatter):
-    """Enables use of ``%f`` (micro/milliseconds) in datetime formats."""
-
-    def formatTime(self, record, datefmt=None):
-        dt = datetime.fromtimestamp(record.created)
-        if datefmt:
-            return dt.strftime(datefmt)
-        else:
-            t = dt.strftime(self.default_time_format)
-            return self.default_msec_format % (t, record.msecs)
-
-
-@contextmanager
-def gui_log_handler(
-    element: Multiline,
-    logger_name: str = None,
-    level: int = logging.DEBUG,
-    detail: bool = False,
-    logger: logging.Logger = None,
-):
-    handler = GuiTextHandler(element, level)
-    if detail:
-        entry_fmt = '%(asctime)s %(levelname)s %(threadName)s %(name)s %(lineno)d %(message)s'
-        # handler.setFormatter(DatetimeFormatter(entry_fmt, '%Y-%m-%d %H:%M:%S %Z'))
-        handler.setFormatter(DatetimeFormatter(entry_fmt, '%Y-%m-%d %H:%M:%S'))
-
-    loggers = [logging.getLogger(logger_name), logger] if logger else [logging.getLogger(logger_name)]
-    for logger in loggers:
-        logger.addHandler(handler)
-    try:
-        yield handler
-    finally:
-        for logger in loggers:
-            logger.removeHandler(handler)
-
-
-# endregion
-
-
 def _clear_selection(widget: Union[Entry, Text], event: Event = None):
     widget.selection_clear()
-
-
-def normalize_text_ele_widths(rows: Sequence[Sequence[Union[Text, Input]]], column: int = 0):
-    if not rows:
-        return rows
-
-    longest = max(row[column].expected_width for row in rows)
-    if longest < 1:
-        return rows
-
-    for row in rows:
-        ele = row[column]
-        ele.size = (longest, ele.expected_height)
-
-    return rows

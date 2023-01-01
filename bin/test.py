@@ -309,7 +309,13 @@ class GuiTest(Command):
             [HorizontalSeparator()],
             [inpt, Button('Submit', bind_enter=True), Button(image=search_path, shortcut='s', size=(30, 30))],
             [Animation(gif_path)], [SpinnerImage()], [ClockImage(right_click_menu=EleRightClickMenu())],
-            [Text('test'), VerticalSeparator(), Text('link test', link='https://google.com')],
+            [
+                Text('test'),
+                VerticalSeparator(),
+                Text('link test', link='https://google.com'),
+                VerticalSeparator(),
+                Text('path link test', link=Path(__file__).resolve()),
+            ],
             # [Text(f'test_{i:03d}')] for i in range(100)
         ]
 

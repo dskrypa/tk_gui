@@ -10,25 +10,20 @@ import logging
 from abc import ABCMeta
 from contextvars import ContextVar
 from enum import Enum
-from os import startfile
-from pathlib import Path
-from subprocess import Popen
 from tkinter import Event, Entry, Text, BaseWidget, TclError, StringVar
 from typing import TYPE_CHECKING, Optional, Union, Any, Mapping, Iterator, Sequence
 
 # from music.text.extraction import split_enclosed  # TODO: Resolve
-from ...utils import ON_LINUX, ON_WINDOWS
 from .._utils import get_top_level
 from ..exceptions import NoActiveGroup
 
 if TYPE_CHECKING:
-    from ...typing import Bool, EventCallback
+    from tk_gui.typing import Bool, EventCallback
     from .menu import MenuItem, MenuGroup, MenuEntry
 
 __all__ = ['MenuMode', 'CallbackMetadata']
 log = logging.getLogger(__name__)
 
-OPEN_CMD = 'xdg-open' if ON_LINUX else 'open'  # open is for OSX
 _menu_group_stack = ContextVar('tk_gui.elements.menu.stack', default=[])
 
 
@@ -230,6 +225,7 @@ def replace_selection(widget: Union[Entry, Text], text: str, first: Union[str, i
 
 
 def flip_name_parts(text: str) -> str:
+    # TODO: Implement
     return text
     # try:
     #     a, b = split_enclosed(text, maxsplit=1)
@@ -240,24 +236,3 @@ def flip_name_parts(text: str) -> str:
 
 
 # endregion
-
-
-def launch(path: Union[Path, str]):
-    """Open the given path with its associated application"""
-    path = Path(path)
-    if ON_WINDOWS:
-        startfile(str(path))
-    else:
-        Popen([OPEN_CMD, path.as_posix()])
-
-
-def explore(path: Union[Path, str]):
-    """Open the given path in the default file manager"""
-    path = Path(path)
-    if ON_WINDOWS:
-        cmd = list(filter(None, ('explorer', '/select,' if path.is_file() else None, str(path))))
-    else:
-        cmd = [OPEN_CMD, (path if path.is_dir() else path.parent).as_posix()]
-
-    log.debug(f'Running: {cmd}')
-    Popen(cmd)

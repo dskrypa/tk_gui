@@ -6,13 +6,22 @@ Tkinter GUI element utils
 
 from __future__ import annotations
 
+import logging
+from os import startfile
+from pathlib import Path
+from subprocess import Popen
 from tkinter import TclError, Entry, Text, BaseWidget
 from typing import TYPE_CHECKING, Optional, Union, Iterator
 
-if TYPE_CHECKING:
-    from ..typing import XY
+from tk_gui.utils import ON_LINUX, ON_WINDOWS
 
-__all__ = ['normalize_underline', 'get_selection_pos', 'find_descendants', 'get_top_level']
+if TYPE_CHECKING:
+    from tk_gui.typing import XY
+
+__all__ = ['normalize_underline', 'get_selection_pos', 'find_descendants', 'get_top_level', 'launch', 'explore']
+log = logging.getLogger(__name__)
+
+OPEN_CMD = 'xdg-open' if ON_LINUX else 'open'  # open is for OSX
 
 
 def normalize_underline(underline: Union[str, int], label: str) -> Optional[int]:
@@ -53,3 +62,24 @@ def find_descendants(widget: BaseWidget) -> Iterator[BaseWidget]:
 def get_top_level(widget: BaseWidget) -> BaseWidget:
     name = widget._w  # noqa
     return widget.nametowidget('.!'.join(name.split('.!')[:2]))
+
+
+def launch(path: Union[Path, str]):
+    """Open the given path with its associated application"""
+    path = Path(path)
+    if ON_WINDOWS:
+        startfile(str(path))
+    else:
+        Popen([OPEN_CMD, path.as_posix()])
+
+
+def explore(path: Union[Path, str]):
+    """Open the given path in the default file manager"""
+    path = Path(path)
+    if ON_WINDOWS:
+        cmd = list(filter(None, ('explorer', '/select,' if path.is_file() else None, str(path))))
+    else:
+        cmd = [OPEN_CMD, (path if path.is_dir() else path.parent).as_posix()]
+
+    log.debug(f'Running: {cmd}')
+    Popen(cmd)
