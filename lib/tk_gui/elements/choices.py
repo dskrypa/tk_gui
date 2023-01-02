@@ -68,6 +68,12 @@ class Radio(DisableableMixin, Interactive, Generic[T]):
     def select(self):
         self.group.select(self)
 
+    def select_as_callback(self) -> BindCallback:
+        def select_callback(event: Event):
+            self.select()
+
+        return select_callback
+
     @property
     def value(self) -> Union[T, str]:
         if (value := self._value) is not _NotSet:
@@ -259,6 +265,14 @@ class CheckBox(DisableableMixin, Interactive):
         new_val = not tk_var.get()
         tk_var.set(new_val)
         return new_val
+
+    def toggle_as_callback(self) -> BindCallback:
+        """Helper method that returns a callback that can be used by other elements to toggle this checkbox's value."""
+
+        def toggle_callback(event: Event):
+            self.toggle()
+
+        return toggle_callback
 
     @property
     def underline(self) -> Optional[int]:
