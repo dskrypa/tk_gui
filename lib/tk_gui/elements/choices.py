@@ -221,6 +221,7 @@ def get_current_radio_group(silent: bool = False) -> Optional[RadioGroup]:
 
 
 class CheckBox(DisableableMixin, CallbackCommandMixin, Interactive, base_style_layer='checkbox'):
+    __change_cb_name: str | None = None
     widget: Checkbutton
     tk_var: Optional[BooleanVar] = None
     _values: Optional[tuple[B, A]] = None
@@ -303,6 +304,20 @@ class CheckBox(DisableableMixin, CallbackCommandMixin, Interactive, base_style_l
 
     # endregion
 
+    @property
+    def change_cb(self) -> TraceCallback | None:
+        return self._change_cb
+
+    @change_cb.setter
+    def change_cb(self, value: TraceCallback | None):
+        self._change_cb = value
+        if tk_var := self.tk_var:
+            if value is None:
+                if cb_name := self.__change_cb_name:
+                    tk_var.trace_remove('write', cb_name)
+            else:
+                self.__change_cb_name = tk_var.trace_add('write', value)
+
     def pack_into(self, row: Row, column: int):
         self.tk_var = tk_var = BooleanVar(value=self.default)
         kwargs = {
@@ -325,7 +340,7 @@ class CheckBox(DisableableMixin, CallbackCommandMixin, Interactive, base_style_l
         if (callback := self._callback) is not None:
             kwargs['command'] = self.normalize_callback(callback)
         if (change_cb := self._change_cb) is not None:
-            tk_var.trace_add('write', change_cb)
+            self.__change_cb_name = tk_var.trace_add('write', change_cb)
 
         self.widget = Checkbutton(row.frame, **kwargs)
         self.pack_widget()
