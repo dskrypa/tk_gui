@@ -44,10 +44,21 @@ class View(HandlesEvents):
     def __repr__(self) -> str:
         return f'<{self.__class__.__name__}[{self.title}][{self.primary=!r}][handlers: {len(self._event_handlers_)}]>'
 
-    def get_init_layout(self) -> Layout:
+    def get_pre_window_layout(self) -> Layout:  # noqa
+        """
+        Intended to be overridden by subclasses to provide their layouts.
+
+        Called by :meth:`.init_window` before the :class:`.Window` is initialized.
+        """
         return []
 
-    def get_layout(self) -> Layout:
+    def get_post_window_layout(self) -> Layout:  # noqa
+        """
+        Intended to be overridden by subclasses to provide their layouts.
+
+        Called by :meth:`.finalize_window` after the :class:`.Window` is initialized.  May be used for elements that
+        need to obtain some information from the window before they can be initialized/rendered properly.
+        """
         return []
 
     def init_window(self) -> Window:
@@ -56,7 +67,7 @@ class View(HandlesEvents):
 
         binds = window_kwargs.setdefault('binds', {})
         binds.update(self.event_handler_binds())
-        return Window(self.get_init_layout(), title=self.title, **window_kwargs)
+        return Window(self.get_pre_window_layout(), title=self.title, **window_kwargs)
 
     @cached_property
     def window(self) -> Window:
@@ -64,9 +75,9 @@ class View(HandlesEvents):
 
     def finalize_window(self) -> Window:
         window = self.window
-        if layout := self.get_layout():
-            window.add_rows(layout)
-            # TODO: Need to trigger an update after this or something
+        if layout := self.get_post_window_layout():
+            window.add_rows(layout, pack=True)
+            window._update_idle_tasks()
         if parent := self.parent:
             if isinstance(parent, View):
                 parent = parent.window
@@ -74,11 +85,12 @@ class View(HandlesEvents):
         return window
 
     def run(self) -> dict[Key, Any]:
-        with self.window(take_focus=True) as window:
+        window = self.finalize_window()
+        with window(take_focus=True):
             window.run()
             return window.results
 
-    def get_next_view(self) -> View | None:
+    def get_next_view(self) -> View | None:  # noqa
         """
         Intended to be overwritten by subclasses.  If another view should be run after this one exits, this method
         should return that view.

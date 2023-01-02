@@ -247,8 +247,12 @@ class GuiTest(Command):
                 result = options.run_popup()
                 return result
 
-            def get_init_layout(self):
-                return [[self.menu], [Input(key='test_input', size=(40, 1))]]
+            def get_pre_window_layout(self):
+                yield [self.menu]
+
+            def get_post_window_layout(self):
+                yield [Input(key='test_input', size=(40, 1))]
+
 
         TestView().run()
 

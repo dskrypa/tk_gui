@@ -663,6 +663,9 @@ class Window(RowContainer):
         for element in self.all_elements:
             element.update_style()
 
+    def _update_idle_tasks(self):
+        self._root.update_idletasks()
+
     # endregion
 
     # region Show Window Methods

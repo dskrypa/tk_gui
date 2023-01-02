@@ -19,7 +19,7 @@ from ..utils import Inheritable
 
 if TYPE_CHECKING:
     from ..elements.element import Element, ElementBase
-    from ..typing import XY
+    from ..typing import Bool, XY
     from ..window import Window
     from .row_container import RowContainer
 
@@ -111,7 +111,7 @@ class RowBase(ABC):
         else:
             return item in self.elements
 
-    def pack_elements(self, debug: bool = False):
+    def pack_elements(self, debug: Bool = False):
         if debug:
             n_eles = len(self.elements)
             for i, ele in enumerate(self.elements):
@@ -146,7 +146,7 @@ class Row(RowBase):
     def anchor(self):
         return self.anchor_elements.value
 
-    def pack(self, debug: bool = False):
+    def pack(self, debug: Bool = False):
         # log.debug(f'Packing row {self.num} in {self.parent=} {self.parent.tk_container=}')
         self.frame = frame = Frame(self.parent.tk_container)
         self.pack_elements(debug)

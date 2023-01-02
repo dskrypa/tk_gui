@@ -101,10 +101,19 @@ class RowContainer(ABC):
         self.scroll_y_div = scroll_y_div
         self.scroll_x_div = scroll_x_div
 
-    def add_rows(self, layout: Layout):
+    def __repr__(self) -> str:
+        return f'<{self.__class__.__name__}[{self._id}]>'
+
+    def add_rows(self, layout: Layout, pack: Bool = False, debug: Bool = False):
         rows = self.rows
-        for i, row in enumerate(layout, len(rows)):
-            rows.append(Row(self, row, i))
+        n_rows = len(rows)
+        for i, raw_row in enumerate(layout, n_rows):
+            row = Row(self, raw_row, i)
+            rows.append(row)
+            if pack:
+                if debug:
+                    log.debug(f'Packing row {i} / {n_rows}')
+                row.pack(debug)
 
     @property
     @abstractmethod
@@ -120,6 +129,8 @@ class RowContainer(ABC):
     @abstractmethod
     def window(self) -> Window:
         raise NotImplementedError
+
+    # region Widget / Element Contents
 
     @cached_property
     def widgets(self) -> list[BaseWidget]:
@@ -189,9 +200,6 @@ class RowContainer(ABC):
 
         return [e for e in self.widget_element_map.values() if isinstance(e, (ElementBase, Row))]
 
-    def __repr__(self) -> str:
-        return f'<{self.__class__.__name__}[{self._id}]>'
-
     def __getitem__(self, item: Union[str, BaseWidget, tuple[int, int]]) -> ElementBase:
         if isinstance(item, str):
             try:
@@ -225,6 +233,8 @@ class RowContainer(ABC):
         elif isinstance(item, BaseWidget):
             return item in self.widget_element_map
         return item in self.element_widgets_map
+
+    # endregion
 
     def _scroll_divisors(self) -> tuple[float, float]:
         x_div, y_div = self.scroll_x_div, self.scroll_y_div

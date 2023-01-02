@@ -17,7 +17,6 @@ from .elements.choices import Combo, ListBox, CheckBox, make_checkbox_grid
 from .elements import Text, Element, Button, Input, Submit, Frame
 from .elements.text import normalize_text_ele_widths
 from .popups import PickFolder, Popup
-from .views.view import View
 
 if TYPE_CHECKING:
     from tkinter import Event
@@ -544,22 +543,9 @@ class GuiOptions:
             self._default_row = old_row
 
     def run_popup(self, **kwargs):
+        from .views.options import GuiOptionsView
+
         return GuiOptionsView(self, **kwargs).run()
-
-
-class GuiOptionsView(View, title='Options', primary=False):
-    window_kwargs = {'exit_on_esc': True}
-
-    def __init__(self, gui_options: GuiOptions, **kwargs):
-        super().__init__(**kwargs)
-        self.gui_options = gui_options
-
-    def get_init_layout(self):
-        return self.gui_options.layout()
-
-    def run(self):
-        data = super().run()
-        return self.gui_options.parse(data)  # noqa
 
 
 class GuiOptionError(Exception):
