@@ -284,14 +284,7 @@ class Element(ElementBase, ABC):
             self.add_tooltip(tooltip)
 
     def pack_widget(
-        self,
-        *,
-        expand: bool = None,
-        fill: TkFill = None,
-        focus: bool = False,
-        disabled: bool = False,
-        widget: Widget = None,
-        **kwargs,
+        self, *, expand: bool = None, fill: TkFill = None, focus: bool = False, widget: Widget = None, **kwargs
     ):
         if not widget:
             widget = self.widget
@@ -299,8 +292,6 @@ class Element(ElementBase, ABC):
         self._pack_widget(widget, expand, fill, kwargs)
         if focus:
             self.parent.window.maybe_set_focus(self, widget)
-        if disabled:  # TODO: Handle state=disabled separately from readonly
-            widget['state'] = 'readonly' if disabled is True else disabled
 
     def _pack_widget(self, widget: Widget, expand: bool, fill: TkFill, kwargs: dict[str, Any]):
         if expand is None:
@@ -430,6 +421,7 @@ class Element(ElementBase, ABC):
 
 
 class InteractiveMixin:
+    widget: Optional[Widget]
     style: Style
     _base_style_layer: str | None
     disabled: bool = False
@@ -460,7 +452,7 @@ class InteractiveMixin:
         return self.style.base, self.style_state
 
     def pack_widget(self, *, expand: bool = False, fill: TkFill = tkc.NONE, **kwargs):
-        super().pack_widget(expand=expand, fill=fill, focus=self.focus, disabled=self.disabled, **kwargs)  # noqa
+        super().pack_widget(expand=expand, fill=fill, focus=self.focus, **kwargs)  # noqa
 
     def enable(self):
         raise NotImplementedError

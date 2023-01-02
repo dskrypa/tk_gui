@@ -19,6 +19,7 @@ from tk_gui.pseudo_elements.scroll import ScrollableText
 from tk_gui.style import Style, Font, StyleState, StyleLayer
 from tk_gui.utils import max_line_len, call_with_popped
 from ..element import Element, Interactive
+from ..mixins import DisableableMixin
 from .links import LinkTarget, _Link
 
 if TYPE_CHECKING:
@@ -304,13 +305,7 @@ class Link(Text):
         super().__init__(value, link=link, link_bind=link_bind, **kwargs)
 
 
-class InteractiveText(Interactive, ABC):
-    _disabled_state: str
-
-    def __init_subclass__(cls, disabled_state: str, **kwargs):  # noqa
-        super().__init_subclass__(**kwargs)
-        cls._disabled_state = disabled_state
-
+class InteractiveText(DisableableMixin, Interactive, ABC):
     @property
     def base_style_layer_and_state(self) -> tuple[StyleLayer, StyleState]:
         return self.style.input, self.style_state
@@ -326,7 +321,7 @@ class InteractiveText(Interactive, ABC):
         self._update_state(False)
 
     def _update_state(self, disabled: bool):
-        self.widget['state'] = self._disabled_state if disabled else 'normal'
+        self.widget['state'] = self._disabled_state if disabled else self._enabled_state
         self.disabled = disabled
         self._refresh_colors()
 
@@ -468,6 +463,8 @@ class Multiline(InteractiveText, disabled_state='disabled'):
                 kwargs['width'] = max_line_len(lines)
         elif 'width' not in kwargs:
             kwargs['width'] = max_line_len(value.splitlines())
+        if self.disabled:
+            kwargs['state'] = self._disabled_state
 
         """
         maxundo:
