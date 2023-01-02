@@ -17,7 +17,7 @@ from tk_gui.constants import LEFT_CLICK
 from tk_gui.enums import Justify, Anchor
 from tk_gui.pseudo_elements.scroll import ScrollableText
 from tk_gui.style import Style, Font, StyleState, StyleLayer
-from tk_gui.utils import max_line_len
+from tk_gui.utils import max_line_len, call_with_popped
 from ..element import Element, Interactive
 from .links import LinkTarget, _Link
 
@@ -79,7 +79,7 @@ class TextValueMixin:
             return 1
 
 
-class Linkable(ABC):
+class LinkableMixin:
     __link: Optional[LinkTarget] = None
     _tooltip_text: str | None
     add_tooltip: Callable
@@ -88,9 +88,12 @@ class Linkable(ABC):
     size_and_pos: tuple[XY, XY]
     value: str
 
-    def __init__(self, link: _Link | LinkTarget = None, link_bind: str = None, tooltip_text: str = None):
+    def init_linkable(self, link: _Link | LinkTarget = None, link_bind: str = None, tooltip_text: str = None):
         self._tooltip_text = tooltip_text
         self.link = (link_bind, link)
+
+    def init_linkable_from_kwargs(self, kwargs: dict[str, Any]):
+        call_with_popped(self.init_linkable, ('link', 'link_bind', 'tooltip_text'), kwargs)
 
     @property
     def tooltip_text(self) -> str:
@@ -167,7 +170,7 @@ class Linkable(ABC):
         link.open(event)
 
 
-class Text(TextValueMixin, Linkable, Element):
+class Text(TextValueMixin, LinkableMixin, Element):
     widget: Union[Label, Entry]
 
     def __init__(
@@ -184,12 +187,12 @@ class Text(TextValueMixin, Linkable, Element):
         **kwargs,
     ):
         self.value = value
-        Linkable.__init__(self, link, link_bind, kwargs.pop('tooltip', None))
+        self.init_linkable(link, link_bind, kwargs.pop('tooltip', None))
         if justify is anchor is None:
             justify = Justify.LEFT
             if not selectable:
                 anchor = Justify.LEFT.as_anchor()
-        Element.__init__(self, justify_text=justify, anchor=anchor, **kwargs)
+        super().__init__(justify_text=justify, anchor=anchor, **kwargs)
         self._selectable = selectable
         self._auto_size = auto_size
         self._use_input_style = use_input_style
@@ -330,7 +333,7 @@ class InteractiveText(Interactive, ABC):
         raise NotImplementedError
 
 
-class Input(TextValueMixin, Linkable, InteractiveText, disabled_state='readonly', move_cursor=True):
+class Input(TextValueMixin, LinkableMixin, InteractiveText, disabled_state='readonly', move_cursor=True):
     widget: Entry
     password_char: Optional[str] = None
 
@@ -346,8 +349,8 @@ class Input(TextValueMixin, Linkable, InteractiveText, disabled_state='readonly'
         **kwargs,
     ):
         self.value = value
-        Linkable.__init__(self, link, link_bind, kwargs.pop('tooltip', None))
-        Interactive.__init__(self, justify_text=justify_text, **kwargs)
+        self.init_linkable(link, link_bind, kwargs.pop('tooltip', None))
+        super().__init__(justify_text=justify_text, **kwargs)
         self._callback = callback
         if password_char:
             self.password_char = password_char

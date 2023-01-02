@@ -21,8 +21,9 @@ from ..pseudo_elements.scroll import ScrollableListbox
 from ..typing import Bool, T, BindTarget, BindCallback
 from ..utils import max_line_len
 from ._utils import normalize_underline
-from .element import Interactive, DisableableMixin
+from .element import Interactive
 from .exceptions import NoActiveGroup, BadGroupCombo
+from .mixins import DisableableMixin, CallbackCommandMixin
 
 if TYPE_CHECKING:
     from ..pseudo_elements import Row
@@ -35,10 +36,11 @@ _radio_group_stack = ContextVar('tk_gui.elements.choices.radio.stack', default=[
 A = TypeVar('A')
 B = TypeVar('B')
 
+
 # region Radio
 
 
-class Radio(DisableableMixin, Interactive, Generic[T]):
+class Radio(DisableableMixin, CallbackCommandMixin, Interactive, Generic[T]):
     widget: Radiobutton
 
     def __init__(
@@ -218,7 +220,7 @@ def get_current_radio_group(silent: bool = False) -> Optional[RadioGroup]:
 # region CheckBox
 
 
-class CheckBox(DisableableMixin, Interactive):
+class CheckBox(DisableableMixin, CallbackCommandMixin, Interactive):
     widget: Checkbutton
     tk_var: Optional[BooleanVar] = None
     _values: Optional[tuple[B, A]] = None
@@ -241,6 +243,8 @@ class CheckBox(DisableableMixin, Interactive):
         self._callback = callback
         if not (true_value is false_value is None):
             self._values = (false_value, true_value)
+
+    # region Value-related Methods
 
     @property
     def value(self) -> Union[bool, A, B]:
@@ -274,6 +278,10 @@ class CheckBox(DisableableMixin, Interactive):
 
         return toggle_callback
 
+    # endregion
+
+    # region Style Methods
+
     @property
     def underline(self) -> Optional[int]:
         return normalize_underline(self._underline, self.label)
@@ -290,6 +298,8 @@ class CheckBox(DisableableMixin, Interactive):
             **style.get_map('selected', self.style_state, selectcolor='fg'),
             **self._style_config,
         }
+
+    # endregion
 
     def pack_into(self, row: Row, column: int):
         self.tk_var = tk_var = BooleanVar(value=self.default)
@@ -365,6 +375,8 @@ class Combo(DisableableMixin, Interactive, disabled_state='disable', enabled_sta
         except TypeError:
             return choice
 
+    # region Style Methods
+
     def _prepare_ttk_style(self) -> str:
         style, state = self.style, self.style_state
         ttk_style_name, ttk_style = style.make_ttk_style('.TCombobox')
@@ -385,6 +397,18 @@ class Combo(DisableableMixin, Interactive, disabled_state='disable', enabled_sta
             **style.get_map('combo', state, font='font'),
             **self._style_config,
         }
+
+    # endregion
+
+    @property
+    def callback(self) -> BindTarget | None:
+        return self._callback
+
+    @callback.setter
+    def callback(self, callback: BindTarget | None):
+        self._callback = callback
+        if widget := self.widget:
+            widget.bind('<<ComboboxSelected>>', self.normalize_callback(callback))
 
     def pack_into(self, row: Row, column: int):
         self.tk_var = tk_var = StringVar()
@@ -429,7 +453,6 @@ class Combo(DisableableMixin, Interactive, disabled_state='disable', enabled_sta
 
 class ListBox(DisableableMixin, Interactive):
     widget: ScrollableListbox
-    callback: Optional[BindCallback] = None
 
     def __init__(
         self,
@@ -523,6 +546,17 @@ class ListBox(DisableableMixin, Interactive):
             **self._style_config,
         }
 
+    @property
+    def callback(self) -> BindTarget | None:
+        return self._callback
+
+    @callback.setter
+    def callback(self, callback: BindTarget | None):
+        if self.widget:
+            self._callback = self.normalize_callback(callback)
+        else:
+            self._callback = callback
+
     def pack_into(self, row: Row, column: int):
         kwargs = {
             'exportselection': False,  # Prevent selections in this box from affecting others / the primary selection
@@ -550,7 +584,7 @@ class ListBox(DisableableMixin, Interactive):
         self.pack_widget()
         list_box.bind('<<ListboxSelect>>', self._handle_selection_made)
         if (callback := self._callback) is not None:
-            self.callback = self.normalize_callback(callback)
+            self._callback = self.normalize_callback(callback)
 
     @cached_property
     def widgets(self) -> list[BaseWidget]:

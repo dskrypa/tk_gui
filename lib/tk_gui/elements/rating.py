@@ -215,6 +215,7 @@ class Rating(InteractiveRowFrame):
             return
         widget = self.star_element.widget
         widget.unbind('<Button-1>')
+        widget.unbind('<ButtonRelease-1>')
         widget.unbind('<B1-Motion>')
         if rating_input := self.rating_input:
             rating_input.string_var.trace_remove('write', self._val_change_cb)

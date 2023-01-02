@@ -18,7 +18,8 @@ from PIL.ImageTk import PhotoImage
 
 from ..enums import Justify
 from ..images import as_image, scale_image
-from .element import Interactive, DisableableMixin
+from .element import Interactive
+from .mixins import DisableableMixin
 
 if TYPE_CHECKING:
     from PIL.Image import Image as PILImage

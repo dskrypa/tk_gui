@@ -28,7 +28,7 @@ if TYPE_CHECKING:
     from ..window import Window
     from .menu import Menu
 
-__all__ = ['ElementBase', 'Element', 'Interactive', 'InteractiveMixin', 'DisableableMixin']
+__all__ = ['ElementBase', 'Element', 'Interactive', 'InteractiveMixin']
 log = logging.getLogger(__name__)
 
 _DIRECT_ATTRS = {'key', 'right_click_menu', 'left_click_cb', 'binds', 'data'}
@@ -438,29 +438,3 @@ class Interactive(InteractiveMixin, Element, ABC):
     def __init__(self, disabled: Bool = False, focus: Bool = False, valid: Bool = True, **kwargs):
         super().__init__(**kwargs)
         self.init_interactive(disabled, focus, valid)
-
-
-class DisableableMixin:
-    widget: Optional[Widget]
-    disabled: bool
-    _disabled_state: str = 'disabled'
-    _enabled_state: str = 'normal'
-
-    def __init_subclass__(cls, disabled_state: str = None, enabled_state: str = None, **kwargs):
-        super().__init_subclass__(**kwargs)
-        if disabled_state:
-            cls._disabled_state = disabled_state
-        if enabled_state:
-            cls._enabled_state = enabled_state
-
-    def enable(self):
-        if not self.disabled:
-            return
-        self.widget['state'] = self._enabled_state
-        self.disabled = False
-
-    def disable(self):
-        if self.disabled:
-            return
-        self.widget['state'] = self._disabled_state
-        self.disabled = True
