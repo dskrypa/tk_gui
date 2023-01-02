@@ -457,6 +457,13 @@ class Window(RowContainer):
             height = max_height
         self.size = (width, height)
 
+    def update_scroll_region(self, size: Optional[XY] = None):
+        outer, inner = self._root, self.root
+        if outer != inner:
+            self._update_scroll_region(outer, inner, size)
+        else:
+            raise TypeError(f'Unable to update scroll region for non-scrollable window={self!r}')
+
     # endregion
 
     @property
@@ -727,7 +734,7 @@ class Window(RowContainer):
         outer = self._init_root()
         self.pack_rows()
         if (inner := self.root) != outer:  # outer is scrollable
-            self.pack_container(outer, inner, self._get_init_inner_size(inner))
+            self._update_scroll_region(outer, inner, self._get_init_inner_size(inner))
         else:
             outer.configure(padx=self.margins[0], pady=self.margins[1])
 

@@ -244,7 +244,7 @@ class RowContainer(ABC):
             y_div = 1.5
         return x_div, y_div
 
-    def pack_container(self, outer: ScrollableContainer, inner: TkContainer, size: Optional[XY]):
+    def _update_scroll_region(self, outer: ScrollableContainer, inner: TkContainer, size: Optional[XY]):
         inner.update()
         try:
             width, height = size

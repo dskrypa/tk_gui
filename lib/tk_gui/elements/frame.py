@@ -20,7 +20,7 @@ from ..utils import call_with_popped
 from .element import Element, InteractiveMixin
 
 if TYPE_CHECKING:
-    from ..typing import Layout, Bool
+    from ..typing import Layout, Bool, XY
     from ..pseudo_elements.row import Row
 
 __all__ = ['RowFrame', 'InteractiveRowFrame', 'Frame', 'InteractiveFrame', 'ScrollFrame']
@@ -268,5 +268,8 @@ class ScrollFrame(Element, RowContainer):
         self.widget = outer_frame = outer_cls(self.parent.frame, self.scroll_y, self.scroll_x, **kwargs)
         self.inner_frame = inner_frame = outer_frame.inner_widget
         self.pack_rows()
-        self.pack_container(outer_frame, inner_frame, self.size)
+        self._update_scroll_region(outer_frame, inner_frame, self.size)
         self.pack_widget()
+
+    def update_scroll_region(self, size: Optional[XY] = None):
+        self._update_scroll_region(self.widget, self.inner_frame, size)

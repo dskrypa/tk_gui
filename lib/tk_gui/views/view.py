@@ -78,6 +78,10 @@ class View(HandlesEvents):
         if layout := self.get_post_window_layout():
             window.add_rows(layout, pack=True)
             window._update_idle_tasks()
+            try:
+                window.update_scroll_region()
+            except TypeError:  # It was not scrollable
+                pass
         if parent := self.parent:
             if isinstance(parent, View):
                 parent = parent.window
