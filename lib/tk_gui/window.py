@@ -14,7 +14,7 @@ from time import monotonic
 from tkinter import Tk, Toplevel, PhotoImage, TclError, Event, CallWrapper, Frame, BaseWidget
 from tkinter.ttk import Sizegrip, Scrollbar, Treeview
 from typing import TYPE_CHECKING, Optional, Union, Type, Any, Iterable, Callable, Literal, overload
-from weakref import finalize
+from weakref import finalize, WeakSet
 
 from PIL import ImageGrab
 
@@ -119,6 +119,7 @@ class Window(RowContainer):
     __hidden_root = None
     _tk_event_handlers: dict[str, str] = {}
     _always_bind_events: set[BindEvent] = set()
+    _instances: WeakSet[Window] = WeakSet()
     # endregion
     # region Instance Attrs (with defaults)
     __focus_widget: Optional[BaseWidget] = None
@@ -217,6 +218,7 @@ class Window(RowContainer):
         **kwargs,
         # kill_others_on_close: Bool = False,
     ):
+        self._instances.add(self)
         self.title = title or ProgramMetadata('').name.replace('_', ' ').title()
         cfg = extract_kwargs(kwargs, {'size', 'position'})
         self._config = (config_name or title, config_path, cfg if config is None else (config | cfg))
@@ -1019,6 +1021,13 @@ class Window(RowContainer):
             height += self.title_bar_height
 
         return ImageGrab.grab((x, y, x + width, y + height))
+
+    @classmethod
+    def get_active_windows(cls, is_popup: Bool = None) -> list[Window]:
+        if is_popup is None:
+            return [w for w in cls._instances if not w.closed]
+        else:
+            return [w for w in cls._instances if not w.closed and w.is_popup == is_popup]
 
 
 def _normalize_bind_event(event_pat: Bindable) -> Bindable:
