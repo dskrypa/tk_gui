@@ -223,7 +223,7 @@ class GuiTest(Command):
 
             @menu['File']['Select File'].callback
             def select_file_handler(self, event):
-                path = PickFile().run()
+                path = PickFile(title='Pick a File').run()
                 try:
                     path_str = path.as_posix()
                 except AttributeError:
@@ -303,10 +303,10 @@ class GuiTest(Command):
         class MenuBar(Menu):
             with MenuGroup('File'):
                 # MenuItem('Open', print)
-                MenuItem('Pick Color', PickColor.as_callback('#1c1e23'))
+                MenuItem('Pick Color', PickColor.as_callback('#1c1e23', title='Pick a Color'))
                 CloseWindow()
             with MenuGroup('Help'):
-                MenuItem('About', AboutPopup.as_callback())
+                MenuItem('About', AboutPopup)
 
         frame_layout = [
             [MenuBar()],

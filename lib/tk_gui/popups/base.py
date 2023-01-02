@@ -7,6 +7,7 @@ Tkinter GUI base popups
 from __future__ import annotations
 
 import logging
+from abc import ABC, abstractmethod
 from concurrent.futures import Future
 from functools import cached_property
 from queue import Queue
@@ -30,7 +31,41 @@ log = logging.getLogger(__name__)
 POPUP_QUEUE = Queue()
 
 
-class Popup(HandlesEvents):
+class BasePopup(ABC):
+    __slots__ = ('title', 'parent')
+
+    _default_title: str = None
+
+    def __init_subclass__(cls, title: str = None, **kwargs):
+        super().__init_subclass__(**kwargs)
+        if title:
+            cls._default_title = title
+
+    def __init__(self, title: str = None, parent: Window = None):
+        self.title = title or self._default_title
+        self.parent = parent
+
+    @classmethod
+    def as_callback(cls, *args, **kwargs) -> Callable:
+        def callback(event: Event = None):
+            return cls(*args, **kwargs).run()
+
+        return callback
+
+    @abstractmethod
+    def _run(self) -> dict[Key, Any]:
+        raise NotImplementedError
+
+    def run(self):
+        if current_thread() == main_thread():
+            return self._run()
+
+        future = Future()
+        POPUP_QUEUE.put((future, self._run, (), {}))
+        return future.result()
+
+
+class Popup(BasePopup, HandlesEvents):
     def __init__(
         self,
         layout: Layout = (),
@@ -42,9 +77,8 @@ class Popup(HandlesEvents):
         can_minimize: Bool = False,
         **kwargs
     ):
-        self.title = title
+        super().__init__(title, parent)
         self.layout = layout
-        self.parent = parent
         kwargs['keep_on_top'] = keep_on_top
         kwargs['can_minimize'] = can_minimize
         binds = kwargs.setdefault('binds', {})
@@ -52,13 +86,6 @@ class Popup(HandlesEvents):
             binds['<Escape>'] = 'exit'
         binds.update(self.event_handler_binds())
         self.window_kwargs = kwargs
-
-    @classmethod
-    def as_callback(cls, *args, **kwargs) -> Callable:
-        def callback(event: Event = None):
-            return cls(*args, **kwargs).run()
-
-        return callback
 
     def get_layout(self) -> Layout:
         return self.layout
@@ -77,14 +104,6 @@ class Popup(HandlesEvents):
         with self.window(take_focus=True) as window:
             window.run()
             return window.results
-
-    def run(self):
-        if current_thread() == main_thread():
-            return self._run()
-
-        future = Future()
-        POPUP_QUEUE.put((future, self._run, (), {}))
-        return future.result()
 
 
 class BasicPopup(Popup):
