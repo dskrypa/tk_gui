@@ -15,11 +15,11 @@ from PIL.Image import Image as PILImage, new as new_image
 from PIL.ImageDraw import ImageDraw, Draw
 from PIL.ImageFont import FreeTypeFont, truetype
 
-from .color import Color, color_to_rgb
+from .color import color_to_rgb
 from .utils import ICONS_DIR
 
 if TYPE_CHECKING:
-    from ..typing import XY
+    from ..typing import XY, Color
 
 __all__ = ['Icons']
 

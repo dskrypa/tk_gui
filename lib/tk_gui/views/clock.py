@@ -16,8 +16,7 @@ from ..window import Window
 
 if TYPE_CHECKING:
     from tkinter import Event
-    from ..typing import XY
-    from ..images.color import Color
+    from ..typing import XY, Color
 
 __all__ = ['ClockView']
 
