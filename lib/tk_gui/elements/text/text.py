@@ -413,6 +413,7 @@ class Input(TextValueMixin, LinkableMixin, InteractiveText, disabled_state='read
 
 class Multiline(InteractiveText, disabled_state='disabled'):
     widget: ScrollableText
+    _read_only: Bool = False
 
     def __init__(
         self,
@@ -424,15 +425,51 @@ class Multiline(InteractiveText, disabled_state='disabled'):
         rstrip: bool = False,
         justify_text: Union[str, Justify, None] = Justify.LEFT,
         callback: BindTarget = None,
+        read_only: Bool = False,
         **kwargs,
     ):
         super().__init__(justify_text=justify_text, **kwargs)
+        self.__entered = False
         self._value = str(value)
         self.scroll_y = scroll_y
         self.scroll_x = scroll_x
         self.auto_scroll = auto_scroll
         self.rstrip = rstrip
         self._callback = callback
+        self._read_only = read_only
+
+    @property
+    def read_only(self) -> Bool:
+        return self._read_only
+
+    @read_only.setter
+    def read_only(self, value: Bool):
+        if self.__entered:
+            raise RuntimeError(f'{self} does not support changing read-only status while in its context')
+        old = self._read_only
+        self._read_only = value
+        if self.disabled:
+            return
+        if ((old and not value) or (not old and value)) and (widget := self.widget):
+            widget.inner_widget.configure(state='disabled' if value else 'normal')  # noqa
+
+    def disable(self):
+        if self.__entered:
+            raise RuntimeError(f'{self} does not support changing disabled status while in its context')
+        super().disable()
+
+    def enable(self):
+        if self.__entered:
+            raise RuntimeError(f'{self} does not support changing disabled status while in its context')
+        super().enable()
+
+    def _update_state(self, disabled: bool):
+        old_state = 'disabled' if self.disabled or self._read_only else 'normal'
+        new_state = 'disabled' if disabled or self._read_only else 'normal'
+        if old_state != new_state:
+            self.widget.inner_widget.configure(state=new_state)  # noqa
+        self.disabled = disabled
+        self._refresh_colors()
 
     @property
     def style_config(self) -> dict[str, Any]:
@@ -463,18 +500,8 @@ class Multiline(InteractiveText, disabled_state='disabled'):
                 kwargs['width'] = max_line_len(lines)
         elif 'width' not in kwargs:
             kwargs['width'] = max_line_len(value.splitlines())
-        if self.disabled:
-            kwargs['state'] = self._disabled_state
 
-        """
-        maxundo:
-        spacing1:
-        spacing2:
-        spacing3:
-        tabs:
-        undo:
-        wrap:
-        """
+        # Other keys:  maxundo:  spacing1:  spacing2:  spacing3:  tabs:  undo:  wrap:
         self.widget = scroll_text = ScrollableText(row.frame, self.scroll_y, self.scroll_x, self.style, **kwargs)
         text = scroll_text.inner_widget
         if value:
@@ -488,38 +515,58 @@ class Multiline(InteractiveText, disabled_state='disabled'):
         if (callback := self._callback) is not None:
             text.bind('<Key>', self.normalize_callback(callback))
 
+        if self.disabled or self._read_only:
+            # Note: This needs to occur after setting any text value, otherwise the text does not appear.
+            text.configure(state='disabled')
+
+    def __enter__(self) -> Multiline:
+        if self.__entered:
+            raise RuntimeError(f'{self} does not support entering its context multiple times')
+        self.__entered = True
+        if self._read_only and not self.disabled:
+            self.widget.inner_widget.configure(state='normal')
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.__entered = False
+        if self._read_only and not self.disabled:
+            self.widget.inner_widget.configure(state='disabled')
+
     def clear(self):
-        self.widget.inner_widget.delete('1.0', tkc.END)
+        with self:
+            self.widget.inner_widget.delete('1.0', tkc.END)
 
     def write(self, text: str, *, fg: str = None, bg: str = None, font: Font = None, append: Bool = False):
-        widget = self.widget.inner_widget
-        # TODO: Handle justify
-        if fg or bg or font:
-            style = Style(parent=self.style, text_fg=fg, text_bg=bg, text_font=font)
-            tag = f'{self.__class__.__name__}({fg},{bg},{font})'
-            widget.tag_configure(tag, **style.get_map('text', background='bg', foreground='fg', font='font'))
-            args = ((None, tag),)
-        else:
-            args = ()
+        with self:
+            widget = self.widget.inner_widget
+            # TODO: Handle justify
+            if fg or bg or font:
+                style = Style(parent=self.style, text_fg=fg, text_bg=bg, text_font=font)
+                tag = f'{self.__class__.__name__}({fg},{bg},{font})'
+                widget.tag_configure(tag, **style.get_map('text', background='bg', foreground='fg', font='font'))
+                args = ((None, tag),)
+            else:
+                args = ()
 
-        if not append:
-            self.clear()
+            if not append:
+                self.clear()
 
-        if self.rstrip:
-            text = '\n'.join(line.rstrip() for line in text.splitlines())
+            if self.rstrip:
+                text = '\n'.join(line.rstrip() for line in text.splitlines())
 
-        widget.insert(tkc.END, text, *args)
-        if self.auto_scroll:
-            widget.see(tkc.END)
+            widget.insert(tkc.END, text, *args)
+            if self.auto_scroll:
+                widget.see(tkc.END)
 
     @cached_property
     def widgets(self) -> list[BaseWidget]:
         return self.widget.widgets
 
     def _refresh_colors(self):
-        kwargs = self.style.get_map('text', self.style_state, fg='fg', bg='bg')
-        log.debug(f'Refreshing colors for {self} with {self.style_state=}: {kwargs}')
-        self.widget.configure(**kwargs)
+        with self:
+            kwargs = self.style.get_map('text', self.style_state, fg='fg', bg='bg')
+            log.debug(f'Refreshing colors for {self} with {self.style_state=}: {kwargs}')
+            self.widget.configure(**kwargs)
 
 
 def _clear_selection(widget: Union[Entry, Text], event: Event = None):
