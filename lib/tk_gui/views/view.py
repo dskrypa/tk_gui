@@ -24,25 +24,27 @@ log = logging.getLogger(__name__)
 class View(HandlesEvents):
     window_kwargs: Optional[dict[str, Any]] = None
     parent: Union[View, Window] = None
-    primary: bool = True
+    # primary: bool = True
     title: str = None
 
     def __init_subclass__(  # noqa
         cls,
-        title: str,
-        primary: bool = True,
+        title: str = None,
+        # primary: bool = True,
         # config_path: PathLike = None,
         # config: Mapping[str, Any] = None,
     ):
-        cls.title = title
-        cls.primary = primary
+        if title:
+            cls.title = title
+        # cls.primary = primary
 
     def __init__(self, parent: Union[View, Window] = None):
         if parent is not None:
             self.parent = parent
 
     def __repr__(self) -> str:
-        return f'<{self.__class__.__name__}[{self.title}][{self.primary=!r}][handlers: {len(self._event_handlers_)}]>'
+        # return f'<{self.__class__.__name__}[{self.title}][{self.primary=!r}][handlers: {len(self._event_handlers_)}]>'
+        return f'<{self.__class__.__name__}[{self.title}][handlers: {len(self._event_handlers_)}]>'
 
     def get_pre_window_layout(self) -> Layout:  # noqa
         """
