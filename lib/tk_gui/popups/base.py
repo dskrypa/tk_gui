@@ -167,6 +167,8 @@ class BasicPopup(Popup):
             anchors = (None, None)
         elif n_buttons == 3:
             sides = ('left', 'left', 'left')
+            # TODO: These anchor values are probably wrong - anchor affects the text within the buttons, not where the
+            #  buttons are placed.
             anchors = ('left', 'center', 'right')
         else:
             sides = anchors = ('left' for _ in buttons)
@@ -216,13 +218,22 @@ class BoolPopup(BasicPopup):
         return None  # exited without clicking either button
 
 
-class TextPromptPopup(BasicPopup):
-    input_key = 'input'
+class SubmitOrCancelPopup(BasicPopup):
+    submit_key = 'submit'
 
-    def __init__(self, text: str, button_text: str = 'Submit', **kwargs):
-        # TODO: Add option to include a `cancel` button
-        button = Button(button_text, side='right', bind_enter=True, focus=False)
-        super().__init__(text, button=button, **kwargs)
+    def __init__(self, text: str, button_text: str = 'Submit', cancel_text: str = None, **kwargs):
+        submit = Button(button_text, key=self.submit_key, bind_enter=True, focus=False, side='right')
+        if cancel_text:
+            # The order here is counter-intuitive - Submit will be to the left of Cancel because when both have
+            # side=right, they are packed right-to-left, where earlier elements end up further right.
+            buttons = (Button(cancel_text, side='right'), submit)
+        else:
+            buttons = (submit,)
+        super().__init__(text, buttons=buttons, **kwargs)
+
+
+class TextPromptPopup(SubmitOrCancelPopup):
+    input_key = 'input'
 
     def get_layout(self) -> list[list[Element]]:
         layout = super().get_layout()
@@ -231,17 +242,20 @@ class TextPromptPopup(BasicPopup):
 
     def run(self) -> Optional[str]:
         results = super().run()
-        return results[self.input_key]
+        if results[self.submit_key]:
+            return results[self.input_key]
+        else:
+            return None
 
 
-class LoginPromptPopup(BasicPopup):
+class LoginPromptPopup(SubmitOrCancelPopup, title='Login'):
     user_key = 'username'
     pw_key = 'password'
 
-    def __init__(self, text: str, button_text: str = 'Submit', password_char: str = '\u2b24', **kwargs):
-        # TODO: Add option to include a `cancel` button
-        button = Button(button_text, side='right', bind_enter=True, focus=False)
-        super().__init__(text, button=button, **kwargs)
+    def __init__(
+        self, text: str, button_text: str = 'Submit', password_char: str = '\u2b24', cancel_text: str = None, **kwargs
+    ):
+        super().__init__(text, button_text=button_text, cancel_text=cancel_text, **kwargs)
         self.password_char = password_char
 
     def get_layout(self) -> list[list[Element]]:
@@ -252,4 +266,7 @@ class LoginPromptPopup(BasicPopup):
 
     def run(self) -> tuple[Optional[str], Optional[str]]:
         results = super().run()
-        return results[self.user_key], results[self.pw_key]
+        if results[self.submit_key]:
+            return results[self.user_key], results[self.pw_key]
+        else:
+            return None, None

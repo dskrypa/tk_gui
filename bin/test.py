@@ -21,7 +21,7 @@ from tk_gui.options import GuiOptions
 from tk_gui.popups import ImagePopup, AnimatedPopup, SpinnerPopup, ClockPopup, BasicPopup, Popup
 from tk_gui.popups.about import AboutPopup
 from tk_gui.popups.base import TextPromptPopup, LoginPromptPopup
-from tk_gui.popups.common import popup_warning, popup_error, popup_yes_no, popup_no_yes, popup_ok
+from tk_gui.popups.common import popup_warning, popup_error, popup_yes_no, popup_no_yes, popup_ok, popup_get_text
 from tk_gui.popups.raw import PickFolder, PickColor, PickFile
 from tk_gui.popups.style import StylePopup
 from tk_gui.views.view import View
@@ -202,8 +202,13 @@ class GuiTest(Command):
         print(f'{result=}')
 
     @action
+    def popup_text_cancel(self):
+        result = TextPromptPopup('Enter a string', cancel_text='Cancel', bind_esc=True).run()
+        print(f'{result=}')
+
+    @action
     def popup_login(self):
-        user, pw = LoginPromptPopup('Enter your login info').run()
+        user, pw = LoginPromptPopup('Enter your login info', cancel_text='Cancel').run()
         print(f'{user=}, {pw=}')
 
     # endregion
