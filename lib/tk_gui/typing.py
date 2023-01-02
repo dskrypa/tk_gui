@@ -46,6 +46,9 @@ TkJustify = Literal['left', 'center', 'right']
 
 TkContainer = Union['Toplevel', 'Frame', 'LabelFrame']
 
+RGB = HSL = tuple[int, int, int]
+RGBA = tuple[int, int, int, int]
+Color = Union[str, RGB, RGBA]
 ImageType = Union['PILImage', bytes, PathLike, None]
 
 

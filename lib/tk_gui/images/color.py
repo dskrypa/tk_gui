@@ -8,15 +8,14 @@ from __future__ import annotations
 
 from colorsys import rgb_to_hls
 from random import randrange
-from typing import Union, Optional, Collection
+from typing import TYPE_CHECKING, Union, Optional, Collection
 
 from PIL.ImageColor import getrgb
 
-__all__ = ['color_to_rgb', 'get_hue', 'get_lightness', 'get_saturation', 'pick_fg', 'find_unused_color']
+if TYPE_CHECKING:
+    from tk_gui.typing import RGB, HSL, RGBA, Color
 
-RGB = HSL = tuple[int, int, int]
-RGBA = tuple[int, int, int, int]
-Color = Union[str, RGB, RGBA]
+__all__ = ['color_to_rgb', 'get_hue', 'get_lightness', 'get_saturation', 'pick_fg', 'find_unused_color']
 
 
 def color_to_rgb(color: Color) -> Union[RGB, RGBA]:
