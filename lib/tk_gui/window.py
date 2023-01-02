@@ -945,6 +945,26 @@ class Window(RowContainer):
         elif cb := self._event_cbs.get(BindEvent.MENU_RESULT):
             cb(event, result)
 
+    # @_tk_event_handler(BindEvent.LEFT_CLICK, True)
+    # def _handle_left_click(self, event: Event):
+    #     try:
+    #         widget = event.widget
+    #     except AttributeError:
+    #         element, widget, geometry, pack_info = None, None, '???', '???'
+    #     else:
+    #         element = self.widget_element_map.get(widget)
+    #         geometry = widget.winfo_geometry()
+    #         try:
+    #             pack_info = widget.pack_info()
+    #         except AttributeError:  # Toplevel does not extend Pack
+    #             pack_info = None
+    #
+    #     log.info(
+    #         f'Tkinter {event=}\n    {element=}\n    {widget=}\n'
+    #         # f'    event.__dict__={event.__dict__}\n'
+    #         f'    {geometry=}  {pack_info=}\n',
+    #     )
+
     # endregion
 
     # region Cleanup Methods

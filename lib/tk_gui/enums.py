@@ -57,6 +57,7 @@ class BindEvent(MissingMixin, Enum):
 
     POSITION_CHANGED = '<Configure>'
     SIZE_CHANGED = '<Configure>'
+    LEFT_CLICK = '<ButtonRelease-1>'
     RIGHT_CLICK = '<ButtonRelease-2>' if ON_MAC else '<ButtonRelease-3>'
     MENU_RESULT = '<<Custom:MenuCallback>>'
 
