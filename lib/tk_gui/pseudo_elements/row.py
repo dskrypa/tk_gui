@@ -161,6 +161,6 @@ class Row(RowBase):
         if bg := self.style.base.bg.default:
             frame.configure(background=bg)
 
-    def update_style(self):
+    def apply_style(self):
         if bg := self.style.base.bg.default:
             self.frame.configure(background=bg)

@@ -670,7 +670,7 @@ class Window(RowContainer):
     def update_style(self, style: StyleSpec):
         self.style = Style.get_style(style)
         for element in self.all_elements:
-            element.update_style()
+            element.apply_style()
 
     def _update_idle_tasks(self):
         self._root.update_idletasks()

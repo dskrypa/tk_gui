@@ -144,11 +144,19 @@ class ElementBase(ClearableCachedPropertyMixin, ABC):
     def style_config(self) -> dict[str, Any]:
         return self._style_config
 
-    def update_style(self):
+    def apply_style(self):
         config = self.style_config
-        # print(f'{self}: Updating style: {config}')
+        # log.debug(f'{self}: Updating style: {config}')
         # self.widget.configure(**self.style_config)
         self.widget.configure(**config)
+
+    def update_style(self, style: StyleSpec = None, **kwargs):
+        if style:
+            self.style = style
+            config = self.style_config | kwargs
+            self.widget.configure(**config)
+        elif kwargs:
+            self.widget.configure(**kwargs)
 
     # endregion
 
