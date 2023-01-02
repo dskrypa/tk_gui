@@ -200,11 +200,19 @@ def wrap_menu_cb(
 # region Menu Item Text Helpers
 
 
+def _ensure_str(value) -> str:
+    if isinstance(value, str):
+        return value
+    else:
+        raise TypeError(f'Unexpected type={value.__class__.__name__!r}')
+
+
 def get_text(widget: Union[Entry, Text]) -> str:
     try:
-        return widget.get()
+        value = widget.get()
     except TypeError:
-        return widget.get(0)
+        value = widget.get(0)
+    return _ensure_str(value)
 
 
 def get_any_text(widget: BaseWidget) -> Optional[str]:
@@ -212,16 +220,20 @@ def get_any_text(widget: BaseWidget) -> Optional[str]:
         return get_text(widget)  # noqa
     except (AttributeError, TypeError, TclError):
         pass
+
     try:
-        return widget['text']
-    except TclError:
+        return _ensure_str(widget['text'])
+    except (TclError, TypeError):
         pass
+
     try:
         var: StringVar = widget['textvariable']
     except TclError:
         return None
-    else:
-        return var.get()
+    try:
+        return _ensure_str(var.get())
+    except TypeError:
+        return None
 
 
 def replace_selection(widget: Union[Entry, Text], text: str, first: Union[str, int], last: Union[str, int]):
