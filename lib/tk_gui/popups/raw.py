@@ -18,7 +18,10 @@ from ..utils import ON_MAC
 if TYPE_CHECKING:
     from tk_gui.window import Window
 
-__all__ = ['PickFolder', 'PickFile', 'PickFiles', 'SaveAs', 'PickColor']
+__all__ = [
+    'PickFolder', 'PickFile', 'PickFiles', 'SaveAs', 'PickColor',
+    'pick_folder_popup', 'pick_file_popup', 'pick_files_popup', 'save_as_popup', 'pick_color_popup',
+]
 log = logging.getLogger(__name__)
 
 PathLike = Union[Path, str]
@@ -109,6 +112,32 @@ class SaveAs(PickFile):
         return None
 
 
+def pick_folder_popup(initial_dir: PathLike = None, title: str = None, parent: Window = None) -> Optional[Path]:
+    return PickFolder(initial_dir, title, parent).run()
+
+
+def pick_file_popup(
+    initial_dir: PathLike = None, file_types: FileTypes = None, title: str = None, parent: Window = None
+) -> Optional[Path]:
+    return PickFile(initial_dir, file_types, title, parent).run()
+
+
+def pick_files_popup(
+    initial_dir: PathLike = None, file_types: FileTypes = None, title: str = None, parent: Window = None
+) -> list[Path]:
+    return PickFiles(initial_dir, file_types, title, parent).run()
+
+
+def save_as_popup(
+    initial_dir: PathLike = None,
+    file_types: FileTypes = None,
+    default_ext: str = None,
+    title: str = None,
+    parent: Window = None,
+) -> Optional[Path]:
+    return SaveAs(initial_dir, file_types, default_ext, title, parent).run()
+
+
 # endregion
 
 
@@ -123,3 +152,9 @@ class PickColor(RawPopup):
         if color := colorchooser.askcolor(self.initial_color, title=self.title, parent=self._get_root()):
             return color  # noqa  # hex RGB
         return None
+
+
+def pick_color_popup(
+    initial_color: str = None, title: str = None, parent: Window = None
+) -> Optional[tuple[tuple[int, int, int], str]]:
+    return PickColor(initial_color, title, parent).run()
