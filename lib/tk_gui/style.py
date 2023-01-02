@@ -493,6 +493,11 @@ class Style(ClearableCachedPropertyMixin):
             ancestors.add(style)
         return ancestors
 
+    def __getitem__(self, layer_name: str) -> StyleLayer:
+        if layer_name in self._layers:
+            return getattr(self, layer_name)
+        raise KeyError(layer_name)
+
     # region Configuration / Init
 
     def _configure(self, kwargs: StyleOptions):

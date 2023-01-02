@@ -42,7 +42,7 @@ class ButtonAction(Enum):
             return None
 
 
-class Button(DisableableMixin, Interactive):
+class Button(DisableableMixin, Interactive, base_style_layer='button'):
     widget: _Button
     separate: bool = False
     bind_enter: bool = False

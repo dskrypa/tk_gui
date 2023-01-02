@@ -132,7 +132,7 @@ class MenuMeta(ABCMeta, type):
     _containers: dict[tuple[str, tuple[type, ...]], EntryContainer] = {}
 
     @classmethod
-    def __prepare__(mcs, name: str, bases: tuple[type, ...]) -> dict:
+    def __prepare__(mcs, name: str, bases: tuple[type, ...], **kwargs) -> dict:
         """
         Called before ``__new__`` and before evaluating the contents of a class, which facilitates the creation of an
         :class:`EntryContainer` that unnamed :class:`MenuEntry` instances can register themselves with.  That
@@ -143,7 +143,7 @@ class MenuMeta(ABCMeta, type):
         container.__enter__()
         return {}
 
-    def __new__(mcs, name: str, bases: tuple[type, ...], namespace: dict[str, Any]):
+    def __new__(mcs, name: str, bases: tuple[type, ...], namespace: dict[str, Any], **kwargs):
         container = mcs._containers.pop((name, bases))
         container.__exit__()
         cls = super().__new__(mcs, name, bases, namespace)

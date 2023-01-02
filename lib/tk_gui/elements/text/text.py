@@ -85,6 +85,7 @@ class LinkableMixin:
     add_tooltip: Callable
     widget: Union[Label, Entry]
     style: Style
+    base_style_layer_and_state: tuple[StyleLayer, StyleState]
     size_and_pos: tuple[XY, XY]
     value: str
 
@@ -155,14 +156,10 @@ class LinkableMixin:
         widget, link = self.widget, self.__link
         widget.unbind(link_bind)
         if link.use_link_style:
-            style_layer, state = self._link_disabled_style_layer_and_state()
+            style_layer, state = self.base_style_layer_and_state
             widget.configure(cursor='', fg=style_layer.fg[state], font=style_layer.font[state])
         else:
             widget.configure(cursor='')
-
-    @abstractmethod
-    def _link_disabled_style_layer_and_state(self) -> [StyleLayer, StyleState]:
-        raise NotImplementedError
 
     def _open_link(self, event: Event):
         if not (link := self.link) or self.should_ignore(event):
@@ -245,7 +242,8 @@ class Text(TextValueMixin, LinkableMixin, Element):
                 config.setdefault('relief', 'flat')
             return config
 
-    def _link_disabled_style_layer_and_state(self) -> [StyleLayer, StyleState]:
+    @property
+    def base_style_layer_and_state(self) -> tuple[StyleLayer, StyleState]:
         if self._use_input_style:
             return self.style.input, StyleState.DISABLED
         else:
@@ -313,6 +311,10 @@ class InteractiveText(Interactive, ABC):
         super().__init_subclass__(**kwargs)
         cls._disabled_state = disabled_state
 
+    @property
+    def base_style_layer_and_state(self) -> tuple[StyleLayer, StyleState]:
+        return self.style.input, self.style_state
+
     def disable(self):
         if self.disabled:
             return
@@ -365,9 +367,6 @@ class Input(TextValueMixin, LinkableMixin, InteractiveText, disabled_state='read
             **style.get_map('insert', state, insertbackground='bg'),  # Insert cursor (vertical line) color
             **self._style_config,
         }
-
-    def _link_disabled_style_layer_and_state(self) -> [StyleLayer, StyleState]:
-        return self.style.input, self.style_state
 
     def pack_into(self, row: Row, column: int):
         self.init_string_var()

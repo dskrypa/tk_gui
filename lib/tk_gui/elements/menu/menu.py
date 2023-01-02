@@ -323,7 +323,7 @@ class MenuGroup(ContainerMixin, MenuEntry):
         return True
 
 
-class Menu(ContainerMixin, ElementBase, metaclass=MenuMeta):
+class Menu(ContainerMixin, ElementBase, metaclass=MenuMeta, base_style_layer='menu'):
     """A menu bar or right-click menu"""
 
     _result_counter = count()

@@ -84,7 +84,7 @@ class FrameMixin:
         self.pack_widget()
 
 
-class RowFrame(FrameMixin, RowBase, Element, ABC):
+class RowFrame(FrameMixin, RowBase, Element, ABC, base_style_layer='frame'):
     """
     A compound element that behaves both like a single :class:`.Element` and like a :class:`.Row` that contains other
     elements.  Compound elements that do not contain multiple rows can extend this instead of a Frame-like class that
@@ -138,7 +138,7 @@ class InteractiveRowFrame(InteractiveMixin, RowFrame, ABC):
         self.disabled = True
 
 
-class Frame(FrameMixin, Element, RowContainer):
+class Frame(FrameMixin, Element, RowContainer, base_style_layer='frame'):
     def __init__(self, layout: Layout = None, **kwargs):
         self.init_frame_from_kwargs(kwargs)
         self.init_container_from_kwargs(layout, kwargs=kwargs)
@@ -194,7 +194,7 @@ class InteractiveFrame(InteractiveMixin, Frame, ABC):
         self.disabled = True
 
 
-class ScrollFrame(Element, RowContainer):
+class ScrollFrame(Element, RowContainer, base_style_layer='frame'):
     widget: Union[ScrollableLabelFrame, ScrollableFrame]
     inner_frame: Union[TkFrame, LabelFrame]
     inner_style: Optional[Style] = None

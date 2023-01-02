@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Optional, Callable, Union, Any, MutableMapping
 
 from ..enums import StyleState, Anchor, Justify, Side, BindTargets
 from ..pseudo_elements.tooltips import ToolTip
-from ..style import Style, StyleSpec
+from ..style import Style, StyleSpec, StyleLayer, Layer
 from ..utils import Inheritable, ClearableCachedPropertyMixin, call_with_popped, extract_style
 from ._utils import find_descendants
 
@@ -40,6 +40,7 @@ _Side = Union[str, Side]
 class ElementBase(ClearableCachedPropertyMixin, ABC):
     _counters = defaultdict(count)
     _style_config: dict[str, Any]
+    _base_style_layer: str = None
     _id: int
     id: str
     parent: Optional[RowBase] = None
@@ -52,6 +53,11 @@ class ElementBase(ClearableCachedPropertyMixin, ABC):
     pad: XY = Inheritable('element_padding')
     side: Side = Inheritable('element_side', type=Side)
     style: Style = Inheritable(type=Style.get_style)
+
+    def __init_subclass__(cls, base_style_layer: Layer = None, **kwargs):
+        super().__init_subclass__(**kwargs)
+        if base_style_layer:
+            cls._base_style_layer = base_style_layer
 
     def __init__(
         self,
@@ -140,9 +146,19 @@ class ElementBase(ClearableCachedPropertyMixin, ABC):
         }
         self.widget.pack(**pack_kwargs)
 
+    # endregion
+
+    # region Style Methods / Attributes
+
     @property
     def style_config(self) -> dict[str, Any]:
         return self._style_config
+
+    @property
+    def base_style_layer_and_state(self) -> tuple[StyleLayer, StyleState]:
+        if base_style_layer := self._base_style_layer:
+            return self.style[base_style_layer], StyleState.DEFAULT
+        return self.style.base, StyleState.DEFAULT
 
     def apply_style(self):
         config = self.style_config
@@ -403,6 +419,8 @@ class Element(ElementBase, ABC):
 
 
 class InteractiveMixin:
+    style: Style
+    _base_style_layer: str | None
     disabled: bool = False
     focus: bool = False
     valid: bool = True
@@ -423,6 +441,12 @@ class InteractiveMixin:
         elif not self.valid:
             return StyleState.INVALID
         return StyleState.DEFAULT
+
+    @property
+    def base_style_layer_and_state(self) -> tuple[StyleLayer, StyleState]:
+        if base_style_layer := self._base_style_layer:
+            return self.style[base_style_layer], self.style_state
+        return self.style.base, self.style_state
 
     def pack_widget(self, *, expand: bool = False, fill: TkFill = tkc.NONE, **kwargs):
         super().pack_widget(expand=expand, fill=fill, focus=self.focus, disabled=self.disabled, **kwargs)  # noqa

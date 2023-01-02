@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Iterable, Iterator, Union, Any
 
 from .element import ElementBase, Element, Interactive
 from .mixins import DisableableMixin, CallbackCommandMixin
+from ..style import StyleLayer, StyleState
 
 if TYPE_CHECKING:
     from ..pseudo_elements import Row
@@ -26,7 +27,7 @@ log = logging.getLogger(__name__)
 # region Separators
 
 
-class Separator(ElementBase):
+class Separator(ElementBase, base_style_layer='separator'):
     widget: TtkSeparator
 
     def __init__(self, orientation: Orientation, **kwargs):
@@ -55,7 +56,7 @@ class VerticalSeparator(Separator):
 # endregion
 
 
-class ProgressBar(Element):
+class ProgressBar(Element, base_style_layer='progress'):
     widget: Progressbar
 
     def __init__(
@@ -131,7 +132,7 @@ class ProgressBar(Element):
             self.widget['value'] = self.max_value
 
 
-class Slider(DisableableMixin, CallbackCommandMixin, Interactive):
+class Slider(DisableableMixin, CallbackCommandMixin, Interactive, base_style_layer='slider'):
     widget: Scale
     tk_var: Union[IntVar, DoubleVar]
 

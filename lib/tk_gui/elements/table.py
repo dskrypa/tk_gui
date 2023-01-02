@@ -96,7 +96,7 @@ class TableColumn:
             raise
 
 
-class Table(Element):
+class Table(Element, base_style_layer='table'):
     widget: Union[Treeview, ScrollableTreeview]
     columns: dict[str, TableColumn]
 

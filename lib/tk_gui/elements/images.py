@@ -36,11 +36,12 @@ ImageAndSize = tuple[_Image, int, int]
 ImageCycle = Union[FrameCycle, '_ClockCycle']
 
 
-class Image(Element):
+class Image(Element, base_style_layer='image'):
     widget: Label = None
     animated: bool = False
 
-    def __init_subclass__(cls, animated: bool = None):
+    def __init_subclass__(cls, animated: bool = None, **kwargs):
+        super().__init_subclass__(**kwargs)
         if animated is not None:
             cls.animated = animated
 

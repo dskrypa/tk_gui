@@ -40,7 +40,7 @@ B = TypeVar('B')
 # region Radio
 
 
-class Radio(DisableableMixin, CallbackCommandMixin, Interactive, Generic[T]):
+class Radio(DisableableMixin, CallbackCommandMixin, Interactive, Generic[T], base_style_layer='radio'):
     widget: Radiobutton
 
     def __init__(
@@ -220,7 +220,7 @@ def get_current_radio_group(silent: bool = False) -> Optional[RadioGroup]:
 # region CheckBox
 
 
-class CheckBox(DisableableMixin, CallbackCommandMixin, Interactive):
+class CheckBox(DisableableMixin, CallbackCommandMixin, Interactive, base_style_layer='checkbox'):
     widget: Checkbutton
     tk_var: Optional[BooleanVar] = None
     _values: Optional[tuple[B, A]] = None
@@ -347,7 +347,7 @@ def make_checkbox_grid(rows: list[Sequence[CheckBox]]):
 # endregion
 
 
-class Combo(DisableableMixin, Interactive, disabled_state='disable', enabled_state='enable'):
+class Combo(DisableableMixin, Interactive, disabled_state='disable', enabled_state='enable', base_style_layer='combo'):
     """A form element that provides a drop down list of items to select.  Only 1 item may be selected."""
     widget: Combobox
     tk_var: Optional[StringVar] = None
@@ -451,7 +451,7 @@ class Combo(DisableableMixin, Interactive, disabled_state='disable', enabled_sta
         self.disabled = False
 
 
-class ListBox(DisableableMixin, Interactive):
+class ListBox(DisableableMixin, Interactive, base_style_layer='listbox'):
     widget: ScrollableListbox
 
     def __init__(
