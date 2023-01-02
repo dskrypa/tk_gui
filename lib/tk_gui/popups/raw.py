@@ -16,7 +16,7 @@ from .base import BasePopup
 from ..utils import ON_MAC
 
 if TYPE_CHECKING:
-    from tk_gui.window import Window
+    from tk_gui.typing import RGB
 
 __all__ = [
     'PickFolder', 'PickFile', 'PickFiles', 'SaveAs', 'PickColor',
@@ -46,8 +46,8 @@ class RawPopup(BasePopup, ABC):
 class FilePopup(RawPopup, ABC):
     __slots__ = ('initial_dir',)
 
-    def __init__(self, initial_dir: PathLike = None, title: str = None, parent: Window = None):
-        super().__init__(title=title, parent=parent)
+    def __init__(self, initial_dir: PathLike = None, title: str = None, **kwargs):
+        super().__init__(title=title, **kwargs)
         self.initial_dir = initial_dir
 
 
@@ -64,10 +64,8 @@ class PickFolder(FilePopup):
 class PickFile(FilePopup):
     __slots__ = ('file_types',)
 
-    def __init__(
-        self, initial_dir: PathLike = None, file_types: FileTypes = None, title: str = None, parent: Window = None
-    ):
-        super().__init__(initial_dir, title=title, parent=parent)
+    def __init__(self, initial_dir: PathLike = None, file_types: FileTypes = None, title: str = None, **kwargs):
+        super().__init__(initial_dir, title=title, **kwargs)
         self.file_types = file_types
 
     def _dialog_kwargs(self):
@@ -99,9 +97,9 @@ class SaveAs(PickFile):
         file_types: FileTypes = None,
         default_ext: str = None,
         title: str = None,
-        parent: Window = None,
+        **kwargs,
     ):
-        super().__init__(initial_dir, file_types, title=title, parent=parent)
+        super().__init__(initial_dir, file_types, title=title, **kwargs)
         self.default_ext = default_ext
 
     def _run(self) -> Optional[Path]:
@@ -112,20 +110,20 @@ class SaveAs(PickFile):
         return None
 
 
-def pick_folder_popup(initial_dir: PathLike = None, title: str = None, parent: Window = None) -> Optional[Path]:
-    return PickFolder(initial_dir, title, parent).run()
+def pick_folder_popup(initial_dir: PathLike = None, title: str = None, **kwargs) -> Optional[Path]:
+    return PickFolder(initial_dir, title, **kwargs).run()
 
 
 def pick_file_popup(
-    initial_dir: PathLike = None, file_types: FileTypes = None, title: str = None, parent: Window = None
+    initial_dir: PathLike = None, file_types: FileTypes = None, title: str = None, **kwargs
 ) -> Optional[Path]:
-    return PickFile(initial_dir, file_types, title, parent).run()
+    return PickFile(initial_dir, file_types, title, **kwargs).run()
 
 
 def pick_files_popup(
-    initial_dir: PathLike = None, file_types: FileTypes = None, title: str = None, parent: Window = None
+    initial_dir: PathLike = None, file_types: FileTypes = None, title: str = None, **kwargs
 ) -> list[Path]:
-    return PickFiles(initial_dir, file_types, title, parent).run()
+    return PickFiles(initial_dir, file_types, title, **kwargs).run()
 
 
 def save_as_popup(
@@ -133,9 +131,9 @@ def save_as_popup(
     file_types: FileTypes = None,
     default_ext: str = None,
     title: str = None,
-    parent: Window = None,
+    **kwargs,
 ) -> Optional[Path]:
-    return SaveAs(initial_dir, file_types, default_ext, title, parent).run()
+    return SaveAs(initial_dir, file_types, default_ext, title, **kwargs).run()
 
 
 # endregion
@@ -144,17 +142,15 @@ def save_as_popup(
 class PickColor(RawPopup):
     __slots__ = ('initial_color',)
 
-    def __init__(self, initial_color: str = None, title: str = None, parent: Window = None):
-        super().__init__(title=title, parent=parent)
+    def __init__(self, initial_color: str = None, title: str = None, **kwargs):
+        super().__init__(title=title, **kwargs)
         self.initial_color = initial_color
 
-    def _run(self) -> Optional[tuple[tuple[int, int, int], str]]:
+    def _run(self) -> Optional[tuple[RGB, str]]:
         if color := colorchooser.askcolor(self.initial_color, title=self.title, parent=self._get_root()):
             return color  # noqa  # hex RGB
         return None
 
 
-def pick_color_popup(
-    initial_color: str = None, title: str = None, parent: Window = None
-) -> Optional[tuple[tuple[int, int, int], str]]:
-    return PickColor(initial_color, title, parent).run()
+def pick_color_popup(initial_color: str = None, title: str = None, **kwargs) -> Optional[tuple[RGB, str]]:
+    return PickColor(initial_color, title, **kwargs).run()

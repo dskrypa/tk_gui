@@ -28,22 +28,35 @@ if TYPE_CHECKING:
 __all__ = ['Popup', 'POPUP_QUEUE', 'BasicPopup', 'BoolPopup', 'TextPromptPopup', 'LoginPromptPopup']
 log = logging.getLogger(__name__)
 
+_NotSet = object()
 POPUP_QUEUE = Queue()
 
 
 class BasePopup(ABC):
-    __slots__ = ('title', 'parent')
+    __slots__ = ('title', 'parent', 'return_focus')
 
     _default_title: str = None
+    _return_focus: Bool = True
+    title: str | None
+    parent: Window | None
+    return_focus: Bool
 
-    def __init_subclass__(cls, title: str = None, **kwargs):
+    def __init_subclass__(cls, title: str = None, return_focus: Bool = None, **kwargs):
         super().__init_subclass__(**kwargs)
         if title:
             cls._default_title = title
+        if return_focus is not None:
+            cls._return_focus = return_focus
 
-    def __init__(self, title: str = None, parent: Window = None):
+    def __init__(self, title: str = None, parent: Window = _NotSet, return_focus: Bool = None):
         self.title = title or self._default_title
+        if parent is _NotSet:
+            if (active := Window.get_active_windows(False)) and (len(active) == 1):
+                parent = active[0]
+            else:
+                parent = None
         self.parent = parent
+        self.return_focus = self._return_focus if return_focus is None else return_focus
 
     @classmethod
     def as_callback(cls, *args, **kwargs) -> Callable:
@@ -58,11 +71,16 @@ class BasePopup(ABC):
 
     def run(self):
         if current_thread() == main_thread():
-            return self._run()
+            result = self._run()
+        else:
+            future = Future()
+            POPUP_QUEUE.put((future, self._run, (), {}))
+            result = future.result()
 
-        future = Future()
-        POPUP_QUEUE.put((future, self._run, (), {}))
-        return future.result()
+        if self.return_focus and (parent := self.parent):
+            # log.debug(f'Returning focus to {parent=}')
+            parent.take_focus()
+        return result
 
 
 class Popup(BasePopup, HandlesEvents):
@@ -71,13 +89,14 @@ class Popup(BasePopup, HandlesEvents):
         layout: Layout = (),
         title: str = None,
         *,
-        parent: Window = None,
+        parent: Window = _NotSet,
         bind_esc: Bool = False,
         keep_on_top: Bool = False,
         can_minimize: Bool = False,
+        return_focus: Bool = None,
         **kwargs
     ):
-        super().__init__(title, parent)
+        super().__init__(title, parent, return_focus)
         self.layout = layout
         kwargs['keep_on_top'] = keep_on_top
         kwargs['can_minimize'] = can_minimize
