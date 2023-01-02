@@ -8,16 +8,15 @@ from __future__ import annotations
 
 import logging
 import tkinter.constants as tkc
-import webbrowser
 from abc import ABC, abstractmethod
 from functools import cached_property, partial
 from tkinter import StringVar, Label, Event, Entry, BaseWidget
-from typing import TYPE_CHECKING, Optional, Union, Any
+from typing import TYPE_CHECKING, Optional, Union, Any, Callable
 
 from tk_gui.constants import LEFT_CLICK
 from tk_gui.enums import Justify, Anchor
 from tk_gui.pseudo_elements.scroll import ScrollableText
-from tk_gui.style import Style, Font, StyleState
+from tk_gui.style import Style, Font, StyleState, StyleLayer
 from tk_gui.utils import max_line_len
 from ..element import Element, Interactive
 from .links import LinkTarget, _Link
@@ -80,8 +79,95 @@ class TextValueMixin:
             return 1
 
 
-class Text(TextValueMixin, Element):
+class Linkable(ABC):
     __link: Optional[LinkTarget] = None
+    _tooltip_text: str | None
+    add_tooltip: Callable
+    widget: Union[Label, Entry]
+    style: Style
+    size_and_pos: tuple[XY, XY]
+    value: str
+
+    def __init__(self, link: _Link | LinkTarget = None, link_bind: str = None, tooltip_text: str = None):
+        self._tooltip_text = tooltip_text
+        self.link = (link_bind, link)
+
+    @property
+    def tooltip_text(self) -> str:
+        try:
+            return self.link.tooltip
+        except AttributeError:
+            return self._tooltip_text
+
+    def should_ignore(self, event: Event) -> bool:
+        """Return True if the event ended with the cursor outside this element, False otherwise"""
+        width, height = self.size_and_pos[0]
+        return not (0 <= event.x <= width and 0 <= event.y <= height)
+
+    @property
+    def link(self) -> Optional[LinkTarget]:
+        return self.__link
+
+    @link.setter
+    def link(self, value: Union[LinkTarget, _Link, tuple[Optional[str], _Link]]):
+        if isinstance(value, tuple):
+            bind, value = value
+        else:
+            bind = getattr(self.__link, 'bind', None)
+
+        if isinstance(value, LinkTarget):
+            if bind is not None:
+                raise TypeError(f'The link={value!r} should be initialized with {bind=} instead of providing both')
+            self.__link = value
+        else:
+            self.__link = LinkTarget.new(value, bind, self._tooltip_text, self.value)
+
+    def update_link(self, link: Union[bool, str, BindTarget]):
+        old = self.__link
+        self.__link = new = LinkTarget.new(link, getattr(old, 'bind', None), self._tooltip_text, self.value)
+        self.add_tooltip(new.tooltip if new else self._tooltip_text)
+        if old and new and old.bind != new.bind:
+            widget = self.widget
+            widget.unbind(old.bind)
+            widget.bind(new.bind, self._open_link)
+        elif new and not old:
+            self._enable_link()
+        elif old and not new:
+            self._disable_link(old.bind)
+
+    def maybe_enable_link(self):
+        if self.__link:
+            self._enable_link()
+
+    def _enable_link(self):
+        widget, link = self.widget, self.__link
+        widget.bind(link.bind, self._open_link)
+        if link.use_link_style:
+            link_style = self.style.link
+            widget.configure(cursor='hand2', fg=link_style.fg.default, font=link_style.font.default)
+        else:
+            widget.configure(cursor='hand2')
+
+    def _disable_link(self, link_bind: str):
+        widget, link = self.widget, self.__link
+        widget.unbind(link_bind)
+        if link.use_link_style:
+            style_layer, state = self._link_disabled_style_layer_and_state()
+            widget.configure(cursor='', fg=style_layer.fg[state], font=style_layer.font[state])
+        else:
+            widget.configure(cursor='')
+
+    @abstractmethod
+    def _link_disabled_style_layer_and_state(self) -> [StyleLayer, StyleState]:
+        raise NotImplementedError
+
+    def _open_link(self, event: Event):
+        if not (link := self.link) or self.should_ignore(event):
+            return
+        link.open(event)
+
+
+class Text(TextValueMixin, Linkable, Element):
     widget: Union[Label, Entry]
 
     def __init__(
@@ -97,14 +183,13 @@ class Text(TextValueMixin, Element):
         use_input_style: Bool = False,
         **kwargs,
     ):
-        self._tooltip_text = kwargs.pop('tooltip', None)
+        self.value = value
+        Linkable.__init__(self, link, link_bind, kwargs.pop('tooltip', None))
         if justify is anchor is None:
             justify = Justify.LEFT
             if not selectable:
                 anchor = Justify.LEFT.as_anchor()
-        super().__init__(justify_text=justify, anchor=anchor, **kwargs)
-        self.value = value
-        self.link = (link_bind, link)
+        Element.__init__(self, justify_text=justify, anchor=anchor, **kwargs)
         self._selectable = selectable
         self._auto_size = auto_size
         self._use_input_style = use_input_style
@@ -148,10 +233,20 @@ class Text(TextValueMixin, Element):
                 **self._style_config,
             }
         else:
-            return {
+            config = {
                 **style.get_map('text', bd='border_width', fg='fg', bg='bg', font='font', relief='relief'),
                 **self._style_config,
             }
+            if self._selectable:
+                config.update(self.style.get_map('text', readonlybackground='bg'))
+                config.setdefault('relief', 'flat')
+            return config
+
+    def _link_disabled_style_layer_and_state(self) -> [StyleLayer, StyleState]:
+        if self._use_input_style:
+            return self.style.input, StyleState.DISABLED
+        else:
+            return self.style.text, StyleState.DEFAULT
 
     def pack_into(self, row: Row, column: int):
         self.init_string_var()
@@ -161,8 +256,7 @@ class Text(TextValueMixin, Element):
             self._pack_label(row)
 
         self.pack_widget()
-        if self.__link:
-            self._enable_link()
+        self.maybe_enable_link()
 
     def _pack_label(self, row: Row):
         kwargs = {
@@ -191,94 +285,17 @@ class Text(TextValueMixin, Element):
             'takefocus': int(self.allow_focus),
             **self.style_config,
         }
-        if not self._use_input_style:
-            kwargs.update(self.style.get_map('text', readonlybackground='bg'))
-            kwargs.setdefault('relief', 'flat')
         try:
             kwargs['width'] = self._init_size(kwargs.get('font'))[0]
         except TypeError:
             pass
         self.widget = Entry(row.frame, **kwargs)
 
-    def update(self, value: Any = None, link: Union[bool, str] = None):
+    def update(self, value: Any = None, link: _Link = None):
         if value is not None:
             self.value = value
         if link is not None:
             self.update_link(link)
-
-    @property
-    def tooltip_text(self) -> str:
-        try:
-            return self.__link.tooltip
-        except AttributeError:
-            return self._tooltip_text
-
-    def should_ignore(self, event: Event) -> bool:
-        """Return True if the event ended with the cursor outside this element, False otherwise"""
-        width, height = self.size_and_pos[0]
-        return not (0 <= event.x <= width and 0 <= event.y <= height)
-
-    # region Link Handling
-
-    @property
-    def link(self) -> Optional[LinkTarget]:
-        return self.__link
-
-    @link.setter
-    def link(self, value: Union[LinkTarget, _Link, tuple[Optional[str], _Link]]):
-        if isinstance(value, tuple):
-            bind, value = value
-        else:
-            bind = getattr(self.__link, 'bind', None)
-
-        if isinstance(value, LinkTarget):
-            if bind is not None:
-                raise TypeError(f'The link={value!r} should be initialized with {bind=} instead of providing both')
-            self.__link = value
-        else:
-            self.__link = LinkTarget.new(value, bind, self._tooltip_text, self._value)
-
-    def update_link(self, link: Union[bool, str, BindTarget]):
-        old = self.__link
-        self.__link = new = LinkTarget.new(link, getattr(old, 'bind', None), self._tooltip_text, self._value)
-        self.add_tooltip(new.tooltip if new else self._tooltip_text)
-        if old and new and old.bind != new.bind:
-            widget = self.widget
-            widget.unbind(old.bind)
-            widget.bind(new.bind, self._open_link)
-        elif new and not old:
-            self._enable_link()
-        elif old and not new:
-            self._disable_link(old.bind)
-
-    def _enable_link(self):
-        widget, link = self.widget, self.__link
-        widget.bind(link.bind, self._open_link)
-        if link.use_link_style:
-            link_style = self.style.link
-            widget.configure(cursor='hand2', fg=link_style.fg.default, font=link_style.font.default)
-        else:
-            widget.configure(cursor='hand2')
-
-    def _disable_link(self, link_bind: str):
-        widget, link = self.widget, self.__link
-        widget.unbind(link_bind)
-        if link.use_link_style:
-            if self._use_input_style:
-                input_style = self.style.input
-                widget.configure(cursor='', fg=input_style.fg.disabled, font=input_style.font.disabled)
-            else:
-                text_style = self.style.text
-                widget.configure(cursor='', fg=text_style.fg.default, font=text_style.font.default)
-        else:
-            widget.configure(cursor='')
-
-    def _open_link(self, event: Event):
-        if not (link := self.link) or self.should_ignore(event):
-            return
-        link.open(event)
-
-    # endregion
 
 
 class Link(Text):
@@ -313,7 +330,7 @@ class InteractiveText(Interactive, ABC):
         raise NotImplementedError
 
 
-class Input(TextValueMixin, InteractiveText, disabled_state='readonly', move_cursor=True):
+class Input(TextValueMixin, Linkable, InteractiveText, disabled_state='readonly', move_cursor=True):
     widget: Entry
     password_char: Optional[str] = None
 
@@ -321,15 +338,16 @@ class Input(TextValueMixin, InteractiveText, disabled_state='readonly', move_cur
         self,
         value: Any = '',
         *,
-        link: bool = None,
+        link: _Link | LinkTarget = None,
+        link_bind: str = None,
         password_char: str = None,
         justify_text: Union[str, Justify, None] = Justify.LEFT,
         callback: BindTarget = None,
-        **kwargs
+        **kwargs,
     ):
-        super().__init__(justify_text=justify_text, **kwargs)
         self.value = value
-        self._link = link or link is None
+        Linkable.__init__(self, link, link_bind, kwargs.pop('tooltip', None))
+        Interactive.__init__(self, justify_text=justify_text, **kwargs)
         self._callback = callback
         if password_char:
             self.password_char = password_char
@@ -344,6 +362,9 @@ class Input(TextValueMixin, InteractiveText, disabled_state='readonly', move_cur
             **style.get_map('insert', state, insertbackground='bg'),  # Insert cursor (vertical line) color
             **self._style_config,
         }
+
+    def _link_disabled_style_layer_and_state(self) -> [StyleLayer, StyleState]:
+        return self.style.input, self.style_state
 
     def pack_into(self, row: Row, column: int):
         self.init_string_var()
@@ -361,16 +382,12 @@ class Input(TextValueMixin, InteractiveText, disabled_state='readonly', move_cur
 
         self.widget = entry = Entry(row.frame, **kwargs)
         self.pack_widget()
-
+        self.maybe_enable_link()
         entry.bind('<FocusOut>', partial(_clear_selection, entry))  # Prevents ghost selections
-        if self._link:  # TODO: Unify with Text's link handling
-            entry.bind('<Control-Button-1>', self._open_link)
-            if (value := self._value) and value.startswith(('http://', 'https://')):
-                entry.configure(cursor='hand2')
         if (callback := self._callback) is not None:
             entry.bind('<Key>', self.normalize_callback(callback))
 
-    def update(self, value: Any = None, disabled: Bool = None, password_char: str = None):
+    def update(self, value: Any = None, disabled: Bool = None, password_char: str = None, link: _Link = None):
         if disabled is not None:
             self._update_state(disabled)
         if value is not None:
@@ -378,6 +395,8 @@ class Input(TextValueMixin, InteractiveText, disabled_state='readonly', move_cur
         if password_char is not None:
             self.widget.configure(show=password_char)
             self.password_char = password_char
+        if link is not None:
+            self.update_link(link)
 
     # region Update State
 
@@ -393,10 +412,6 @@ class Input(TextValueMixin, InteractiveText, disabled_state='readonly', move_cur
         self.widget.configure(**kwargs)
 
     # endregion
-
-    def _open_link(self, event):
-        if (value := self.value) and value.startswith(('http://', 'https://')):
-            webbrowser.open(value)
 
 
 class Multiline(InteractiveText, disabled_state='disabled'):

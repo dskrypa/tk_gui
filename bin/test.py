@@ -268,6 +268,7 @@ class GuiTest(Command):
             [{'a': n, 'b': n + 1, 'c': n + 2} for n in range(1, 21, 3)], show_row_nums=True, size=(4, 4)
         )
         inpt = Input('test', size=(15, 1))
+        # inpt = Input('test', size=(15, 1), link='https://google.com')
 
         gif_path = ICONS_DIR.joinpath('spinners', 'ring_gray_segments.gif')
         png_path = ICONS_DIR.joinpath('exclamation-triangle-yellow.png')
