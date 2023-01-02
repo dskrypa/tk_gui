@@ -16,17 +16,17 @@ from tkinter.ttk import Combobox
 from typing import TYPE_CHECKING, Optional, Union, Any, MutableMapping, Generic, Collection, TypeVar, Sequence, Iterable
 from weakref import WeakValueDictionary
 
-from ..enums import ListBoxSelectMode
-from ..pseudo_elements.scroll import ScrollableListbox
-from ..typing import Bool, T, BindTarget, BindCallback
-from ..utils import max_line_len
+from tk_gui.enums import ListBoxSelectMode
+from tk_gui.pseudo_elements.scroll import ScrollableListbox
+from tk_gui.typing import Bool, T, BindTarget, BindCallback, TraceCallback
+from tk_gui.utils import max_line_len
 from ._utils import normalize_underline
 from .element import Interactive
 from .exceptions import NoActiveGroup, BadGroupCombo
 from .mixins import DisableableMixin, CallbackCommandMixin
 
 if TYPE_CHECKING:
-    from ..pseudo_elements import Row
+    from tk_gui.pseudo_elements import Row
 
 __all__ = ['Radio', 'RadioGroup', 'CheckBox', 'Combo', 'ListBox', 'make_checkbox_grid']
 log = logging.getLogger(__name__)
@@ -234,6 +234,7 @@ class CheckBox(DisableableMixin, CallbackCommandMixin, Interactive, base_style_l
         false_value: B = None,
         underline: Union[str, int] = None,
         callback: BindTarget = None,
+        change_cb: TraceCallback = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -241,6 +242,7 @@ class CheckBox(DisableableMixin, CallbackCommandMixin, Interactive, base_style_l
         self.default = default
         self._underline = underline
         self._callback = callback
+        self._change_cb = change_cb
         if not (true_value is false_value is None):
             self._values = (false_value, true_value)
 
@@ -313,14 +315,17 @@ class CheckBox(DisableableMixin, CallbackCommandMixin, Interactive, base_style_l
             **self.style_config,
         }
         # Note: The default tristate icon on Win10 / Py 3.10.5 / Tcl 8.6.12 appears to be the same as the checked icon
-        if (callback := self._callback) is not None:
-            kwargs['command'] = self.normalize_callback(callback)
         try:
             kwargs['width'], kwargs['height'] = self.size
         except TypeError:
             pass
         if self.disabled:
             kwargs['state'] = self._disabled_state
+
+        if (callback := self._callback) is not None:
+            kwargs['command'] = self.normalize_callback(callback)
+        if (change_cb := self._change_cb) is not None:
+            tk_var.trace_add('write', change_cb)
 
         self.widget = Checkbutton(row.frame, **kwargs)
         self.pack_widget()
