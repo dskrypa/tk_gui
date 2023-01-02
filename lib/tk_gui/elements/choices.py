@@ -243,6 +243,23 @@ class CheckBox(DisableableMixin, Interactive):
             return values[result]
         return result
 
+    @value.setter
+    def value(self, value: Union[bool, A, B]):
+        if (values := self._values) and value in values:
+            self.tk_var.set(values[0] != value)
+        else:
+            self.tk_var.set(value)
+
+    def toggle(self) -> bool:
+        """
+        Toggle the value, and return the new value.
+        Only returns the boolean value, not the custom ones, if custom ones were provided.
+        """
+        tk_var = self.tk_var
+        new_val = not tk_var.get()
+        tk_var.set(new_val)
+        return new_val
+
     @property
     def underline(self) -> Optional[int]:
         return normalize_underline(self._underline, self.label)
