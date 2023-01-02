@@ -148,6 +148,18 @@ class ElementBase(ClearableCachedPropertyMixin, ABC):
 
     # endregion
 
+    def configure_widget(self, outer: Bool = False, **kwargs):
+        widget = self.widget
+        if outer:
+            config_func = widget.configure
+        else:
+            try:
+                config_func = widget.configure_inner_widget  # noqa  # ScrollableWidget
+            except AttributeError:
+                config_func = widget.configure
+
+        return config_func(**kwargs)
+
     # region Style Methods / Attributes
 
     @property
@@ -163,16 +175,15 @@ class ElementBase(ClearableCachedPropertyMixin, ABC):
     def apply_style(self):
         config = self.style_config
         # log.debug(f'{self}: Updating style: {config}')
-        # self.widget.configure(**self.style_config)
-        self.widget.configure(**config)
+        self.configure_widget(**config)
 
     def update_style(self, style: StyleSpec = None, **kwargs):
         if style:
             self.style = style
             config = self.style_config | kwargs
-            self.widget.configure(**config)
+            self.configure_widget(**config)
         elif kwargs:
-            self.widget.configure(**kwargs)
+            self.configure_widget(**kwargs)
 
     # endregion
 

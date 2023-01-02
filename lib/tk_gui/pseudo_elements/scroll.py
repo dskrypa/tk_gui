@@ -321,6 +321,9 @@ class ScrollableWidget(ScrollableBase, ABC):
     def widgets(self) -> list[BaseWidget]:
         return [self.inner_widget, *self._widgets()]
 
+    def configure_inner_widget(self, **kwargs):
+        return self.inner_widget.configure(**kwargs)
+
 
 class ScrollableTreeview(ScrollableWidget, Frame, tk_cls=Frame, inner_cls=Treeview):
     inner_widget: Treeview
