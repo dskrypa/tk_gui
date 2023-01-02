@@ -250,8 +250,11 @@ class RowContainer(ABC):
             width, height = size
         except TypeError:
             x_div, y_div = self._scroll_divisors()
-            width = inner.winfo_reqwidth() // x_div
-            height = inner.winfo_reqheight() // y_div
+            req_width = inner.winfo_reqwidth()
+            req_height = inner.winfo_reqheight()
+            width = req_width // x_div
+            height = req_height // y_div
+            # log.debug(f'Using size=({width}, {height}) for required=({req_width}, {req_height})')
 
         canvas = outer.canvas
         canvas.configure(scrollregion=canvas.bbox('all'), width=width, height=height)

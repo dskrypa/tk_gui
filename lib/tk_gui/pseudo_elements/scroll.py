@@ -32,7 +32,7 @@ log = logging.getLogger(__name__)
 FrameLike = Union[Tk, Frame, LabelFrame]
 ScrollOuter = Union[BaseWidget, 'ScrollableBase', 'ScrollableContainer']
 
-AXIS_DIR_SIDE = {'x': (tkc.HORIZONTAL, tkc.BOTTOM), 'y': (tkc.VERTICAL, tkc.RIGHT)}
+AXIS_DIR_SIDE_ANCHOR = {'x': (tkc.HORIZONTAL, tkc.BOTTOM, tkc.S), 'y': (tkc.VERTICAL, tkc.RIGHT, tkc.E)}
 
 
 def add_scroll_bar(
@@ -42,7 +42,7 @@ def add_scroll_bar(
     style: Style = None,
     pack_kwargs: Mapping[str, Any] = None,
 ) -> Scrollbar:
-    direction, side = AXIS_DIR_SIDE[axis]
+    direction, side, anchor = AXIS_DIR_SIDE_ANCHOR[axis]
     if style:
         name, ttk_style = style.make_ttk_style(f'scroll_bar.{direction.title()}.TScrollbar')
     else:
@@ -64,10 +64,11 @@ def add_scroll_bar(
 
     inner.configure(**{f'{axis}scrollcommand': scroll_bar.set})
 
-    kwargs = {'side': side, 'fill': axis}
+    kwargs = {'side': side, 'fill': axis, 'anchor': anchor}
     if pack_kwargs:
         # Additional possible kwargs: elementborderwidth, jump, repeatdelay, repeatinterval
         kwargs.update(pack_kwargs)
+    # log.debug(f'Packing scrollbar with {kwargs=}')
     scroll_bar.pack(**kwargs)
 
     return scroll_bar
@@ -102,7 +103,7 @@ class ScrollableBase(ABC):
         self_id: str = self._w  # noqa
         id_parts = self_id.split('.!')[:-1]
         for i, id_part in enumerate(reversed(id_parts)):
-            if (m := self._tk_w_cls_search(id_part)) and m.group(1) in self._scrollable_cls_names:
+            if (m := self._tk_w_cls_search(id_part)) and m.group(1) in self._scrollable_cls_names:  # noqa
                 return self.nametowidget('.!'.join(id_parts[:-i]))
         return None
 
@@ -213,7 +214,7 @@ class ScrollableContainer(ScrollableBase, ABC):
         if scroll_x:
             self.scroll_bar_x = add_scroll_bar(self, canvas, 'x', style, {'expand': 'false'})
         if scroll_y:
-            self.scroll_bar_y = add_scroll_bar(self, canvas, 'y', style, {'fill': 'both', 'expand': True})
+            self.scroll_bar_y = add_scroll_bar(self, canvas, 'y', style, {'fill': 'y', 'expand': True})
 
         kwargs = {'side': 'left', 'fill': 'both', 'expand': True}
         try:
@@ -238,8 +239,9 @@ class ScrollableContainer(ScrollableBase, ABC):
             # canvas.bind('<Leave>', self.unhook_mouse_scroll)
             self.bind('<Configure>', self.set_scroll_region)
 
-    def resize_inner(self, event: Event):
-        self.canvas.itemconfigure(self._inner_widget_id, width=event.width, height=event.height)
+    # def resize_inner(self, event: Event):
+    #     log.debug(f'Resizing inner={self._inner_widget_id!r} to width={event.width}, height={event.height}')
+    #     self.canvas.itemconfigure(self._inner_widget_id, width=event.width, height=event.height)
 
     # def hook_mouse_scroll(self, event: Event):
     #     log.debug(f'Hooking mouse scroll for {self!r} due to {event=}, {self.scroll_children=}')
