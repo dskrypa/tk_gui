@@ -355,7 +355,7 @@ class Element(ElementBase, ABC):
     def _bind(self, event_pat: str, cb: BindCallback):
         if cb is None:
             return
-        log.debug(f'Binding event={event_pat!r} to {cb=}')
+        # log.debug(f'Binding event={event_pat!r} to {cb=}')
         try:
             self.widget.bind(event_pat, cb)
         except (TclError, RuntimeError) as e:

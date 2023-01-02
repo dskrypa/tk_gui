@@ -861,7 +861,7 @@ class Window(RowContainer):
             return
         else:
             cb = self._normalize_bind_cb(cb)
-            log.debug(f'Binding event={bind_event!r} to {cb=}')
+            # log.debug(f'Binding event={bind_event!r} to {cb=}')
             try:
                 self._root.bind(bind_event, cb)
             except (TclError, RuntimeError) as e:
