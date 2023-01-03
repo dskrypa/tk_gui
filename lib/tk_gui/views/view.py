@@ -90,11 +90,18 @@ class View(HandlesEvents):
             window.move_to_center(parent)
         return window
 
+    def get_results(self):
+        """
+        Called by :meth:`.run` to provide the results of running this view.  May be overridden by subclasses to handle
+        custom finalization / form submission logic.
+        """
+        return self.window.results
+
     def run(self) -> dict[Key, Any]:
         window = self.finalize_window()
         with window(take_focus=True):
             window.run()
-            return window.results
+            return self.get_results()
 
     def get_next_view(self) -> View | None:  # noqa
         """
