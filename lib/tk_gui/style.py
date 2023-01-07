@@ -319,9 +319,11 @@ class StyleLayer:
         try:
             return self._tk_font  # noqa
         except AttributeError:
-            parts = (TkFont(font=font) if font else None for font in self.font)
-            self._tk_font = tk_font = StateValues(self, 'tk_font', *parts)  # noqa
-            return tk_font
+            pass
+
+        parts = (_font_or_none(font) for font in self.font)
+        self._tk_font = tk_font = StateValues(self, 'tk_font', *parts)  # noqa
+        return tk_font
 
     def sub_font(self, state: StateName = 'default', name: str = None, size: int = None, *attrs: str) -> Font:
         font = self.font[state]
@@ -345,6 +347,20 @@ class StyleLayer:
         for key, values in self._iter_values():
             if values is not None:
                 yield key, values
+
+
+def _font_or_none(font: Font) -> TkFont | None:
+    if not font:
+        return None
+    try:
+        return TkFont(font=font)
+    except RuntimeError:  # Fonts require the hidden root to have been initialized first
+        pass
+
+    from .window import Window
+
+    Window._ensure_tk_is_initialized()
+    return TkFont(font=font)
 
 
 class StyleProperty(Generic[T]):

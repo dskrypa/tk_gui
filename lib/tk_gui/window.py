@@ -746,8 +746,7 @@ class Window(RowContainer):
         return outer
 
     def show(self):
-        if self.__hidden_root is None:
-            self._init_hidden_root()
+        self._ensure_tk_is_initialized()
         if self._root is not None:
             log.warning('Attempted to show window after it was already shown', stack_info=True)
             return
@@ -780,6 +779,11 @@ class Window(RowContainer):
             log.error('Error overriding redirect for hidden root:', exc_info=True)
         hidden_root.withdraw()
         Window.__hidden_finalizer = finalize(Window, Window.__close_hidden_root)
+
+    @classmethod
+    def _ensure_tk_is_initialized(cls):
+        if cls.__hidden_root is None:
+            cls._init_hidden_root()
 
     def _init_fix_focus(self):
         if (widget := self.__focus_widget) is None:
