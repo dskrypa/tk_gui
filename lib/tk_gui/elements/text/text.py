@@ -10,7 +10,7 @@ import logging
 import tkinter.constants as tkc
 from abc import ABC, abstractmethod
 from functools import cached_property, partial
-from tkinter import StringVar, Label, Event, Entry, BaseWidget
+from tkinter import StringVar, Event, Entry, BaseWidget, Label as TkLabel
 from typing import TYPE_CHECKING, Optional, Union, Any, Callable
 
 from tk_gui.constants import LEFT_CLICK
@@ -26,16 +26,17 @@ if TYPE_CHECKING:
     from tk_gui.pseudo_elements import Row
     from tk_gui.typing import Bool, XY, BindTarget
 
-__all__ = ['Text', 'Link', 'Input', 'Multiline']
+__all__ = ['Text', 'Link', 'Input', 'Multiline', 'Label']
 log = logging.getLogger(__name__)
 
 
 class TextValueMixin:
     string_var: Optional[StringVar] = None
-    widget: Union[Label, Entry]
+    widget: Union[TkLabel, Entry]
     size: XY
     _value: str
     _move_cursor: bool = False
+    _auto_size: bool = True
 
     def __init_subclass__(cls, move_cursor: bool = False, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -79,12 +80,28 @@ class TextValueMixin:
         except TypeError:
             return 1
 
+    def _init_size(self, font: Font) -> Optional[XY]:
+        try:
+            width, size = self.size
+        except TypeError:
+            pass
+        else:
+            return width, size
+        if not self._auto_size or not self._value:
+            return None
+        lines = self._value.splitlines()
+        width = max(map(len, lines))
+        height = len(lines)
+        if font and 'bold' in font:
+            width += 1
+        return width, height
+
 
 class LinkableMixin:
     __link: Optional[LinkTarget] = None
     _tooltip_text: str | None
     add_tooltip: Callable
-    widget: Union[Label, Entry]
+    widget: Union[TkLabel, Entry]
     style: Style
     base_style_layer_and_state: tuple[StyleLayer, StyleState]
     size_and_pos: tuple[XY, XY]
@@ -168,8 +185,9 @@ class LinkableMixin:
         link.open(event)
 
 
-class Text(TextValueMixin, LinkableMixin, Element):
-    widget: Union[Label, Entry]
+class Label(TextValueMixin, LinkableMixin, Element, base_style_layer='text'):
+    """A text element in which the text is NOT selectable."""
+    widget: TkLabel
 
     def __init__(
         self,
@@ -179,7 +197,72 @@ class Text(TextValueMixin, LinkableMixin, Element):
         justify: Union[str, Justify] = None,
         anchor: Union[str, Anchor] = None,
         link_bind: str = None,
-        selectable: Bool = True,
+        auto_size: Bool = True,
+        **kwargs,
+    ):
+        self.value = value
+        self.init_linkable(link, link_bind, kwargs.pop('tooltip', None))
+        if justify is anchor is None:
+            justify = Justify.LEFT
+            anchor = Justify.LEFT.as_anchor()
+        super().__init__(justify_text=justify, anchor=anchor, **kwargs)
+        self._auto_size = auto_size
+
+    @property
+    def pad_kw(self) -> dict[str, int]:
+        try:
+            x, y = self.pad
+        except TypeError:
+            x, y = 0, 3
+        return {'padx': x, 'pady': y}
+
+    @property
+    def style_config(self) -> dict[str, Any]:
+        return {
+            **self.style.get_map('text', bd='border_width', fg='fg', bg='bg', font='font', relief='relief'),
+            **self._style_config,
+        }
+
+    def pack_into(self, row: Row, column: int):
+        self.init_string_var()
+        kwargs = {
+            'textvariable': self.string_var,
+            'justify': self.justify_text.value,
+            'wraplength': 0,
+            'takefocus': int(self.allow_focus),
+            **self.style_config,
+        }
+        try:
+            kwargs['width'], kwargs['height'] = self._init_size(kwargs.get('font'))
+        except TypeError:
+            pass
+
+        self.widget = label = TkLabel(row.frame, **kwargs)
+        if kwargs.get('height', 1) != 1:
+            wrap_len = label.winfo_reqwidth()  # width in pixels
+            label.configure(wraplength=wrap_len)
+
+        self.pack_widget()
+        self.maybe_enable_link()
+
+    def update(self, value: Any = None, link: _Link = None):
+        if value is not None:
+            self.value = value
+        if link is not None:
+            self.update_link(link)
+
+
+class Text(TextValueMixin, LinkableMixin, Element):
+    widget: Entry
+
+    def __init__(
+        self,
+        value: Any = '',
+        link: _Link | LinkTarget = None,
+        *,
+        justify: Union[str, Justify] = None,
+        anchor: Union[str, Anchor] = None,
+        link_bind: str = None,
         auto_size: Bool = True,
         use_input_style: Bool = False,
         **kwargs,
@@ -188,10 +271,7 @@ class Text(TextValueMixin, LinkableMixin, Element):
         self.init_linkable(link, link_bind, kwargs.pop('tooltip', None))
         if justify is anchor is None:
             justify = Justify.LEFT
-            if not selectable:
-                anchor = Justify.LEFT.as_anchor()
         super().__init__(justify_text=justify, anchor=anchor, **kwargs)
-        self._selectable = selectable
         self._auto_size = auto_size
         self._use_input_style = use_input_style
 
@@ -200,28 +280,8 @@ class Text(TextValueMixin, LinkableMixin, Element):
         try:
             x, y = self.pad
         except TypeError:
-            if self._selectable:
-                x, y = 5, 3
-            else:
-                x, y = 0, 3
-
+            x, y = 5, 3
         return {'padx': x, 'pady': y}
-
-    def _init_size(self, font: Font) -> Optional[XY]:
-        try:
-            width, size = self.size
-        except TypeError:
-            pass
-        else:
-            return width, size
-        if not self._auto_size or not self._value:
-            return None
-        lines = self._value.splitlines()
-        width = max(map(len, lines))
-        height = len(lines)
-        if font and 'bold' in font:
-            width += 1
-        return width, height
 
     @property
     def style_config(self) -> dict[str, Any]:
@@ -236,11 +296,10 @@ class Text(TextValueMixin, LinkableMixin, Element):
         else:
             config = {
                 **style.get_map('text', bd='border_width', fg='fg', bg='bg', font='font', relief='relief'),
+                **style.get_map('text', readonlybackground='bg'),
                 **self._style_config,
             }
-            if self._selectable:
-                config.update(self.style.get_map('text', readonlybackground='bg'))
-                config.setdefault('relief', 'flat')
+            config.setdefault('relief', 'flat')
             return config
 
     @property
@@ -252,33 +311,6 @@ class Text(TextValueMixin, LinkableMixin, Element):
 
     def pack_into(self, row: Row, column: int):
         self.init_string_var()
-        if self._selectable:
-            self._pack_entry(row)
-        else:
-            self._pack_label(row)
-
-        self.pack_widget()
-        self.maybe_enable_link()
-
-    def _pack_label(self, row: Row):
-        kwargs = {
-            'textvariable': self.string_var,
-            'justify': self.justify_text.value,
-            'wraplength': 0,
-            'takefocus': int(self.allow_focus),
-            **self.style_config,
-        }
-        try:
-            kwargs['width'], kwargs['height'] = self._init_size(kwargs.get('font'))
-        except TypeError:
-            pass
-
-        self.widget = label = Label(row.frame, **kwargs)
-        if kwargs.get('height', 1) != 1:
-            wrap_len = label.winfo_reqwidth()  # width in pixels
-            label.configure(wraplength=wrap_len)
-
-    def _pack_entry(self, row: Row):
         kwargs = {
             'highlightthickness': 0,
             'textvariable': self.string_var,
@@ -292,6 +324,8 @@ class Text(TextValueMixin, LinkableMixin, Element):
         except TypeError:
             pass
         self.widget = Entry(row.frame, **kwargs)
+        self.pack_widget()
+        self.maybe_enable_link()
 
     def update(self, value: Any = None, link: _Link = None):
         if value is not None:
@@ -331,7 +365,7 @@ class InteractiveText(DisableableMixin, Interactive, ABC):
 
 
 class Input(TextValueMixin, LinkableMixin, InteractiveText, disabled_state='readonly', move_cursor=True):
-    widget: Entry
+    widget: Entry  # Default relief: sunken
     password_char: Optional[str] = None
 
     def __init__(
@@ -426,6 +460,7 @@ class Multiline(InteractiveText, disabled_state='disabled'):
         justify_text: Union[str, Justify, None] = Justify.LEFT,
         callback: BindTarget = None,
         read_only: Bool = False,
+        read_only_style: Bool = False,
         **kwargs,
     ):
         super().__init__(justify_text=justify_text, **kwargs)
@@ -437,6 +472,7 @@ class Multiline(InteractiveText, disabled_state='disabled'):
         self.rstrip = rstrip
         self._callback = callback
         self._read_only = read_only
+        self._read_only_style = read_only_style
 
     @property
     def read_only(self) -> Bool:
@@ -472,16 +508,33 @@ class Multiline(InteractiveText, disabled_state='disabled'):
         self._refresh_colors()
 
     @property
+    def base_style_layer_and_state(self) -> tuple[StyleLayer, StyleState]:
+        if self._read_only_style:
+            return self.style.text, StyleState.DISABLED
+        else:
+            return self.style.input, self.style_state
+
+    @property
     def style_config(self) -> dict[str, Any]:
         style, state = self.style, self.style_state
-        config: dict[str, Any] = {
-            'highlightthickness': 0,
-            **style.get_map('input', state, bd='border_width', fg='fg', bg='bg', font='font', relief='relief'),
-            **style.get_map('text', 'highlight', selectforeground='fg', selectbackground='bg'),
-            **style.get_map('insert', insertbackground='bg'),
-            **self._style_config,
-        }
-        config.setdefault('relief', 'sunken')
+        if self._read_only_style:
+            config = {
+                # 'highlightthickness': 0,
+                **style.get_map('text', bd='border_width', fg='fg', bg='bg', font='font', relief='relief'),
+                **style.get_map('text', 'highlight', selectforeground='fg', selectbackground='bg'),
+                **self._style_config,
+            }
+            config.setdefault('relief', 'flat')
+        else:
+            config: dict[str, Any] = {
+                'highlightthickness': 0,
+                **style.get_map('input', state, bd='border_width', fg='fg', bg='bg', font='font', relief='relief'),
+                **style.get_map('text', 'highlight', selectforeground='fg', selectbackground='bg'),
+                **style.get_map('insert', insertbackground='bg'),
+                **self._style_config,
+            }
+            config.setdefault('relief', 'sunken')
+
         return config
 
     def pack_into(self, row: Row, column: int):
