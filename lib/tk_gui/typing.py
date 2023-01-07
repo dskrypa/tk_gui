@@ -18,7 +18,8 @@ if TYPE_CHECKING:
 # fmt: off
 __all__ = [
     'Bool', 'XY', 'Key', 'HasParent', 'HasValue', 'Layout', 'Axis', 'Orientation', 'PathLike',
-    'BindCallback', 'EventCallback', 'TraceCallback', 'BindTarget', 'Bindable', 'BindMap', 'ProvidesEventCallback',
+    'BindCallback', 'EventCallback', 'TraceCallback', 'BindTarget', 'Bindable', 'BindMap', 'MultiBindMap',
+    'ProvidesEventCallback',
     'TkFill', 'TkSide', 'TkJustify',
     'TkContainer',
 ]
@@ -33,6 +34,7 @@ TraceCallback = Callable[[str, str, str], Any]
 Bindable = Union['BindEvent', str]
 BindTarget = Union[BindCallback, EventCallback, 'BindTargets', str, None]
 BindMap = MutableMapping[Bindable, BindTarget]
+MultiBindMap = MutableMapping[Bindable, BindTarget | list[BindTarget]]
 
 Bool = Union[bool, Any]
 XY = tuple[int, int]

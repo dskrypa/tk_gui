@@ -13,7 +13,7 @@ from os import environ
 from time import monotonic
 from tkinter import Tk, Toplevel, PhotoImage, TclError, Event, CallWrapper, Frame, BaseWidget
 from tkinter.ttk import Sizegrip, Scrollbar, Treeview
-from typing import TYPE_CHECKING, Optional, Union, Type, Any, Iterable, Callable, Literal, overload
+from typing import TYPE_CHECKING, Optional, Union, Type, Any, Iterable, Callable, Literal, Iterator, overload
 from weakref import finalize, WeakSet
 
 from PIL import ImageGrab
@@ -33,7 +33,7 @@ if TYPE_CHECKING:
     from pathlib import Path
     from PIL.Image import Image as PILImage
     from .elements.element import Element, ElementBase
-    from .typing import XY, BindCallback, EventCallback, Key, BindTarget, Bindable, BindMap, Layout, Bool, HasValue
+    from .typing import XY, BindCallback, EventCallback, Key, BindTarget, Bindable, MultiBindMap, Layout, Bool, HasValue
     from .typing import TkContainer
 
 __all__ = ['Window']
@@ -178,7 +178,7 @@ class Window(RowContainer):
         element_side: Union[str, Side] = None,
         element_padding: XY = None,
         element_size: XY = None,
-        binds: BindMap = None,
+        binds: MultiBindMap = None,
         exit_on_esc: Bool = False,
         scroll_y: Bool = False,
         scroll_x: Bool = False,
@@ -205,7 +205,7 @@ class Window(RowContainer):
         title: str = None,
         *,
         min_size: XY = (200, 50),
-        binds: BindMap = None,
+        binds: MultiBindMap = None,
         exit_on_esc: Bool = False,
         close_cbs: Iterable[Callable] = None,
         right_click_menu: Menu = None,
@@ -228,16 +228,20 @@ class Window(RowContainer):
             setattr(self, key, val)  # This needs to happen before touching self.config to have is_popup set
 
         super().__init__(layout, style=style or self.config.style, **kwargs)
-        self._event_cbs: dict[BindEvent, EventCallback] = {}
+        self._event_cbs: dict[BindEvent, list[EventCallback]] = {}
         self._bound_for_events: set[str] = set()
         self.element_map = {}
         self.close_cbs = list(close_cbs) if close_cbs is not None else []
-        self.binds = binds or {}
+        if binds:
+            self.binds = {k: v if isinstance(v, list) else [v] for k, v in binds.items()}
+        else:
+            self.binds = {}
+
         if right_click_menu:
             self._right_click_menu = right_click_menu
-            self.binds.setdefault(BindEvent.RIGHT_CLICK, None)
+            self.binds.setdefault(BindEvent.RIGHT_CLICK, []).append(None)
         if exit_on_esc:
-            self.binds.setdefault('<Escape>', BindTargets.EXIT)
+            self.binds.setdefault('<Escape>', []).append(BindTargets.EXIT)
 
         if grab_anywhere is True:
             self.grab_anywhere = True
@@ -808,9 +812,9 @@ class Window(RowContainer):
     def _init_grab_anywhere(self):
         prefix = 'Control-' if self.grab_anywhere == 'control' else ''
         root = self._root
-        root.bind(f'<{prefix}Button-1>', self._begin_grab_anywhere)
-        root.bind(f'<{prefix}B1-Motion>', self._handle_grab_anywhere_motion)
-        root.bind(f'<{prefix}ButtonRelease-1>', self._end_grab_anywhere)
+        root.bind(f'<{prefix}Button-1>', self._begin_grab_anywhere, add=True)
+        root.bind(f'<{prefix}B1-Motion>', self._handle_grab_anywhere_motion, add=True)
+        root.bind(f'<{prefix}ButtonRelease-1>', self._end_grab_anywhere, add=True)
 
     def _begin_grab_anywhere(self, event: Event):
         widget: BaseWidget = event.widget
@@ -836,20 +840,23 @@ class Window(RowContainer):
 
     # region Bind Methods
 
-    def bind(self, event_pat: Bindable, cb: BindTarget):
+    def bind(self, event_pat: Bindable, cb: BindTarget, add: bool = True):
         """
         Register a bind callback.  If :meth:`.show` was already called, it is applied immediately, otherwise it is
         registered to be applied later.
         """
         if self._root:
-            self._bind(event_pat, cb)
+            self._bind(event_pat, cb, add=add)
+        elif add:
+            self.binds.setdefault(event_pat, []).append(cb)
         else:
-            self.binds[event_pat] = cb
+            self.binds[event_pat] = [cb]
 
     def apply_binds(self):
         """Called by :meth:`.show` to apply all registered callback bindings"""
-        for event_pat, cb in self.binds.items():
-            self._bind(event_pat, cb)
+        for event_pat, cbs in self.binds.items():
+            for cb in cbs:
+                self._bind(event_pat, cb, add=True)
 
         for bind_event in self._always_bind_events:
             self._bind_event(bind_event, None)
@@ -857,17 +864,17 @@ class Window(RowContainer):
         if self.grab_anywhere:
             self._init_grab_anywhere()
 
-    def _bind(self, event_pat: Bindable, cb: BindTarget):
+    def _bind(self, event_pat: Bindable, cb: BindTarget, add: bool = True):
         bind_event = _normalize_bind_event(event_pat)
         if isinstance(bind_event, BindEvent):
-            self._bind_event(bind_event, cb)
+            self._bind_event(bind_event, cb, add=add)
         elif cb is None:
             return
         else:
             cb = self._normalize_bind_cb(cb)
             # log.debug(f'Binding event={bind_event!r} to {cb=}')
             try:
-                self._root.bind(bind_event, cb)
+                self._root.bind(bind_event, cb, add=add)
             except (TclError, RuntimeError) as e:
                 log.error(f'Unable to bind event={bind_event!r}: {e}')
                 # self._root.unbind_all(bind_event)
@@ -885,14 +892,21 @@ class Window(RowContainer):
 
         return cb
 
-    def _bind_event(self, bind_event: BindEvent, cb: Optional[EventCallback]):
+    def _bind_event(self, bind_event: BindEvent, cb: Optional[EventCallback], add: bool = True):
         if cb is not None:
-            self._event_cbs[bind_event] = cb
+            if not add:
+                self._event_cbs[bind_event] = [cb]
+            else:
+                self._event_cbs.setdefault(bind_event, []).append(cb)
         if (tk_event := getattr(bind_event, 'event', bind_event)) not in self._bound_for_events:
             method = getattr(self, self._tk_event_handlers[tk_event])
             log.debug(f'Binding event={tk_event!r} to {method=}')
-            self._root.bind(tk_event, method)
+            self._root.bind(tk_event, method, add=add)
             self._bound_for_events.add(tk_event)
+
+    def _iter_callbacks(self, bind_event: BindEvent) -> Iterator[EventCallback]:
+        if cbs := self._event_cbs.get(bind_event):
+            yield from cbs
 
     # endregion
 
@@ -915,7 +929,7 @@ class Window(RowContainer):
             if new_pos != self._last_known_pos:
                 # log.debug(f'  Position changed: old={self._last_known_pos}, new={new_pos}')
                 self._last_known_pos = new_pos
-                if cb := self._event_cbs.get(BindEvent.POSITION_CHANGED):
+                for cb in self._iter_callbacks(BindEvent.POSITION_CHANGED):
                     cb(event, new_pos)
                 # if not self.is_popup and config.remember_position:
                 if config.remember_position:
@@ -926,7 +940,7 @@ class Window(RowContainer):
             if new_size != self._last_known_size:
                 # log.debug(f'  Size changed: old={self._last_known_size}, new={new_size}')
                 self._last_known_size = new_size
-                if cb := self._event_cbs.get(BindEvent.SIZE_CHANGED):
+                for cb in self._iter_callbacks(BindEvent.SIZE_CHANGED):
                     cb(event, new_size)
                 # if not self.is_popup and config.remember_size:
                 if config.remember_size:
@@ -946,7 +960,9 @@ class Window(RowContainer):
         log.debug(f'Menu {result=}')
         if result == CallbackAction.EXIT:
             self.close(event)
-        elif cb := self._event_cbs.get(BindEvent.MENU_RESULT):
+            return
+
+        for cb in self._iter_callbacks(BindEvent.MENU_RESULT):
             cb(event, result)
 
     # @_tk_event_handler(BindEvent.LEFT_CLICK, True)
@@ -954,10 +970,12 @@ class Window(RowContainer):
     #     try:
     #         widget = event.widget
     #     except AttributeError:
-    #         element, widget, geometry, pack_info = None, None, '???', '???'
+    #         element, widget, geometry, pack_info, config_str = None, None, '???', '???', '???'
     #     else:
     #         element = self.widget_element_map.get(widget)
     #         geometry = widget.winfo_geometry()
+    #         # config = widget.configure()
+    #         # config_str = '{\n' + ',\n'.join(f'        {k!r}: {v!r}' for k, v in sorted(config.items())) + '\n}'
     #         try:
     #             pack_info = widget.pack_info()
     #         except AttributeError:  # Toplevel does not extend Pack
@@ -966,6 +984,7 @@ class Window(RowContainer):
     #     log.info(
     #         f'Tkinter {event=}\n    {element=}\n    {widget=}\n'
     #         # f'    event.__dict__={event.__dict__}\n'
+    #         # f'    {geometry=}  {pack_info=}\n    config={config_str}\n',
     #         f'    {geometry=}  {pack_info=}\n',
     #     )
 

@@ -68,7 +68,8 @@ class View(HandlesEvents):
             window_kwargs = {}
 
         binds = window_kwargs.setdefault('binds', {})
-        binds.update(self.event_handler_binds())
+        for key, cb in self.event_handler_binds().items():
+            binds.setdefault(key, []).append(cb)
         return Window(self.get_pre_window_layout(), title=self.title, **window_kwargs)
 
     @cached_property
