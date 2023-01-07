@@ -175,6 +175,11 @@ class GuiTest(Command):
         print(f'{results=}')
 
     @action
+    def popup_multiline(self):
+        filler = 'the quick brown fox jumped over the lazy dog'
+        popup_ok(f'{filler}\n{filler}')
+
+    @action
     def popup_warning(self):
         popup_warning('This is a test warning!')
 
@@ -257,7 +262,6 @@ class GuiTest(Command):
 
             def get_post_window_layout(self):
                 yield [Input(key='test_input', size=(40, 1))]
-
 
         TestView().run()
 

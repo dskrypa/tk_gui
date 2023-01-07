@@ -14,7 +14,7 @@ from queue import Queue
 from threading import current_thread, main_thread
 from typing import TYPE_CHECKING, Union, Optional, Collection, Mapping, Callable, Literal, Any
 
-from ..elements import Element, Button, Text, Image, Input
+from ..elements import Element, Button, Text, Image, Input, Multiline
 from ..event_handling import HandlesEvents
 from ..positioning import positioner
 from ..style import Style, StyleSpec
@@ -132,7 +132,7 @@ class BasicPopup(Popup):
         *,
         button: Union[str, Button] = None,
         buttons: Union[Mapping[str, str], Collection[str], Collection[Button]] = None,
-        multiline: Bool = False,
+        multiline: Bool = None,
         style: StyleSpec = None,
         image: ImageType = None,
         image_size: XY = None,
@@ -145,7 +145,7 @@ class BasicPopup(Popup):
         super().__init__(**kwargs)
         self.text = text
         self.buttons = (button,) if button else buttons
-        self.multiline = multiline
+        self.multiline = '\n' in text if multiline is None else multiline
         self.style = Style.get_style(style)
         self.image = image
         self.image_size = image_size or (100, 100)
@@ -160,7 +160,7 @@ class BasicPopup(Popup):
             return size
         lines = self.lines
         n_lines = len(lines)
-        if self.multiline or n_lines > 1:
+        if self.multiline:
             if parent := self.parent:
                 monitor = positioner.get_monitor(*parent.position)
             else:
@@ -201,7 +201,19 @@ class BasicPopup(Popup):
         return buttons
 
     def get_layout(self) -> list[list[Element]]:
-        layout: list[list[Element]] = [[Text(self.text)], self.prepare_buttons()]
+        if self.multiline:
+            width, height = size = self.text_size
+            text = Multiline(
+                self.text,
+                read_only=True,
+                read_only_style=True,
+                scroll_y=len(self.lines) > height,
+                size=size,
+            )
+        else:
+            text = Text(self.text)
+
+        layout: list[list[Element]] = [[text], self.prepare_buttons()]
         if image := self.image:
             layout[0].insert(0, Image(image, size=self.image_size))
 
