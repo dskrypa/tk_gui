@@ -139,19 +139,24 @@ class Button(DisableableMixin, Interactive, base_style_layer='button'):
 
         style = self.style
         if text and image:
+            lines = text.splitlines()
             if not width:
                 # width = int(ceil(image.width / style.char_width())) + len(text)
-                width = style.char_width('button') * len(text) + image.width
+                text_width = max(len(line) for line in lines) * style.char_width('button')
+                width = text_width + image.width
             if not height:
-                height = int(ceil(image.height / style.char_height('button')))
+                text_height = len(lines) * style.char_height('button')
+                # This needs testing - I would have thought it would make more sense to use max(img, txt)
+                height = int(ceil(image.height / text_height))
                 # height = style.char_height() + image.height
         elif text:
+            lines = text.splitlines()
             if not width:
-                # pass
-                width = len(text) + 1
+                width = max(len(line) for line in lines) + 1
+                # width = len(text) + 1
                 # width = style.char_width() * len(text)
             if not height:
-                height = 1
+                height = len(lines)
                 # height = style.char_height()
         else:
             if not width:
