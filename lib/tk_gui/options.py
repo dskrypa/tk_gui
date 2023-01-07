@@ -16,10 +16,12 @@ from typing import TYPE_CHECKING, Any, Callable, Optional, Collection, Iterator,
 from .elements.choices import Combo, ListBox, CheckBox, make_checkbox_grid
 from .elements import Text, Element, Button, Input, Submit, Frame
 from .elements.text import normalize_text_ele_widths
-from .popups import PickFolder, Popup
+from .popups.base import BasePopup
+from .popups import PickFolder
 
 if TYPE_CHECKING:
     from tkinter import Event
+    from .typing import Key
 
 __all__ = [
     'GuiOptions',
@@ -185,7 +187,7 @@ class PopupOption(Option, opt_type='popup'):
         self,
         name: str,
         label: str,
-        popup_cls: Type[Popup],
+        popup_cls: Type[BasePopup],
         button: str = 'Choose...',
         default: Any = _NotSet,
         popup_kwargs: Mapping[str, Any] = None,
@@ -221,7 +223,7 @@ class PathOption(PopupOption, opt_type='path'):
         self,
         name: str,
         label: str,
-        popup_cls: Type[Popup],
+        popup_cls: Type[BasePopup],
         button: str = 'Browse',
         default: Any = _NotSet,
         disabled: bool = False,
@@ -375,7 +377,7 @@ class GuiOptions:
         self,
         option: str,
         label: str,
-        popup_cls: Type[Popup],
+        popup_cls: Type[BasePopup],
         default: Union[Path, str] = _NotSet,
         *,
         must_exist: bool = False,
@@ -393,7 +395,7 @@ class GuiOptions:
         self,
         option: str,
         label: str,
-        popup_cls: Type[Popup],
+        popup_cls: Type[BasePopup],
         button: str = 'Choose...',
         default: Any = _NotSet,
         popup_kwargs: Mapping[str, Any] = None,
@@ -471,7 +473,7 @@ class GuiOptions:
 
     # endregion
 
-    def parse(self, data: dict[str, Any]) -> dict[str, Any]:
+    def parse(self, data: dict[Key, Any]) -> dict[str, Any]:
         errors = []
         parsed = {}
         defaults = []
