@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Optional, Union, Any, Callable
 
 from tk_gui.constants import LEFT_CLICK
 from tk_gui.enums import Justify, Anchor
+from tk_gui.event_handling import BindManager
 from tk_gui.pseudo_elements.scroll import ScrollableText
 from tk_gui.style import Style, Font, StyleState, StyleLayer
 from tk_gui.utils import max_line_len, call_with_popped
@@ -460,7 +461,7 @@ class Multiline(InteractiveText, disabled_state='disabled'):
         auto_scroll: bool = False,
         rstrip: bool = False,
         justify_text: Union[str, Justify, None] = Justify.LEFT,
-        callback: BindTarget = None,
+        input_cb: BindTarget = None,
         read_only: Bool = False,
         read_only_style: Bool = False,
         **kwargs,
@@ -472,9 +473,10 @@ class Multiline(InteractiveText, disabled_state='disabled'):
         self.scroll_x = scroll_x
         self.auto_scroll = auto_scroll
         self.rstrip = rstrip
-        self._callback = callback
+        self._input_cb = self.normalize_callback(input_cb) if input_cb is not None else input_cb
         self._read_only = read_only
         self._read_only_style = read_only_style
+        self._bind_manager = BindManager()
 
     @property
     def read_only(self) -> Bool:
@@ -521,11 +523,14 @@ class Multiline(InteractiveText, disabled_state='disabled'):
         style, state = self.style, self.style_state
         if self._read_only_style:
             config = {
-                # 'highlightthickness': 0,
+                'highlightthickness': 0,
                 **style.get_map('text', bd='border_width', fg='fg', bg='bg', font='font', relief='relief'),
                 **style.get_map('text', 'highlight', selectforeground='fg', selectbackground='bg'),
                 **self._style_config,
             }
+            cg = config.get
+            if cg('selectforeground') == cg('fg') and cg('selectbackground') == cg('bg'):
+                config.update(style.get_map('text', 'highlight', selectforeground='bg', selectbackground='fg'))
             config.setdefault('relief', 'flat')
         else:
             config: dict[str, Any] = {
@@ -567,25 +572,31 @@ class Multiline(InteractiveText, disabled_state='disabled'):
             text.tag_configure(pos, justify=pos)  # noqa
 
         self.pack_widget()
-        if (callback := self._callback) is not None:
-            text.bind('<Key>', self.normalize_callback(callback))
-
-        if self.disabled or self._read_only:
+        if self.disabled:
             # Note: This needs to occur after setting any text value, otherwise the text does not appear.
             text.configure(state='disabled')
+
+        if self._read_only:
+            self._bind_manager.bind('<Key>', _block_text_entry, text)
+        elif (callback := self._input_cb) is not None:
+            self._bind_manager.bind('<Key>', callback, text)
 
     def __enter__(self) -> Multiline:
         if self.__entered:
             raise RuntimeError(f'{self} does not support entering its context multiple times')
         self.__entered = True
-        if self._read_only and not self.disabled:
-            self.widget.inner_widget.configure(state='normal')
+        # if self._read_only and not self.disabled:
+        #     self.widget.inner_widget.configure(state='normal')
+        if self._read_only:
+            self._bind_manager.replace('<Key>', self._input_cb, self.widget.inner_widget)
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.__entered = False
-        if self._read_only and not self.disabled:
-            self.widget.inner_widget.configure(state='disabled')
+        # if self._read_only and not self.disabled:
+        #     self.widget.inner_widget.configure(state='disabled')
+        if self._read_only:
+            self._bind_manager.replace('<Key>', _block_text_entry, self.widget.inner_widget)
 
     def clear(self):
         with self:
@@ -633,3 +644,14 @@ class Multiline(InteractiveText, disabled_state='disabled'):
 
 def _clear_selection(widget: Union[Entry, Text], event: Event = None):
     widget.selection_clear()
+
+
+def _block_text_entry(event: Event = None):
+    """
+    Used by read-only Multiline elements as a workaround for tkinter not supporting proper read-only multi-line text
+    widgets.  Based on: https://stackoverflow.com/questions/3842155
+    """
+    if event.keysym == 'v':  # ctrl+v results in event.char being \x1b
+        return 'break'
+    char = event.char
+    return 'break' if char and char.isprintable() else None

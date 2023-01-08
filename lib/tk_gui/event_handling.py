@@ -247,8 +247,8 @@ class HandlesEvents(metaclass=HandlesEventsMeta):
 class BindManager:
     __slots__ = ('event_cb_map', 'event_bound_id_map')
 
-    def __init__(self, event_cb_map: Mapping[str, BindCallback]):
-        self.event_cb_map = event_cb_map
+    def __init__(self, event_cb_map: MutableMapping[str, BindCallback] = None):
+        self.event_cb_map = {} if event_cb_map is None else event_cb_map
         self.event_bound_id_map = {}
 
     def bind_all(self, widget: BaseWidget, add: Bool = True):
@@ -260,3 +260,17 @@ class BindManager:
             widget.unbind(event_pat, cb_id)
 
         self.event_bound_id_map = {}
+
+    def bind(self, event_pat: str, callback: BindCallback | None, widget: BaseWidget, add: Bool = True):
+        if callback is None:
+            return
+        self.event_cb_map[event_pat] = callback
+        self.event_bound_id_map[event_pat] = widget.bind(event_pat, callback, add=add)
+
+    def unbind(self, event_pat: str, widget: BaseWidget):
+        if cb_id := self.event_bound_id_map.pop(event_pat, None):
+            widget.unbind(event_pat, cb_id)
+
+    def replace(self, event_pat: str, callback: BindCallback | None, widget: BaseWidget, add: Bool = True):
+        self.unbind(event_pat, widget)
+        self.bind(event_pat, callback, widget, add)
