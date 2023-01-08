@@ -15,13 +15,13 @@ from tkinter.ttk import Style as TtkStyle
 from typing import TYPE_CHECKING, Union, Optional, Literal, Type, Mapping, Iterator, Any, Generic, TypeVar, Iterable
 from typing import overload
 
-from .enums import StyleState
-from .utils import ClearableCachedPropertyMixin
+from tk_gui.enums import StyleState
+from tk_gui.utils import ClearableCachedPropertyMixin
 
 if TYPE_CHECKING:
-    from .typing import XY, Bool
+    from tk_gui.typing import XY, Bool
 
-__all__ = ['Style', 'StyleSpec']
+__all__ = ['Style', 'StyleSpec', 'STATE_NAMES', 'StyleLayer', 'Layer', 'StyleState', 'Font']
 # log = logging.getLogger(__name__)
 
 DEFAULT_FONT = ('Helvetica', 10)
@@ -89,8 +89,8 @@ class StateValues(Generic[T_co]):
     default = StateValue()
     disabled = StateValue()
     invalid = StateValue()
-    active = StateValue()
-    highlight = StateValue()
+    active = StateValue()       # Only used for button, radio, and menu elements
+    highlight = StateValue()    # Only used for button, radio, and multiline elements
 
     def __init__(
         self,
@@ -357,7 +357,7 @@ def _font_or_none(font: Font) -> TkFont | None:
     except RuntimeError:  # Fonts require the hidden root to have been initialized first
         pass
 
-    from .window import Window
+    from tk_gui.window import Window
 
     Window._ensure_tk_is_initialized()
     return TkFont(font=font)
@@ -474,7 +474,7 @@ class Style(ClearableCachedPropertyMixin):
     progress = StyleLayerProperty('base')           # Progress bars
     radio = StyleLayerProperty('base')
     scroll = StyleLayerProperty()
-    selected = StyleLayerProperty('base')           # Selected text / radio buttons / etc
+    selected = StyleLayerProperty('base')           # Used in the choices, table, and scroll modules
     separator = StyleLayerProperty('base')          # Vertical / horizontal separator lines
     slider = StyleLayerProperty('base')
     table = StyleLayerProperty('base')              # Table elements
@@ -658,56 +658,3 @@ class Style(ClearableCachedPropertyMixin):
         return width, height
 
     # endregion
-
-
-# States: (default, disabled, invalid, active, highlight)
-_common = {
-    'font': DEFAULT_FONT,
-    'ttk_theme': 'default',
-    'border_width': 1,
-    'link_fg': '#3a78f2',
-    'link_font': (*DEFAULT_FONT, 'underline'),
-}
-# Style('SystemDefault', **_common, table_alt_bg='#cccdcf')
-Style(
-    'SystemDefault',
-    **_common,
-    table_alt_bg='#cccdcf',
-    # fg=('SystemButtonText', 'SystemDisabledText', None, 'SystemButtonText', 'SystemHighlightText'),
-    # bg=('SystemButtonFace', 'SystemButtonFace', None, 'SystemButtonFace', 'SystemHighlight'),
-    # radio_fg=('SystemWindowText', 'SystemDisabledText', None, 'SystemWindowText', 'SystemWindowFrame'),
-    # radio_bg=('SystemButtonFace', 'SystemButtonFace', None, 'SystemButtonFace', 'SystemButtonFace'),
-    # selected_fg='SystemHighlightText',
-    # selected_bg='SystemHighlight',
-    # listbox_bg='SystemWindow',
-    # input_fg=('SystemWindowText', 'SystemDisabledText', None, None, 'SystemWindowFrame'),
-    # input_bg=('SystemWindow', 'SystemButtonFace', None, None, 'SystemButtonFace'),
-    # # text_fg=('SystemButtonText', 'SystemDisabledText', None, 'SystemButtonText', 'SystemWindowFrame'),  # Label
-    # checkbox_fg=('SystemWindowText', 'SystemDisabledText', None, 'SystemWindowText', 'SystemWindowFrame'),
-    # # checkbox_bg=('SystemButtonFace', None, None, 'SystemButtonFace', 'SystemButtonFace',),
-    # scroll_trough_color='SystemScrollbar',
-)
-Style(
-    '__base__',
-    tooltip_fg='#000000',
-    tooltip_bg='#ffffe0',   # light yellow
-    **_common,
-)
-Style('_dark_base', parent='__base__', insert_bg='#FFFFFF')
-Style('_light_base', parent='__base__', insert_bg='#000000')
-Style(
-    'DarkGrey10',
-    parent='_dark_base',
-    fg=('#cccdcf', '#000000', '#FFFFFF'),               # light grey, black, white
-    bg=('#1c1e23', '#a2a2a2', '#781F1F'),               # dark grey, med grey, maroonish red
-    selected_fg=('#1c1e23', '#a2a2a2', '#781F1F'),      # dark grey, med grey, maroonish red [Inverse of non-selected]
-    selected_bg=('#cccdcf', '#000000', '#FFFFFF'),      # light grey, black, white
-    input_fg=('#8b9fde', '#000000', '#FFFFFF'),         # cobaltish blue, black, white
-    input_bg=('#272a31', '#a2a2a2', '#781F1F'),         # dark grey, med grey, maroonish red
-    menu_fg=('#8b9fde', '#616161', None, '#8b9fde'),    # cobaltish blue, med/dark grey, -, cobaltish blue
-    menu_bg=('#272a31', '#272a31', None, '#000000'),    # med grey, med grey, -, black
-    button_fg=('#f5f5f6', None, None, '#000000'),       # whiteish, -, -, black
-    button_bg=('#2e3d5a', None, None, '#8b9fde'),       # dark blue, -, -, cobaltish blue
-    table_alt_fg='#8b9fde',                             # cobaltish blue
-    table_alt_bg='#272a31',                             # med grey
-).make_default()

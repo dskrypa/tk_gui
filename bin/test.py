@@ -341,8 +341,8 @@ class GuiTest(Command):
         ]
 
         # multiline = Multiline(size=(40, 10), expand=True)
-        # multiline = Multiline(size=(120, None), expand=True, read_only=True)
-        multiline = Multiline(size=(120, None), expand=True)
+        multiline = Multiline(size=(120, None), expand=True, read_only=True)
+        # multiline = Multiline(size=(120, None), expand=True)
         # multiline = Multiline(size=(120, None), expand=True, read_only=True, read_only_style=True)
 
         layout = [

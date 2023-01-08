@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 from ..elements.images import ClockImage
 from ..event_handling import event_handler
 from ..popups.image import AnimatedPopup
-from ..style import Style
+from ..styles import Style
 from ..window import Window
 
 if TYPE_CHECKING:

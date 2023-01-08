@@ -27,7 +27,7 @@ from .exceptions import DuplicateKeyError
 from .positioning import positioner, Monitor
 from .pseudo_elements.row_container import RowContainer
 from .pseudo_elements.scroll import ScrollableToplevel
-from .style import Style, StyleSpec
+from .styles import Style, StyleSpec
 from .utils import ON_LINUX, ON_WINDOWS, ProgramMetadata, extract_kwargs
 
 if TYPE_CHECKING:

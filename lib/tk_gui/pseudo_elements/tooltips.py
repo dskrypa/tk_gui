@@ -11,7 +11,7 @@ import tkinter.constants as tkc
 from tkinter import Toplevel, TclError, Event, Label
 from typing import TYPE_CHECKING, Optional
 
-from ..style import Style, StyleSpec
+from ..styles import Style, StyleSpec
 
 if TYPE_CHECKING:
     from ..elements.element import Element

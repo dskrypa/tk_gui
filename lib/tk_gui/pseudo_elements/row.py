@@ -14,7 +14,7 @@ from tkinter import Frame, LabelFrame, Widget, BaseWidget
 from typing import TYPE_CHECKING, Optional, Union, Iterable, Sequence
 
 from ..enums import Anchor, Justify, Side
-from ..style import Style
+from ..styles import Style
 from ..utils import Inheritable
 
 if TYPE_CHECKING:

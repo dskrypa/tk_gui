@@ -17,7 +17,7 @@ from tk_gui.constants import LEFT_CLICK
 from tk_gui.enums import Justify, Anchor
 from tk_gui.event_handling import BindManager
 from tk_gui.pseudo_elements.scroll import ScrollableText
-from tk_gui.style import Style, Font, StyleState, StyleLayer
+from tk_gui.styles import Style, Font, StyleState, StyleLayer
 from tk_gui.utils import max_line_len, call_with_popped
 from ..element import Element, Interactive
 from ..mixins import DisableableMixin
@@ -491,7 +491,9 @@ class Multiline(InteractiveText, disabled_state='disabled'):
         if self.disabled:
             return
         if ((old and not value) or (not old and value)) and (widget := self.widget):
-            widget.inner_widget.configure(state='disabled' if value else 'normal')  # noqa
+            callback = _block_text_entry if value else self._input_cb
+            self._bind_manager.replace('<Key>', callback, widget.inner_widget)
+            # widget.inner_widget.configure(state='disabled' if value else 'normal')  # noqa
 
     def disable(self):
         if self.__entered:
@@ -528,15 +530,12 @@ class Multiline(InteractiveText, disabled_state='disabled'):
                 **style.get_map('text', 'highlight', selectforeground='fg', selectbackground='bg'),
                 **self._style_config,
             }
-            cg = config.get
-            if cg('selectforeground') == cg('fg') and cg('selectbackground') == cg('bg'):
-                config.update(style.get_map('text', 'highlight', selectforeground='bg', selectbackground='fg'))
             config.setdefault('relief', 'flat')
         else:
             config: dict[str, Any] = {
                 'highlightthickness': 0,
                 **style.get_map('input', state, bd='border_width', fg='fg', bg='bg', font='font', relief='relief'),
-                **style.get_map('text', 'highlight', selectforeground='fg', selectbackground='bg'),
+                **style.get_map('input', 'highlight', selectforeground='fg', selectbackground='bg'),
                 **style.get_map('insert', insertbackground='bg'),
                 **self._style_config,
             }
@@ -587,7 +586,7 @@ class Multiline(InteractiveText, disabled_state='disabled'):
         self.__entered = True
         # if self._read_only and not self.disabled:
         #     self.widget.inner_widget.configure(state='normal')
-        if self._read_only:
+        if self._read_only:  # TODO: This bind may not need to be toggled off/on the way the state did...
             self._bind_manager.replace('<Key>', self._input_cb, self.widget.inner_widget)
         return self
 

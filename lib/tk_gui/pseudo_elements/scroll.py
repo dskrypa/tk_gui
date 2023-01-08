@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Type, Mapping, Union, Optional, Any, Iterator
 from ..utils import ON_WINDOWS
 
 if TYPE_CHECKING:
-    from ..style import Style
+    from ..styles import Style
     from ..typing import Bool, BindCallback, Axis, XY
 
 __all__ = [

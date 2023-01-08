@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Union, Optional, Collection, Mapping, Callable
 from ..elements import Element, Button, Text, Image, Input, Multiline
 from ..event_handling import HandlesEvents, BindMap
 from ..positioning import positioner
-from ..style import Style, StyleSpec
+from ..styles import Style, StyleSpec
 from ..utils import max_line_len
 from ..window import Window
 

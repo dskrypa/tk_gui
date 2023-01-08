@@ -15,7 +15,7 @@ from ..enums import Anchor
 from ..pseudo_elements.row import RowBase
 from ..pseudo_elements.row_container import RowContainer
 from ..pseudo_elements.scroll import ScrollableFrame, ScrollableLabelFrame
-from ..style import Style, StyleSpec
+from ..styles import Style, StyleSpec
 from ..utils import call_with_popped
 from .element import Element, InteractiveMixin
 

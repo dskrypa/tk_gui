@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, Optional, Callable, Union, Any, overload
 from ..enums import StyleState, Anchor, Justify, Side, BindTargets
 from ..event_handling import BindMixin, BindMapping
 from ..pseudo_elements.tooltips import ToolTip
-from ..style import Style, StyleSpec, StyleLayer, Layer
+from ..styles import Style, StyleSpec, StyleLayer, Layer
 from ..utils import Inheritable, ClearableCachedPropertyMixin, call_with_popped, extract_style
 from ._utils import find_descendants
 

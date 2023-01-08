@@ -15,7 +15,6 @@ from typing import TYPE_CHECKING, Iterable, Iterator, Union, Any
 
 from .element import ElementBase, Element, Interactive
 from .mixins import DisableableMixin, CallbackCommandMixin
-from ..style import StyleLayer, StyleState
 
 if TYPE_CHECKING:
     from ..pseudo_elements import Row

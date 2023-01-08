@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Iterator, Optional
 
 from ..elements import Text, HorizontalSeparator, Combo, Button
 from ..images.color import pick_fg
-from ..style import Style, StyleSpec, STATE_NAMES
+from ..styles import Style, StyleSpec, STATE_NAMES
 from ..window import Window
 from .base import Popup
 

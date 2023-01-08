@@ -20,7 +20,7 @@ from PIL.ImageTk import PhotoImage
 from ..images import SevenSegmentDisplay, calculate_resize, as_image
 from ..images.cycle import FrameCycle, PhotoImageCycle
 from ..images.spinner import Spinner
-from ..style import Style, StyleSpec
+from ..styles import Style, StyleSpec
 from .element import Element
 
 if TYPE_CHECKING:

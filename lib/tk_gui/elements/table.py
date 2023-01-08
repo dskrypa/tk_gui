@@ -21,7 +21,7 @@ from .element import Element
 if TYPE_CHECKING:
     from tkinter import BaseWidget
     from ..pseudo_elements import Row
-    from ..style import Font, Layer
+    from ..styles import Font, Layer
 
 __all__ = ['TableColumn', 'Table']
 log = logging.getLogger(__name__)

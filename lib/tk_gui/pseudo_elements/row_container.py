@@ -14,7 +14,7 @@ from tkinter import Toplevel, Frame, BaseWidget
 from typing import TYPE_CHECKING, Optional, Union, Any, overload
 
 from ..enums import Anchor, Justify, Side
-from ..style import Style, StyleSpec
+from ..styles import Style, StyleSpec
 from ..utils import call_with_popped
 from .row import Row, RowBase
 
