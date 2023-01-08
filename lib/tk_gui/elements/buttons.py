@@ -12,11 +12,12 @@ from enum import Enum
 from math import ceil
 from time import monotonic
 from tkinter import Event, Button as _Button
-from typing import TYPE_CHECKING, Union, Optional, Any, MutableMapping
+from typing import TYPE_CHECKING, Union, Optional, Any
 
 from PIL.ImageTk import PhotoImage
 
 from ..enums import Justify
+from ..event_handling import BindMap, BindMapping
 from ..images import as_image, scale_image
 from .element import Interactive
 from .mixins import DisableableMixin
@@ -56,28 +57,27 @@ class Button(DisableableMixin, Interactive, base_style_layer='button'):
         shortcut: str = None,
         justify_text: Union[str, Justify, None] = Justify.CENTER,
         action: Union[ButtonAction, str] = None,
-        binds: MutableMapping[str, BindCallback] = None,
+        binds: BindMapping = None,
         bind_enter: Bool = False,
         cb: BindCallback = None,
         separate: Bool = False,
         focus: Bool = None,
         **kwargs,
     ):
-        if not binds:
-            binds = {}
+        binds = BindMap.normalize(binds)
         if separate:
             self.separate = True
-            binds.setdefault('<ButtonPress-1>', self.handle_press)
-            binds.setdefault('<ButtonRelease-1>', self.handle_release)
+            binds.add('<ButtonPress-1>', self.handle_press)
+            binds.add('<ButtonRelease-1>', self.handle_release)
         if shortcut:  # TODO: This does not activate (without focus?)
             if len(shortcut) == 1:
                 shortcut = f'<{shortcut}>'
             if not shortcut.startswith('<') or not shortcut.endswith('>'):
                 raise ValueError(f'Invalid keyboard {shortcut=}')
-            binds[shortcut] = self.handle_activated
+            binds.add(shortcut, self.handle_activated)
         if bind_enter:
             self.bind_enter = True
-            binds['<Return>'] = self.handle_activated
+            binds.add('<Return>', self.handle_activated)
         if focus is None:
             focus = bind_enter
         super().__init__(binds=binds, justify_text=justify_text, focus=focus, **kwargs)
@@ -218,9 +218,10 @@ class Button(DisableableMixin, Interactive, base_style_layer='button'):
 
     # region Event Handling
 
-    def _bind(self, event_pat: str, cb: BindCallback):
-        super()._bind(event_pat, cb)
+    def _bind(self, event_pat: str, cb: BindCallback, add: Bool = True):
+        super()._bind(event_pat, cb, add)
         if self.bind_enter and event_pat == '<Return>' and event_pat not in self.window._bound_for_events:
+            # TODO: This should be refactored...
             self.window.bind(event_pat, cb)
             self.window._bound_for_events.add(event_pat)
 

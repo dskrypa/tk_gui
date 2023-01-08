@@ -22,6 +22,7 @@ from .assets import PYTHON_LOGO
 from .config import WindowConfig, WindowConfigProperty
 from .elements.menu import Menu
 from .enums import BindTargets, Anchor, Justify, Side, BindEvent, CallbackAction
+from .event_handling import BindMixin, BindMapping, BindMap
 from .exceptions import DuplicateKeyError
 from .positioning import positioner, Monitor
 from .pseudo_elements.row_container import RowContainer
@@ -33,7 +34,7 @@ if TYPE_CHECKING:
     from pathlib import Path
     from PIL.Image import Image as PILImage
     from .elements.element import Element, ElementBase
-    from .typing import XY, BindCallback, EventCallback, Key, BindTarget, Bindable, MultiBindMap, Layout, Bool, HasValue
+    from .typing import XY, BindCallback, EventCallback, Key, BindTarget, Bindable, Layout, Bool, HasValue
     from .typing import TkContainer
 
 __all__ = ['Window']
@@ -113,7 +114,7 @@ class MotionTracker:
 # endregion
 
 
-class Window(RowContainer):
+class Window(BindMixin, RowContainer):
     # region Class Attrs
     config: WindowConfig = WindowConfigProperty()
     __hidden_root = None
@@ -178,7 +179,7 @@ class Window(RowContainer):
         element_side: Union[str, Side] = None,
         element_padding: XY = None,
         element_size: XY = None,
-        binds: MultiBindMap = None,
+        binds: BindMapping = None,
         exit_on_esc: Bool = False,
         scroll_y: Bool = False,
         scroll_x: Bool = False,
@@ -205,7 +206,7 @@ class Window(RowContainer):
         title: str = None,
         *,
         min_size: XY = (200, 50),
-        binds: MultiBindMap = None,
+        binds: BindMapping = None,
         exit_on_esc: Bool = False,
         close_cbs: Iterable[Callable] = None,
         right_click_menu: Menu = None,
@@ -228,20 +229,17 @@ class Window(RowContainer):
             setattr(self, key, val)  # This needs to happen before touching self.config to have is_popup set
 
         super().__init__(layout, style=style or self.config.style, **kwargs)
-        self._event_cbs: dict[BindEvent, list[EventCallback]] = {}
+        self._event_cbs = BindMap()
         self._bound_for_events: set[str] = set()
         self.element_map = {}
         self.close_cbs = list(close_cbs) if close_cbs is not None else []
         if binds:
-            self.binds = {k: v if isinstance(v, list) else [v] for k, v in binds.items()}
-        else:
-            self.binds = {}
-
+            self.binds = binds
         if right_click_menu:
             self._right_click_menu = right_click_menu
-            self.binds.setdefault(BindEvent.RIGHT_CLICK, []).append(None)
+            self.binds.add(BindEvent.RIGHT_CLICK, None)
         if exit_on_esc:
-            self.binds.setdefault('<Escape>', []).append(BindTargets.EXIT)
+            self.binds.add('<Escape>', BindTargets.EXIT)
 
         if grab_anywhere is True:
             self.grab_anywhere = True
@@ -747,6 +745,7 @@ class Window(RowContainer):
             self.position = pos
         else:
             self.move_to_center()
+        self._widget_was_initialized = True
         return outer
 
     def show(self):
@@ -840,24 +839,9 @@ class Window(RowContainer):
 
     # region Bind Methods
 
-    def bind(self, event_pat: Bindable, cb: BindTarget, add: bool = True):
-        """
-        Register a bind callback.  If :meth:`.show` was already called, it is applied immediately, otherwise it is
-        registered to be applied later.
-        """
-        if self._root:
-            self._bind(event_pat, cb, add=add)
-        elif add:
-            self.binds.setdefault(event_pat, []).append(cb)
-        else:
-            self.binds[event_pat] = [cb]
-
     def apply_binds(self):
         """Called by :meth:`.show` to apply all registered callback bindings"""
-        for event_pat, cbs in self.binds.items():
-            for cb in cbs:
-                self._bind(event_pat, cb, add=True)
-
+        super().apply_binds()
         for bind_event in self._always_bind_events:
             self._bind_event(bind_event, None)
 
@@ -894,17 +878,14 @@ class Window(RowContainer):
 
     def _bind_event(self, bind_event: BindEvent, cb: Optional[EventCallback], add: bool = True):
         if cb is not None:
-            if not add:
-                self._event_cbs[bind_event] = [cb]
-            else:
-                self._event_cbs.setdefault(bind_event, []).append(cb)
+            self._event_cbs.add(bind_event, cb)
         if (tk_event := getattr(bind_event, 'event', bind_event)) not in self._bound_for_events:
             method = getattr(self, self._tk_event_handlers[tk_event])
             log.debug(f'Binding event={tk_event!r} to {method=}')
             self._root.bind(tk_event, method, add=add)
             self._bound_for_events.add(tk_event)
 
-    def _iter_callbacks(self, bind_event: BindEvent) -> Iterator[EventCallback]:
+    def _iter_event_callbacks(self, bind_event: BindEvent) -> Iterator[EventCallback]:
         if cbs := self._event_cbs.get(bind_event):
             yield from cbs
 
@@ -929,7 +910,7 @@ class Window(RowContainer):
             if new_pos != self._last_known_pos:
                 # log.debug(f'  Position changed: old={self._last_known_pos}, new={new_pos}')
                 self._last_known_pos = new_pos
-                for cb in self._iter_callbacks(BindEvent.POSITION_CHANGED):
+                for cb in self._iter_event_callbacks(BindEvent.POSITION_CHANGED):
                     cb(event, new_pos)
                 # if not self.is_popup and config.remember_position:
                 if config.remember_position:
@@ -940,7 +921,7 @@ class Window(RowContainer):
             if new_size != self._last_known_size:
                 # log.debug(f'  Size changed: old={self._last_known_size}, new={new_size}')
                 self._last_known_size = new_size
-                for cb in self._iter_callbacks(BindEvent.SIZE_CHANGED):
+                for cb in self._iter_event_callbacks(BindEvent.SIZE_CHANGED):
                     cb(event, new_size)
                 # if not self.is_popup and config.remember_size:
                 if config.remember_size:
@@ -962,7 +943,7 @@ class Window(RowContainer):
             self.close(event)
             return
 
-        for cb in self._iter_callbacks(BindEvent.MENU_RESULT):
+        for cb in self._iter_event_callbacks(BindEvent.MENU_RESULT):
             cb(event, result)
 
     # @_tk_event_handler(BindEvent.LEFT_CLICK, True)

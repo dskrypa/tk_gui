@@ -15,7 +15,7 @@ from threading import current_thread, main_thread
 from typing import TYPE_CHECKING, Union, Optional, Collection, Mapping, Callable, Literal, Any
 
 from ..elements import Element, Button, Text, Image, Input, Multiline
-from ..event_handling import HandlesEvents
+from ..event_handling import HandlesEvents, BindMap
 from ..positioning import positioner
 from ..style import Style, StyleSpec
 from ..utils import max_line_len
@@ -100,10 +100,11 @@ class Popup(BasePopup, HandlesEvents):
         self.layout = layout
         kwargs['keep_on_top'] = keep_on_top
         kwargs['can_minimize'] = can_minimize
-        binds = kwargs.setdefault('binds', {})
+        binds = BindMap.pop_and_normalize(kwargs) | self.event_handler_binds()
         if bind_esc:
-            binds['<Escape>'] = 'exit'
-        binds.update(self.event_handler_binds())
+            binds.add('<Escape>', 'exit')
+        if binds:
+            kwargs['binds'] = binds
         self.window_kwargs = kwargs
 
     def get_layout(self) -> Layout:

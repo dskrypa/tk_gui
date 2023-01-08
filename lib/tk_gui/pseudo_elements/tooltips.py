@@ -45,9 +45,9 @@ class ToolTip:
         self._schedule_id: Optional[str] = None
         self._tip_window: Optional[Toplevel] = None
         widget = element.widget
-        widget.bind('<Enter>', self.on_hover)
-        widget.bind('<Leave>', self.on_leave)
-        widget.bind('<ButtonPress>', self.on_leave)
+        widget.bind('<Enter>', self.on_hover, add=True)
+        widget.bind('<Leave>', self.on_leave, add=True)
+        widget.bind('<ButtonPress>', self.on_leave, add=True)
 
     def __repr__(self) -> str:
         return f'<{self.__class__.__name__}[parent={self.parent!r}, text={self.text!r}]>'

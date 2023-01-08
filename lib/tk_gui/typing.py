@@ -5,7 +5,7 @@ Type annotations for the Tkinter GUI package.
 """
 
 from abc import abstractmethod
-from typing import TYPE_CHECKING, Protocol, TypeVar, Any, Union, Callable, Iterable, MutableMapping, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, TypeVar, Any, Union, Callable, Iterable, runtime_checkable
 from typing import Literal, _ProtocolMeta  # noqa
 
 if TYPE_CHECKING:
@@ -18,8 +18,7 @@ if TYPE_CHECKING:
 # fmt: off
 __all__ = [
     'Bool', 'XY', 'Key', 'HasParent', 'HasValue', 'Layout', 'Axis', 'Orientation', 'PathLike',
-    'BindCallback', 'EventCallback', 'TraceCallback', 'BindTarget', 'Bindable', 'BindMap', 'MultiBindMap',
-    'ProvidesEventCallback',
+    'BindCallback', 'EventCallback', 'TraceCallback', 'BindTarget', 'Bindable', 'ProvidesEventCallback',
     'TkFill', 'TkSide', 'TkJustify',
     'TkContainer',
 ]
@@ -33,8 +32,6 @@ EventCallback = Callable[['Event', ...], Any]
 TraceCallback = Callable[[str, str, str], Any]
 Bindable = Union['BindEvent', str]
 BindTarget = Union[BindCallback, EventCallback, 'BindTargets', str, None]
-BindMap = MutableMapping[Bindable, BindTarget]
-MultiBindMap = MutableMapping[Bindable, BindTarget | list[BindTarget]]
 
 Bool = Union[bool, Any]
 XY = tuple[int, int]

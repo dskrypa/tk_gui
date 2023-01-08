@@ -99,6 +99,7 @@ class TextValueMixin:
 
 class LinkableMixin:
     __link: Optional[LinkTarget] = None
+    __bound_id: str | None = None
     _tooltip_text: str | None
     add_tooltip: Callable
     widget: Union[TkLabel, Entry]
@@ -150,8 +151,8 @@ class LinkableMixin:
         self.add_tooltip(new.tooltip if new else self._tooltip_text)
         if old and new and old.bind != new.bind:
             widget = self.widget
-            widget.unbind(old.bind)
-            widget.bind(new.bind, self._open_link)
+            widget.unbind(old.bind, self.__bound_id)
+            self.__bound_id = widget.bind(new.bind, self._open_link, add=True)
         elif new and not old:
             self._enable_link()
         elif old and not new:
@@ -163,7 +164,7 @@ class LinkableMixin:
 
     def _enable_link(self):
         widget, link = self.widget, self.__link
-        widget.bind(link.bind, self._open_link)
+        self.__bound_id = widget.bind(link.bind, self._open_link, add=True)
         if link.use_link_style:
             link_style = self.style.link
             widget.configure(cursor='hand2', fg=link_style.fg.default, font=link_style.font.default)
@@ -172,7 +173,8 @@ class LinkableMixin:
 
     def _disable_link(self, link_bind: str):
         widget, link = self.widget, self.__link
-        widget.unbind(link_bind)
+        widget.unbind(link_bind, self.__bound_id)
+        self.__bound_id = None
         if link.use_link_style:
             style_layer, state = self.base_style_layer_and_state
             widget.configure(cursor='', fg=style_layer.fg[state], font=style_layer.font[state])
@@ -414,9 +416,9 @@ class Input(TextValueMixin, LinkableMixin, InteractiveText, disabled_state='read
         self.widget = entry = Entry(row.frame, **kwargs)
         self.pack_widget()
         self.maybe_enable_link()
-        entry.bind('<FocusOut>', partial(_clear_selection, entry))  # Prevents ghost selections
+        entry.bind('<FocusOut>', partial(_clear_selection, entry), add=True)  # Prevents ghost selections
         if (callback := self._callback) is not None:
-            entry.bind('<Key>', self.normalize_callback(callback))
+            entry.bind('<Key>', self.normalize_callback(callback), add=True)
 
     def update(self, value: Any = None, disabled: Bool = None, password_char: str = None, link: _Link = None):
         if disabled is not None:

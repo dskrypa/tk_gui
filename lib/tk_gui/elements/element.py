@@ -13,9 +13,10 @@ from collections import defaultdict
 from functools import cached_property
 from itertools import count
 from tkinter import TclError
-from typing import TYPE_CHECKING, Optional, Callable, Union, Any, MutableMapping, overload
+from typing import TYPE_CHECKING, Optional, Callable, Union, Any, overload
 
 from ..enums import StyleState, Anchor, Justify, Side, BindTargets
+from ..event_handling import BindMixin, BindMapping
 from ..pseudo_elements.tooltips import ToolTip
 from ..style import Style, StyleSpec, StyleLayer, Layer
 from ..utils import Inheritable, ClearableCachedPropertyMixin, call_with_popped, extract_style
@@ -188,14 +189,13 @@ class ElementBase(ClearableCachedPropertyMixin, ABC):
     # endregion
 
 
-class Element(ElementBase, ABC):
+class Element(BindMixin, ElementBase, ABC):
     _key: Optional[Key] = None
     _tooltip: Optional[ToolTip] = None
     _pack_settings: dict[str, Any] = None
     tooltip_text: Optional[str] = None
     right_click_menu: Optional[Menu] = None
     left_click_cb: Optional[Callable] = None
-    binds: Optional[MutableMapping[str, BindCallback]] = None
     bind_clicks: bool = None
     data: Any = None                                            # Any data that needs to be stored with the element
 
@@ -223,7 +223,7 @@ class Element(ElementBase, ABC):
         tooltip: str = None,
         right_click_menu: Menu = None,
         left_click_cb: Callable = None,
-        binds: MutableMapping[str, BindCallback] = None,
+        binds: BindMapping = None,
         bind_clicks: Bool = None,
         data: Any = None,
     ):
@@ -313,6 +313,7 @@ class Element(ElementBase, ABC):
                 pack_kwargs['anchor'] = anchor
 
         widget.pack(**pack_kwargs)
+        self._widget_was_initialized = True
         if not self._visible:
             widget.pack_forget()
 
@@ -354,31 +355,20 @@ class Element(ElementBase, ABC):
     def apply_binds(self):
         if self.bind_clicks:
             widget = self.widget
-            widget.bind('<Button-1>', self.handle_left_click)
-            widget.bind('<Button-3>', self.handle_right_click)
+            widget.bind('<ButtonRelease-1>', self.handle_left_click, add=True)
+            widget.bind('<ButtonRelease-3>', self.handle_right_click, add=True)
 
-        if self.binds:
-            for event_pat, cb in self.binds.items():
-                self._bind(event_pat, cb)
+        super().apply_binds()
 
-    def bind(self, event_pat: str, cb: BindCallback):
-        if self.widget:
-            self._bind(event_pat, cb)
-        else:
-            try:
-                self.binds[event_pat] = cb
-            except TypeError:  # self.binds is None
-                self.binds = {event_pat: cb}
-
-    def _bind(self, event_pat: str, cb: BindCallback):
+    def _bind(self, event_pat: str, cb: BindCallback, add: Bool = True):
         if cb is None:
             return
         # log.debug(f'Binding event={event_pat!r} to {cb=}')
         try:
-            self.widget.bind(event_pat, cb)
+            self.widget.bind(event_pat, cb, add=add)
         except (TclError, RuntimeError) as e:
             log.error(f'Unable to bind event={event_pat!r}: {e}')
-            self.widget.unbind_all(event_pat)
+            # self.widget.unbind_all(event_pat)
 
     def normalize_callback(self, cb: BindTarget) -> BindCallback:
         if isinstance(cb, str):
@@ -459,6 +449,12 @@ class InteractiveMixin:
 
     def disable(self):
         raise NotImplementedError
+
+    def toggle_enabled(self):
+        if self.disabled:
+            self.enable()
+        else:
+            self.disable()
 
 
 class Interactive(InteractiveMixin, Element, ABC):

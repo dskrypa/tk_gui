@@ -161,8 +161,14 @@ class GuiTest(Command):
 
     @action
     def rating(self):
-        layout = [[Rating(key='a')], [Rating(key='b', show_value=True)]]
-        results = Window(layout, 'Slider Test', exit_on_esc=True).run().results
+        a, b = Rating(key='a'), Rating(key='b', show_value=True)
+
+        def toggle_cb(event=None):
+            for rating in (a, b):
+                rating.toggle_enabled()
+
+        layout = [[a], [b], [Button('Toggle', cb=toggle_cb)]]
+        results = Window(layout, 'Rating Test', exit_on_esc=True).run().results
         print(f'Results: {results}')
 
     # endregion

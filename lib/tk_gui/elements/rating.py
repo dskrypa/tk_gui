@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Optional, Iterator, Callable, Literal, Union
 
 from PIL.Image import Image as PILImage, new as new_image
 
+from ..event_handling import BindManager
 from .frame import InteractiveRowFrame
 from .images import Image
 from .text import Text, Input
@@ -198,13 +199,19 @@ class Rating(InteractiveRowFrame):
             self._rating = rating
             self.star_element.image = self._combined_stars()
 
+    @cached_property
+    def _bind_manager(self) -> BindManager:
+        binds = {
+            '<Button-1>': self._handle_star_clicked,
+            '<ButtonRelease-1>': self._handle_button_released,
+            '<B1-Motion>': self._handle_star_clicked,
+        }
+        return BindManager(binds)
+
     def enable(self):
         if not self.disabled:
             return
-        widget = self.star_element.widget
-        widget.bind('<Button-1>', self._handle_star_clicked)
-        widget.bind('<ButtonRelease-1>', self._handle_button_released)
-        widget.bind('<B1-Motion>', self._handle_star_clicked)
+        self._bind_manager.bind_all(self.star_element.widget)
         if rating_input := self.rating_input:
             rating_input.enable()
             self._val_change_cb = rating_input.string_var.trace_add('write', self._handle_value_changed)
@@ -213,10 +220,7 @@ class Rating(InteractiveRowFrame):
     def disable(self):
         if self.disabled:
             return
-        widget = self.star_element.widget
-        widget.unbind('<Button-1>')
-        widget.unbind('<ButtonRelease-1>')
-        widget.unbind('<B1-Motion>')
+        self._bind_manager.unbind_all(self.star_element.widget)
         if rating_input := self.rating_input:
             rating_input.string_var.trace_remove('write', self._val_change_cb)
             self._val_change_cb = None

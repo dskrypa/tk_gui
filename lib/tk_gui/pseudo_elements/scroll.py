@@ -237,7 +237,7 @@ class ScrollableContainer(ScrollableBase, ABC):
             canvas.bind_all(self._x_bind, _scroll_x, add='+')
             # canvas.bind('<Enter>', self.hook_mouse_scroll)
             # canvas.bind('<Leave>', self.unhook_mouse_scroll)
-            self.bind('<Configure>', self.set_scroll_region)
+            self.bind('<Configure>', self.set_scroll_region, add=True)
 
     # def resize_inner(self, event: Event):
     #     log.debug(f'Resizing inner={self._inner_widget_id!r} to width={event.width}, height={event.height}')

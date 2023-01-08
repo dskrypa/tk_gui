@@ -10,7 +10,7 @@ import logging
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, Union, Optional, Mapping
 
-from ..event_handling import HandlesEvents, event_handler
+from ..event_handling import HandlesEvents, event_handler, BindMap
 from ..window import Window
 
 if TYPE_CHECKING:
@@ -66,10 +66,8 @@ class View(HandlesEvents):
     def init_window(self) -> Window:
         if (window_kwargs := self.window_kwargs) is None:
             window_kwargs = {}
-
-        binds = window_kwargs.setdefault('binds', {})
-        for key, cb in self.event_handler_binds().items():
-            binds.setdefault(key, []).append(cb)
+        if binds := BindMap.pop_and_normalize(window_kwargs) | self.event_handler_binds():
+            window_kwargs['binds'] = binds
         return Window(self.get_pre_window_layout(), title=self.title, **window_kwargs)
 
     @cached_property
