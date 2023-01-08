@@ -127,6 +127,8 @@ class Popup(BasePopup, HandlesEvents):
 
 
 class BasicPopup(Popup):
+    read_only_style: Bool = None
+
     def __init__(
         self,
         text: str,
@@ -134,6 +136,7 @@ class BasicPopup(Popup):
         button: Union[str, Button] = None,
         buttons: Union[Mapping[str, str], Collection[str], Collection[Button]] = None,
         multiline: Bool = None,
+        read_only_style: Bool = None,
         style: StyleSpec = None,
         image: ImageType = None,
         image_size: XY = None,
@@ -150,6 +153,8 @@ class BasicPopup(Popup):
         self.style = Style.get_style(style)
         self.image = image
         self.image_size = image_size or (100, 100)
+        if read_only_style is not None:
+            self.read_only_style = read_only_style
 
     @cached_property
     def lines(self) -> list[str]:
@@ -204,10 +209,11 @@ class BasicPopup(Popup):
     def get_layout(self) -> list[list[Element]]:
         if self.multiline:
             width, height = size = self.text_size
+            ro_style = True if self.read_only_style is None else self.read_only_style
             text = Multiline(
                 self.text,
                 read_only=True,
-                read_only_style=True,
+                read_only_style=ro_style,
                 scroll_y=len(self.lines) > height,
                 size=size,
             )
