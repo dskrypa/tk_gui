@@ -745,7 +745,6 @@ class Window(BindMixin, RowContainer):
             self.position = pos
         else:
             self.move_to_center()
-        self._widget_was_initialized = True
         return outer
 
     def show(self):
@@ -839,6 +838,10 @@ class Window(BindMixin, RowContainer):
 
     # region Bind Methods
 
+    @property
+    def _bind_widget(self) -> BaseWidget | None:
+        return self._root
+
     def apply_binds(self):
         """Called by :meth:`.show` to apply all registered callback bindings"""
         super().apply_binds()
@@ -852,16 +855,8 @@ class Window(BindMixin, RowContainer):
         bind_event = _normalize_bind_event(event_pat)
         if isinstance(bind_event, BindEvent):
             self._bind_event(bind_event, cb, add=add)
-        elif cb is None:
-            return
-        else:
-            cb = self._normalize_bind_cb(cb)
-            # log.debug(f'Binding event={bind_event!r} to {cb=}')
-            try:
-                self._root.bind(bind_event, cb, add=add)
-            except (TclError, RuntimeError) as e:
-                log.error(f'Unable to bind event={bind_event!r}: {e}')
-                # self._root.unbind_all(bind_event)
+        elif cb is not None:
+            super()._bind(event_pat, self._normalize_bind_cb(cb), add)
 
     def _normalize_bind_cb(self, cb: BindTargets) -> BindCallback:
         if isinstance(cb, str):

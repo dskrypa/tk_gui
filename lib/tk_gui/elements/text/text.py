@@ -613,6 +613,10 @@ class Multiline(InteractiveText, disabled_state='disabled'):
             if self.auto_scroll:
                 widget.see(tkc.END)
 
+    @property
+    def _bind_widget(self) -> BaseWidget | None:
+        return self.widget.inner_widget
+
     @cached_property
     def widgets(self) -> list[BaseWidget]:
         return self.widget.widgets

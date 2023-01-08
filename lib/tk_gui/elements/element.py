@@ -313,7 +313,6 @@ class Element(BindMixin, ElementBase, ABC):
                 pack_kwargs['anchor'] = anchor
 
         widget.pack(**pack_kwargs)
-        self._widget_was_initialized = True
         if not self._visible:
             widget.pack_forget()
 
@@ -352,6 +351,10 @@ class Element(BindMixin, ElementBase, ABC):
 
     # region Bind Methods
 
+    @property
+    def _bind_widget(self) -> BaseWidget | None:
+        return self.widget
+
     def apply_binds(self):
         if self.bind_clicks:
             widget = self.widget
@@ -359,16 +362,6 @@ class Element(BindMixin, ElementBase, ABC):
             widget.bind('<ButtonRelease-3>', self.handle_right_click, add=True)
 
         super().apply_binds()
-
-    def _bind(self, event_pat: str, cb: BindCallback, add: Bool = True):
-        if cb is None:
-            return
-        # log.debug(f'Binding event={event_pat!r} to {cb=}')
-        try:
-            self.widget.bind(event_pat, cb, add=add)
-        except (TclError, RuntimeError) as e:
-            log.error(f'Unable to bind event={event_pat!r}: {e}')
-            # self.widget.unbind_all(event_pat)
 
     def normalize_callback(self, cb: BindTarget) -> BindCallback:
         if isinstance(cb, str):

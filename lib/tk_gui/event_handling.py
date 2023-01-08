@@ -9,12 +9,10 @@ from abc import ABCMeta, ABC
 from collections.abc import MutableMapping, ItemsView, KeysView, ValuesView, Iterable
 from contextvars import ContextVar
 from functools import partial, update_wrapper
-from typing import TYPE_CHECKING, Any, Optional, Callable, Mapping, Collection, Iterator
+from tkinter import TclError, BaseWidget
+from typing import Any, Optional, Callable, Mapping, Collection, Iterator
 
 from .typing import BindCallback, Bindable, BindTarget, Bool
-
-if TYPE_CHECKING:
-    from tkinter import BaseWidget
 
 __all__ = ['BindMap', 'BindMixin', 'HandlesEventsMeta', 'HandlesEvents', 'event_handler', 'BindManager']
 log = logging.getLogger(__name__)
@@ -139,7 +137,6 @@ class BindMap(MutableMapping[Bindable, list[BindTarget]]):
 
 
 class BindMixin:
-    _widget_was_initialized: Bool = False
     _binds: BindMap = None
 
     @property
@@ -152,14 +149,26 @@ class BindMixin:
     def binds(self, value: BindMapping | BindMap | None):
         self._binds = value if isinstance(value, BindMap) else BindMap(value)
 
+    @property
+    def _bind_widget(self) -> BaseWidget | None:
+        """The widget that should be used for bind operations"""
+        raise NotImplementedError
+
     def bind(self, event_pat: Bindable, cb: BindTarget, add: Bool = True):
-        if self._widget_was_initialized:
+        if self._bind_widget:
             self._bind(event_pat, cb, add)
         else:
             self.binds.add(event_pat, cb, add)
 
     def _bind(self, event_pat: Bindable, cb: BindTarget, add: Bool = True):
-        raise NotImplementedError
+        if cb is None:
+            return
+        # log.debug(f'Binding event={event_pat!r} to {cb=}')
+        try:
+            self._bind_widget.bind(event_pat, cb, add=add)
+        except (TclError, RuntimeError) as e:
+            log.error(f'Unable to bind event={event_pat!r}: {e}')
+            # self._bind_widget.unbind_all(event_pat)
 
     def apply_binds(self):
         for event_pat, callback in self.binds.flat_items():
