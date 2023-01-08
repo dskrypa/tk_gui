@@ -615,7 +615,10 @@ class Multiline(InteractiveText, disabled_state='disabled'):
 
     @property
     def _bind_widget(self) -> BaseWidget | None:
-        return self.widget.inner_widget
+        try:
+            return self.widget.inner_widget
+        except AttributeError:  # self.widget is still None / hasn't been packed yet
+            return None
 
     @cached_property
     def widgets(self) -> list[BaseWidget]:
