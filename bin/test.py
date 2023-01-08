@@ -328,7 +328,8 @@ class GuiTest(Command):
             [MenuBar()],
             [table1], [table2],
             [HorizontalSeparator()],
-            [inpt, Button('Submit', bind_enter=True), Button(image=search_path, shortcut='s', size=(30, 30))],
+            # [inpt, Button('Submit', bind_enter=True), Button(image=search_path, shortcut='s', size=(30, 30))],
+            [inpt, Button('Submit'), Button(image=search_path, shortcut='s', size=(30, 30))],
             [Animation(gif_path)], [SpinnerImage()], [ClockImage(right_click_menu=EleRightClickMenu())],
             [
                 Text('test'),

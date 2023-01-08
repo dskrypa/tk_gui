@@ -650,7 +650,8 @@ def _block_text_entry(event: Event = None):
     Used by read-only Multiline elements as a workaround for tkinter not supporting proper read-only multi-line text
     widgets.  Based on: https://stackoverflow.com/questions/3842155
     """
+    # print(f'_block_text_entry: {event=}')
     if event.keysym == 'v':  # ctrl+v results in event.char being \x1b
         return 'break'
     char = event.char
-    return 'break' if char and char.isprintable() else None
+    return 'break' if char and (char.isprintable() or char.isspace()) else None
