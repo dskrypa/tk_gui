@@ -9,4 +9,4 @@ from .images import Image, Animation, SpinnerImage, ClockImage
 from .menu import Menu, MenuGroup, MenuItem, MenuProperty
 from .misc import SizeGrip
 from .table import TableColumn, Table
-from .text import Text, Link, Input, Multiline
+from .text import Text, Link, Input, Multiline, Label

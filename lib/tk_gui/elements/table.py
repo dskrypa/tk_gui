@@ -7,7 +7,6 @@ Table GUI elements
 from __future__ import annotations
 
 import logging
-from functools import cached_property
 from itertools import chain
 from tkinter.ttk import Treeview, Style as TtkStyle
 from typing import TYPE_CHECKING, Union, Callable, Literal, Mapping, Any, Iterable
@@ -15,6 +14,7 @@ from unicodedata import normalize
 
 from wcwidth import wcswidth
 
+from tk_gui.caching import cached_property
 from ..pseudo_elements.scroll import ScrollableTreeview
 from .element import Element
 

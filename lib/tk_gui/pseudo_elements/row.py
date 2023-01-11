@@ -9,10 +9,10 @@ from __future__ import annotations
 import logging
 import tkinter.constants as tkc
 from abc import ABC, abstractmethod
-from functools import cached_property
 from tkinter import Frame, LabelFrame, Widget, BaseWidget
 from typing import TYPE_CHECKING, Optional, Union, Iterable, Sequence
 
+from tk_gui.caching import cached_property, clear_cached_properties
 from ..enums import Anchor, Justify, Side
 from ..styles import Style
 from ..utils import Inheritable
@@ -67,6 +67,7 @@ class RowBase(ABC):
 
     @cached_property
     def widget_element_map(self) -> dict[BaseWidget, Union[RowBase, ElementBase]]:
+        """Used to populate this row's parent's :attr:`RowContainer.widget_element_map`."""
         widget_ele_map = {self.frame: self}
         setdefault = widget_ele_map.setdefault
         for ele in self.elements:

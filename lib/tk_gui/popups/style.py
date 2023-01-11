@@ -9,7 +9,7 @@ from __future__ import annotations
 from functools import partial
 from typing import TYPE_CHECKING, Iterator, Optional
 
-from ..elements import Text, HorizontalSeparator, Combo, Button
+from ..elements import Text, HorizontalSeparator, Combo, Button, Label
 from ..images.color import pick_fg
 from ..styles import Style, StyleSpec, STATE_NAMES
 from ..window import Window
@@ -47,13 +47,13 @@ class StylePopup(Popup):
 
         layout = [
             [
-                Text('Style:', size=(10, 1), anchor='e', selectable=False),
+                Label('Style:', size=(10, 1), anchor='e'),
                 Combo(Style.style_names(), style.name, callback=self._style_selected),
                 Button('Select', key='select', visible=self._show_buttons),
                 Button('Cancel', key='cancel', visible=self._show_buttons),
             ],
-            [Text('Parent:', size=(10, 1), anchor='e', selectable=False), Text(**parent_kwargs)],
-            [Text('TTK Theme:', size=(10, 1), anchor='e', selectable=False), Text(style.ttk_theme)],
+            [Label('Parent:', size=(10, 1), anchor='e'), Text(**parent_kwargs)],
+            [Label('TTK Theme:', size=(10, 1), anchor='e'), Text(style.ttk_theme)],
         ]
         layout.extend(self.build_rows(window))
         return layout
@@ -99,7 +99,7 @@ class StylePopup(Popup):
                 continue
 
             yield [HorizontalSeparator()]
-            yield [Text('Layer:', size=(10, 1), selectable=False), Text(name, style=name_style)]
+            yield [Label('Layer:', size=(10, 1)), Text(name, style=name_style)]
             yield [HText('field'), *(HText(state) for state in STATE_NAMES)]
 
             for key, values in layer_vals.items():

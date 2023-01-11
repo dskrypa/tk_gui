@@ -9,13 +9,13 @@ from __future__ import annotations
 import logging
 import tkinter.constants as tkc
 from contextvars import ContextVar
-from functools import cached_property
 from itertools import count
 from tkinter import Radiobutton, Checkbutton, BooleanVar, IntVar, StringVar, Event, TclError, BaseWidget
 from tkinter.ttk import Combobox
 from typing import TYPE_CHECKING, Optional, Union, Any, MutableMapping, Generic, Collection, TypeVar, Sequence, Iterable
 from weakref import WeakValueDictionary
 
+from tk_gui.caching import cached_property
 from tk_gui.enums import ListBoxSelectMode
 from tk_gui.pseudo_elements.scroll import ScrollableListbox
 from tk_gui.typing import Bool, T, BindTarget, BindCallback, TraceCallback

@@ -9,11 +9,11 @@ from __future__ import annotations
 import logging
 import platform
 import sys
-from functools import cached_property
 from inspect import stack
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional, Type, Any, Callable, Collection, Iterable, Sequence
 
+from tk_gui.caching import cached_property
 from .constants import STYLE_CONFIG_KEYS
 
 if TYPE_CHECKING:

@@ -7,12 +7,12 @@ Tkinter GUI Rating Element
 from __future__ import annotations
 
 import logging
-from functools import cached_property
 from tkinter import Event
 from typing import TYPE_CHECKING, Optional, Iterator, Callable, Literal, Union
 
 from PIL.Image import Image as PILImage, new as new_image
 
+from tk_gui.caching import cached_property
 from ..event_handling import BindManager
 from .frame import InteractiveRowFrame
 from .images import Image

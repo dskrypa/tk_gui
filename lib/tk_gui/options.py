@@ -9,10 +9,10 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
-from functools import cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Optional, Collection, Iterator, Mapping, Union, Type, ContextManager
 
+from tk_gui.caching import cached_property
 from .elements.choices import Combo, ListBox, CheckBox, make_checkbox_grid
 from .elements import Text, Element, Button, Input, Submit, Frame
 from .elements.text import normalize_text_ele_widths

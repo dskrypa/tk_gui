@@ -7,9 +7,9 @@ Base View class
 from __future__ import annotations
 
 import logging
-from functools import cached_property
 from typing import TYPE_CHECKING, Any, Union, Optional, Mapping
 
+from tk_gui.caching import cached_property
 from ..event_handling import HandlesEvents, event_handler, BindMap
 from ..window import Window
 

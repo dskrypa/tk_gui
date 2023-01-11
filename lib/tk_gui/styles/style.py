@@ -8,13 +8,13 @@ from __future__ import annotations
 
 # import logging
 from collections import namedtuple
-from functools import cached_property
 from itertools import count
 from tkinter.font import Font as TkFont
 from tkinter.ttk import Style as TtkStyle
 from typing import TYPE_CHECKING, Union, Optional, Literal, Type, Mapping, Iterator, Any, Generic, TypeVar, Iterable
 from typing import overload
 
+from tk_gui.caching import cached_property
 from tk_gui.enums import StyleState
 from tk_gui.utils import ClearableCachedPropertyMixin
 

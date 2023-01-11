@@ -10,12 +10,12 @@ import logging
 import re
 import tkinter.constants as tkc
 from abc import ABC
-from functools import cached_property
 from itertools import count
 from tkinter import BaseWidget, Frame, LabelFrame, Canvas, Widget, Event, Tk, Toplevel, Text, Listbox
 from tkinter.ttk import Scrollbar, Treeview
 from typing import TYPE_CHECKING, Type, Mapping, Union, Optional, Any, Iterator
 
+from tk_gui.caching import cached_property
 from ..utils import ON_WINDOWS
 
 if TYPE_CHECKING:

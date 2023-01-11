@@ -9,11 +9,11 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from concurrent.futures import Future
-from functools import cached_property
 from queue import Queue
 from threading import current_thread, main_thread
 from typing import TYPE_CHECKING, Union, Optional, Collection, Mapping, Callable, Literal, Any
 
+from tk_gui.caching import cached_property
 from ..elements import Element, Button, Text, Image, Input, Multiline
 from ..event_handling import HandlesEvents, BindMap
 from ..positioning import positioner

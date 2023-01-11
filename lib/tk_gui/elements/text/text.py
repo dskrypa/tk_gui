@@ -9,10 +9,11 @@ from __future__ import annotations
 import logging
 import tkinter.constants as tkc
 from abc import ABC, abstractmethod
-from functools import cached_property, partial
+from functools import partial
 from tkinter import StringVar, Event, Entry, BaseWidget, Label as TkLabel
 from typing import TYPE_CHECKING, Optional, Union, Any, Callable
 
+from tk_gui.caching import cached_property
 from tk_gui.constants import LEFT_CLICK
 from tk_gui.enums import Justify, Anchor
 from tk_gui.event_handling import BindManager
