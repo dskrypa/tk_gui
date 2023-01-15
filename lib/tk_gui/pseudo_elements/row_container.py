@@ -106,22 +106,32 @@ class RowContainer(ABC):
     def __repr__(self) -> str:
         return f'<{self.__class__.__name__}[{self._id}]>'
 
-    def add_rows(self, layout: Layout, pack: Bool = False, debug: Bool = False):
+    def add_rows(self, layout: Layout, pack: Bool = False, debug: Bool = False, update: Bool = False):
+        if not pack:
+            self.rows.extend(Row(self, raw_row) for raw_row in layout)
+        elif debug:
+            update_idletasks = self.widget.update_idletasks
+            n_rows = len(self.rows)
+            for i, row in enumerate(self._add_rows(layout), n_rows):
+                log.debug(f'Packing row {i} / {n_rows}')
+                row.pack(debug)
+                if update:
+                    update_idletasks()
+        elif update:
+            update_idletasks = self.widget.update_idletasks
+            for row in self._add_rows(layout):
+                row.pack(debug)
+                update_idletasks()
+        else:
+            for row in self._add_rows(layout):
+                row.pack(debug)
+
+    def _add_rows(self, layout: Layout):
         rows = self.rows
         new_rows = (Row(self, raw_row) for raw_row in layout)
-        if debug:
-            n_rows = len(rows)
-            for i, row in enumerate(new_rows, n_rows):
-                rows.append(row)
-                if pack:
-                    log.debug(f'Packing row {i} / {n_rows}')
-                    row.pack(debug)
-        elif pack:
-            for row in new_rows:
-                rows.append(row)
-                row.pack(debug)
-        else:
-            rows.extend(new_rows)
+        for row in new_rows:
+            rows.append(row)
+            yield row
 
     # region Abstract Properties
 
