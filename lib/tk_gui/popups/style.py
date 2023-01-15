@@ -95,7 +95,7 @@ class StylePopup(Popup):
         HText = partial(Text, size=(15, 1), justify='c', style=header_style)
 
         for name, layer in self.show_style.iter_layers():
-            if not (layer_vals := dict(layer.iter_values())):
+            if not (layer_vals := layer.as_dict(False)):
                 continue
 
             yield [HorizontalSeparator()]

@@ -26,6 +26,8 @@ __all__ = ['Style', 'StyleSpec', 'STATE_NAMES', 'StyleLayer', 'Layer', 'StyleSta
 DEFAULT_FONT = ('Helvetica', 10)
 STATE_NAMES = ('default', 'disabled', 'invalid', 'active', 'highlight')
 
+# region Typing
+
 StateName = Literal['default', 'disabled', 'invalid', 'active', 'highlight']
 StyleAttr = Literal[
     'font', 'tk_font', 'fg', 'bg', 'border_width', 'relief',
@@ -59,6 +61,8 @@ FinalValue = Union[StyleValue, TkFont]
 RawStateValues = Union[OptStrVals, OptIntVals, FontValues]
 
 LayerValues = Union[FontValues, Mapping[StyleStateVal, StyleValue]]
+
+# endregion
 
 # region State Values
 
@@ -166,8 +170,8 @@ class StateValues(Generic[T_co]):
     def __getitem__(self, state: StyleStateVal) -> Optional[T_co]:
         state = StyleState(state)
         value = self.values[state]
-        if not value and state != StyleState.DEFAULT:
-            return self.values[StyleState.DEFAULT]
+        if not value and state != 0:  # StyleState.DEFAULT
+            return self.values[0]
         return value
 
     def __setitem__(self, state: StyleStateVal, value: Optional[T_co]):
@@ -291,14 +295,16 @@ class StyleLayer:
     def __init__(self, style: Style, prop: StyleLayerProperty, **kwargs):
         self.style = style
         self.prop = prop
-        bad = {}
+        fields = self._fields
         for key, val in kwargs.items():
-            if key in self._fields:
+            if key in fields:
                 setattr(self, key, val)
             else:
-                bad[key] = val
-        if bad:
-            raise ValueError(f'Invalid style layer options: {bad}')
+                # The number of times one or more invalid options will be provided is extremely low compared to the
+                # number of times this exception will need to be raised, so the re-iteration over kwargs is acceptable.
+                # This also avoids creating the `bad` dict that would otherwise be thrown away on 99.9% of init calls.
+                bad = {k: v for k, v in kwargs.items() if k not in fields}
+                raise TypeError(f'Invalid style layer options: {bad}')
 
     def __repr__(self) -> str:
         return f'<{self.__class__.__name__}[{self.style.name}: {self.prop.name}]>'
@@ -339,8 +345,8 @@ class StyleLayer:
             if key in fields:
                 yield key, getattr(val, 'values', None)
 
-    def as_dict(self) -> dict[str, StateValues]:
-        return dict(self._iter_values())
+    def as_dict(self, include_none: Bool = True) -> dict[str, StateValues]:
+        return dict(self._iter_values() if include_none else self.iter_values())
 
     def iter_values(self) -> Iterator[tuple[str, StateValues]]:
         for key, values in self._iter_values():
@@ -517,11 +523,12 @@ class Style(ClearableCachedPropertyMixin):
 
     def _configure(self, kwargs: StyleOptions):
         layers = {}
+        layer_keys, layer_fields = self._layers, StyleLayer._fields
         for key, val in kwargs.items():
-            if key in self._layers:
+            if key in layer_keys:
                 # log.info(f'{self}: Full layer config provided: {key}={val!r}', extra={'color': 11})
                 setattr(self, key, val)
-            elif key in StyleLayer._fields:
+            elif key in layer_fields:
                 layers.setdefault('base', {})[key] = val
             else:
                 layer, attr = self._split_config_key(key)
@@ -541,20 +548,20 @@ class Style(ClearableCachedPropertyMixin):
             if layer in self._layers and attr in StyleLayer._fields:
                 return layer, attr
 
-        for layer in self._compound_layer_names():
-            n = len(layer) + 1
-            if key.startswith(layer) and len(key) > n and key[n - 1] in '_.':
-                if (attr := key[n:]) in StyleLayer._fields:
-                    return layer, attr
+        for layer_name, suffix_idx, delim_idx in self._compound_layer_names():
+            if key.startswith(layer_name) and len(key) > suffix_idx and key[delim_idx] in '_.':
+                if (attr := key[suffix_idx:]) in StyleLayer._fields:
+                    return layer_name, attr
 
         raise KeyError(f'Invalid style option: {key!r}')
 
     @classmethod
-    def _compound_layer_names(cls) -> set[str]:
+    def _compound_layer_names(cls) -> list[tuple[str, int, int]]:
         try:
             return cls.__compound_layer_names  # noqa
         except AttributeError:
-            cls.__compound_layer_names = names = {name for name in cls._layers if '_' in name}
+            names_and_lens = ((name, len(name)) for name in cls._layers if '_' in name)
+            cls.__compound_layer_names = names = [(n, ln + 1, ln) for n, ln in names_and_lens]
             return names
 
     @classmethod
@@ -612,23 +619,12 @@ class Style(ClearableCachedPropertyMixin):
         self,
         layer: Layer = 'base',
         state: StyleStateVal = StyleState.DEFAULT,
-        attrs: Iterable[StyleAttr] = None,  # Note: PyCharm doesn't handle this Literal well
-        include_none: Bool = False,
         **dst_src_map
     ) -> dict[str, FinalValue]:
         # log.debug(f'{self}.get_map: {layer=}')
         layer: StyleLayer = getattr(self, layer)
         # log.debug(f'  > {layer=}')
-        if attrs is not None:
-            dst_src_map.update((a, a) for a in attrs)
-
-        found = {}
-        for dst, src in dst_src_map.items():
-            value = getattr(layer, src)[state]
-            if include_none or value is not None:
-                found[dst] = value
-
-        return found
+        return {dst: val for dst, src in dst_src_map.items() if (val := getattr(layer, src)[state]) is not None}
 
     def make_ttk_style(self, name_suffix: str) -> tuple[str, TtkStyle]:
         name = f'{next(self._ttk_count)}__{name_suffix}'

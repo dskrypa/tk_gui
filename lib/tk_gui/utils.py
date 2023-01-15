@@ -19,8 +19,7 @@ if TYPE_CHECKING:
     from .typing import HasParent
 
 __all__ = [
-    'ON_WINDOWS', 'ON_LINUX', 'ON_MAC',
-    'Inheritable', 'ProgramMetadata', 'ViewLoggerAdapter',
+    'ON_WINDOWS', 'ON_LINUX', 'ON_MAC', 'Inheritable', 'ProgramMetadata', 'ViewLoggerAdapter',
     'tcl_version', 'max_line_len', 'call_with_popped', 'resize_text_column', 'extract_kwargs',
 ]
 log = logging.getLogger(__name__)
@@ -62,15 +61,15 @@ class Inheritable:
         try:
             return instance.__dict__[self.name]
         except KeyError:
-            if self.default is not _NotSet:
-                return self.default
+            if (default := self.default) is not _NotSet:
+                return default
             parent = getattr(instance, self.attr_name)
             return getattr(parent, self.parent_attr or self.name)
 
     def __set__(self, instance: HasParent, value):
         if value is not None:
-            if self.type is not None:
-                value = self.type(value)
+            if type_func := self.type:
+                value = type_func(value)
             instance.__dict__[self.name] = value
 
 
