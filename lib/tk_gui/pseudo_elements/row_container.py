@@ -123,8 +123,11 @@ class RowContainer(ABC):
                 row.pack(debug)
                 update_idletasks()
         else:
-            for row in self._add_rows(layout):
-                row.pack(debug)
+            added = [row for row in self._add_rows(layout)]
+            for row in added:
+                row.pack()
+            # for row in self._add_rows(layout):
+            #     row.pack(debug)
 
     def _add_rows(self, layout: Layout):
         rows = self.rows
