@@ -117,6 +117,7 @@ class MotionTracker:
 class Window(BindMixin, RowContainer):
     # region Class Attrs
     config: WindowConfig = WindowConfigProperty()
+    tk_load_profile: Bool = False
     __hidden_root = None
     _tk_event_handlers: dict[str, str] = {}
     _always_bind_events: set[BindEvent] = set()
@@ -770,7 +771,8 @@ class Window(BindMixin, RowContainer):
 
     @classmethod
     def _init_hidden_root(cls):
-        Window.__hidden_root = hidden_root = Tk()
+        tk_cls = Tk if cls.tk_load_profile else NoProfileTk
+        Window.__hidden_root = hidden_root = tk_cls()
         hidden_root.attributes('-alpha', 0)  # Hide this window
         try:
             hidden_root.wm_overrideredirect(True)
@@ -1127,6 +1129,11 @@ def patch_call_wrapper():
             self.widget._report_exception()
 
     CallWrapper.__call__ = _cw_call
+
+
+class NoProfileTk(Tk):
+    def readprofile(self, baseName: str, className: str):
+        return
 
 
 if environ.get('TK_GUI_NO_CALL_WRAPPER_PATCH', '0') != '1':

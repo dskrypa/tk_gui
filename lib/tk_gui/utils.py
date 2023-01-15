@@ -170,7 +170,7 @@ def call_with_popped(func: Callable, keys: Iterable[str], kwargs: dict[str, Any]
 
 def extract_style(
     kwargs: dict[str, Any],
-    _keys_intersection: Callable[[Iterable[str]], set[str]] = STYLE_CONFIG_KEYS.intersection,
+    _keys_intersection: Callable[[Iterable[str]], set[str] | frozenset[str]] = STYLE_CONFIG_KEYS.intersection,
 ) -> dict[str, Any]:
     if kwargs:
         pop = kwargs.pop
@@ -179,7 +179,7 @@ def extract_style(
         return {}
 
 
-def extract_kwargs(kwargs: dict[str, Any], keys: set[str]) -> dict[str, Any]:
+def extract_kwargs(kwargs: dict[str, Any], keys: set[str] | frozenset[str]) -> dict[str, Any]:
     pop = kwargs.pop
     return {key: pop(key) for key in keys.intersection(kwargs)}
 
