@@ -13,7 +13,6 @@ from inspect import stack
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional, Type, Any, Callable, Collection, Iterable, Sequence
 
-from tk_gui.caching import cached_property
 from .constants import STYLE_CONFIG_KEYS
 
 if TYPE_CHECKING:
@@ -21,7 +20,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     'ON_WINDOWS', 'ON_LINUX', 'ON_MAC',
-    'Inheritable', 'ClearableCachedPropertyMixin', 'ProgramMetadata', 'ViewLoggerAdapter',
+    'Inheritable', 'ProgramMetadata', 'ViewLoggerAdapter',
     'tcl_version', 'max_line_len', 'call_with_popped', 'resize_text_column', 'extract_kwargs',
 ]
 log = logging.getLogger(__name__)
@@ -73,34 +72,6 @@ class Inheritable:
             if self.type is not None:
                 value = self.type(value)
             instance.__dict__[self.name] = value
-
-
-class ClearableCachedPropertyMixin:
-    @classmethod
-    def __cached_properties(cls) -> dict[str, cached_property]:
-        cached_properties = {}
-        for clz in cls.mro():
-            if clz == cls:
-                for k, v in cls.__dict__.items():
-                    if isinstance(v, cached_property):
-                        cached_properties[k] = v
-            else:
-                try:
-                    cached_properties.update(clz.__cached_properties())  # noqa
-                except AttributeError:
-                    pass
-        return cached_properties
-
-    def clear_cached_properties(self, *names: str, skip: Collection[str] = None):
-        if not names:
-            names = self.__cached_properties()
-        if skip:
-            names = (name for name in names if name not in skip)
-        for name in names:
-            try:
-                del self.__dict__[name]
-            except KeyError:
-                pass
 
 
 # region Metadata
@@ -196,21 +167,20 @@ def call_with_popped(func: Callable, keys: Iterable[str], kwargs: dict[str, Any]
     func(*args, **kwargs)
 
 
-def extract_style(kwargs: dict[str, Any], keys: Collection[str] = STYLE_CONFIG_KEYS) -> dict[str, Any]:
-    return extract_kwargs(kwargs, keys)
+def extract_style(
+    kwargs: dict[str, Any],
+    _keys_intersection: Callable[[Iterable[str]], set[str]] = STYLE_CONFIG_KEYS.intersection,
+) -> dict[str, Any]:
+    if kwargs:
+        pop = kwargs.pop
+        return {key: pop(key) for key in _keys_intersection(kwargs)}
+    else:
+        return {}
 
 
-def extract_kwargs(kwargs: dict[str, Any], keys: Collection[str]) -> dict[str, Any]:
-    if len(kwargs) < len(keys):
-        return {key: kwargs.pop(key) for key in tuple(kwargs) if key in keys}
-
-    extracted = {}
-    for key in keys:
-        try:
-            extracted[key] = kwargs.pop(key)
-        except KeyError:
-            pass
-    return extracted
+def extract_kwargs(kwargs: dict[str, Any], keys: set[str]) -> dict[str, Any]:
+    pop = kwargs.pop
+    return {key: pop(key) for key in keys.intersection(kwargs)}
 
 
 # endregion

@@ -9,17 +9,16 @@ from __future__ import annotations
 import logging
 import tkinter.constants as tkc
 from abc import ABC, abstractmethod
-from collections import defaultdict
-from functools import cached_property
 from itertools import count
 from tkinter import TclError
 from typing import TYPE_CHECKING, Optional, Callable, Union, Any, overload
 
+from tk_gui.caching import ClearableCachedPropertyMixin, cached_property
 from ..enums import StyleState, Anchor, Justify, Side, BindTargets
 from ..event_handling import BindMixin, BindMapping
 from ..pseudo_elements.tooltips import ToolTip
 from ..styles import Style, StyleSpec, StyleLayer, Layer
-from ..utils import Inheritable, ClearableCachedPropertyMixin, call_with_popped, extract_style
+from ..utils import Inheritable, call_with_popped, extract_style
 from ._utils import find_descendants
 
 if TYPE_CHECKING:
@@ -34,15 +33,14 @@ log = logging.getLogger(__name__)
 
 _DIRECT_ATTRS = {'key', 'right_click_menu', 'left_click_cb', 'binds', 'data'}
 _INHERITABLES = {'size', 'auto_size_text', 'anchor', 'justify_text'}
-_BASIC = {'style', 'pad', 'side', 'fill', 'expand', 'allow_focus', 'ignore_grab'}
+_BASIC = frozenset({'style', 'pad', 'side', 'fill', 'expand', 'allow_focus', 'ignore_grab'})
+_basic_keys = _BASIC.intersection
 _Side = Union[str, Side]
 
 
 class ElementBase(ClearableCachedPropertyMixin, ABC):
-    _counters = defaultdict(count)
     _style_config: dict[str, Any]
     _base_style_layer: str = None
-    _id: int
     id: str
     parent: Optional[RowBase] = None
     column: Optional[int] = None
@@ -57,6 +55,7 @@ class ElementBase(ClearableCachedPropertyMixin, ABC):
 
     def __init_subclass__(cls, base_style_layer: Layer = None, **kwargs):
         super().__init_subclass__(**kwargs)
+        cls.__counter = count()
         if base_style_layer:
             cls._base_style_layer = base_style_layer
 
@@ -68,18 +67,21 @@ class ElementBase(ClearableCachedPropertyMixin, ABC):
         fill: TkFill = None,
         expand: bool = None,
         ignore_grab: Bool = False,
+        allow_focus: Bool = None,
+        _style_config: dict[str, Any] = None,
         **kwargs,
     ):
-        cls = self.__class__
-        self._id = _id = next(self._counters[cls])
-        self.id = f'{cls.__name__}#{_id}'
+        self.id = f'{self.__class__.__name__}#{next(self.__counter)}'
         self.pad = pad
         self.side = side
-        self._style_config = extract_style(kwargs) if kwargs else {}
-        if (allow_focus := kwargs.pop('allow_focus', None)) is not None:
+        if _style_config:
+            self._style_config = _style_config
+        else:
+            self._style_config = extract_style(kwargs) if kwargs else {}
+        if allow_focus is not None:
             self.allow_focus = allow_focus
         if kwargs:
-            raise ValueError(f'Unexpected {kwargs=}')
+            raise TypeError(f'{self.__class__.__name__} received unexpected {kwargs=}')
         if expand is not None:
             self.expand = expand
         if fill:
@@ -229,18 +231,19 @@ class Element(BindMixin, ElementBase, ABC):
     ):
         ...
 
-    def __init__(self, *, visible: Bool = True, bind_clicks: Bool = None, **kwargs):
-        super().__init__(**{k: kwargs.pop(k, None) for k in _BASIC})
+    def __init__(self, *, visible: Bool = True, bind_clicks: Bool = None, tooltip: str = None, **kwargs):
+        if kwargs:
+            super().__init__(_style_config=extract_style(kwargs), **{k: kwargs.pop(k) for k in _basic_keys(kwargs)})
+        else:
+            super().__init__()
         self._visible = visible
-        self._style_config = extract_style(kwargs)
-        if tooltip_text := kwargs.pop('tooltip', None):
-            self.tooltip_text = tooltip_text
+        if tooltip:
+            self.tooltip_text = tooltip
         if bind_clicks is None:
             self.bind_clicks = bool(kwargs.get('right_click_menu') or kwargs.get('left_click_cb'))
         else:
             self.bind_clicks = bind_clicks
 
-        bad = {}
         for key, val in kwargs.items():
             if key in _DIRECT_ATTRS:
                 if val is not None:
@@ -248,9 +251,11 @@ class Element(BindMixin, ElementBase, ABC):
             elif key in _INHERITABLES:
                 setattr(self, key, val)
             else:
-                bad[key] = val
-        if bad:
-            raise ValueError(f'Invalid options for {self.__class__.__name__}: {bad}')
+                # The number of times one or more invalid options will be provided is extremely low compared to the
+                # number of times this exception will need to be raised, so the re-iteration over kwargs is acceptable.
+                # This also avoids creating the `bad` dict that would otherwise be thrown away on 99.9% of init calls.
+                bad = {k: v for k, v in kwargs.items() if k not in _DIRECT_ATTRS and k not in _INHERITABLES}
+                raise TypeError(f'Invalid options for {self.__class__.__name__}: {bad}')
 
     def __repr__(self) -> str:
         return f'<{self.__class__.__name__}[id={self.id}, size={self.size}, visible={self._visible}]>'

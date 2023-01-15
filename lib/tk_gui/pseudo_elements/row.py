@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 import tkinter.constants as tkc
 from abc import ABC, abstractmethod
-from tkinter import Frame, LabelFrame, Widget, BaseWidget
+from tkinter import Frame, LabelFrame, BaseWidget
 from typing import TYPE_CHECKING, Optional, Union, Iterable, Sequence
 
 from tk_gui.caching import cached_property, clear_cached_properties

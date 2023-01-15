@@ -14,9 +14,8 @@ from tkinter.ttk import Style as TtkStyle
 from typing import TYPE_CHECKING, Union, Optional, Literal, Type, Mapping, Iterator, Any, Generic, TypeVar, Iterable
 from typing import overload
 
-from tk_gui.caching import cached_property
+from tk_gui.caching import ClearableCachedPropertyMixin, cached_property
 from tk_gui.enums import StyleState
-from tk_gui.utils import ClearableCachedPropertyMixin
 
 if TYPE_CHECKING:
     from tk_gui.typing import XY, Bool

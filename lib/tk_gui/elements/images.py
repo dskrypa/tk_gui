@@ -74,6 +74,7 @@ class Image(Element, base_style_layer='image'):
         except TypeError:
             width, height = None, None
 
+        # TODO: Right-click menu: save as
         image, width, height = self._image.as_size(width, height)
         self._pack_into(row, image, width, height)
 

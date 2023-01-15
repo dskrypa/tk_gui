@@ -46,10 +46,10 @@ _GRAB_ANYWHERE_IGNORE = (
     Sizegrip, Scrollbar, Treeview,
     tk.Scale, tk.Scrollbar, tk.Entry, tk.Text, tk.PanedWindow, tk.Listbox, tk.OptionMenu, tk.Button,
 )
-_INIT_OVERRIDE_KEYS = {
+_INIT_OVERRIDE_KEYS = frozenset({
     'is_popup', 'resizable', 'keep_on_top', 'can_minimize', 'transparent_color', 'alpha_channel', 'no_title_bar',
     'modal', 'scaling', 'margins', 'icon',
-}
+})
 
 # region Event Handling Helpers
 
