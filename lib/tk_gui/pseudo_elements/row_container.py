@@ -97,7 +97,7 @@ class RowContainer(ABC):
         self.element_side = Side(element_side) if element_side else Side.LEFT
         self.element_padding = element_padding
         self.element_size = element_size
-        self.rows = [Row(self, row, i) for i, row in enumerate(layout)] if layout else []
+        self.rows = [Row(self, row) for row in layout] if layout else []
         self.scroll_y = scroll_y
         self.scroll_x = scroll_x
         self.scroll_y_div = scroll_y_div
@@ -108,14 +108,20 @@ class RowContainer(ABC):
 
     def add_rows(self, layout: Layout, pack: Bool = False, debug: Bool = False):
         rows = self.rows
-        n_rows = len(rows)
-        for i, raw_row in enumerate(layout, n_rows):
-            row = Row(self, raw_row, i)
-            rows.append(row)
-            if pack:
-                if debug:
+        new_rows = (Row(self, raw_row) for raw_row in layout)
+        if debug:
+            n_rows = len(rows)
+            for i, row in enumerate(new_rows, n_rows):
+                rows.append(row)
+                if pack:
                     log.debug(f'Packing row {i} / {n_rows}')
+                    row.pack(debug)
+        elif pack:
+            for row in new_rows:
+                rows.append(row)
                 row.pack(debug)
+        else:
+            rows.extend(new_rows)
 
     # region Abstract Properties
 

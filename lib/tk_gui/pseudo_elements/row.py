@@ -116,8 +116,7 @@ class Row(RowBase):
     fill: Optional[bool] = None         # Changes for Column, Separator, StatusBar
     elements: tuple[Element, ...] = ()  # This satisfies the abstract property req while letting it be assigned in init
 
-    def __init__(self, parent: RowContainer, elements: Iterable[Element], num: int):
-        self.num = num
+    def __init__(self, parent: RowContainer, elements: Iterable[Element]):
         self.parent = parent
         self.elements = tuple(elements)
 
