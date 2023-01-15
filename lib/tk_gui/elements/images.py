@@ -25,7 +25,7 @@ from .element import Element
 
 if TYPE_CHECKING:
     from ..pseudo_elements import Row
-    from ..typing import XY, BindTarget, ImageType
+    from ..typing import XY, BindTarget, ImageType, Bool
 
 __all__ = ['Image', 'Animation', 'SpinnerImage', 'ClockImage', 'get_size']
 log = logging.getLogger(__name__)
@@ -37,26 +37,43 @@ ImageCycle = Union[FrameCycle, '_ClockCycle']
 
 
 class Image(Element, base_style_layer='image'):
+    _callback: BindTarget = None
     widget: Label = None
     animated: bool = False
+    popup_title: str = None
 
     def __init_subclass__(cls, animated: bool = None, **kwargs):
         super().__init_subclass__(**kwargs)
         if animated is not None:
             cls.animated = animated
 
-    def __init__(self, image: ImageType = None, callback: BindTarget = None, **kwargs):
+    def __init__(
+        self,
+        image: ImageType = None,
+        *,
+        callback: BindTarget = None,
+        popup: Bool = None,
+        popup_title: str = None,
+        **kwargs,
+    ):
         """
-        :param image: The image to display
-        :param callback: Callback action to perform when the image is clicked (overrides left_click_cb).  Supports
-          ``'popup'`` to open a popup with the image.
-        :param kwargs: Additional keyword arguments to pass to :class:`.Element`
+        :param image: The image to display.
+        :param callback: Callback action to perform when the image is clicked (overrides left_click_cb).
+        :param popup: True to open a popup with the image on left click (cannot be specified with ``callback``).
+        :param popup_title: The title to use for the popup (defaults to the name of the image file).
+        :param kwargs: Additional keyword arguments to pass to :class:`.Element`.
         """
-        if callback is not None:
+        if (cb_provided := callback is not None) or popup:
             kwargs['bind_clicks'] = True
         super().__init__(**kwargs)
         self.image = image
-        self._callback = callback
+        if popup:
+            if cb_provided:
+                raise TypeError(f"Only one of 'popup' xor 'callback' may be provided for {self.__class__.__name__}")
+            self._callback = self._handle_open_popup
+            self.popup_title = popup_title
+        elif cb_provided:
+            self._callback = callback
 
     @property
     def image(self) -> Optional[_GuiImage]:
@@ -117,11 +134,12 @@ class Image(Element, base_style_layer='image'):
         image, width, height = self._image.as_size(width, height)
         self._re_pack(image, width, height)
 
-    def handle_open_popup(self, event: Event = None):
+    def _handle_open_popup(self, event: Event = None):
         from ..popups.image import ImagePopup
 
         img = self._image
-        ImagePopup(img.src_image, img.path.name if img.path else None, parent=self.window).run()
+        title = self.popup_title or img.path.name if img.path else None
+        ImagePopup(img.src_image, title, parent=self.window).run()
 
 
 class Animation(Image, animated=True):

@@ -376,8 +376,6 @@ class Element(BindMixin, ElementBase, ABC):
                 cb = self.window.close
             elif cb == BindTargets.INTERRUPT:
                 cb = self.trigger_interrupt
-            elif cb == BindTargets.POPUP:
-                cb = self.handle_open_popup
             else:
                 raise ValueError(f'Invalid {cb=} for {self}')
         elif not isinstance(cb, Callable):
@@ -395,15 +393,13 @@ class Element(BindMixin, ElementBase, ABC):
         # log.debug(f'Handling left click')
         if cb := self.left_click_cb:
             # log.debug(f'Passing {event=} to {cb=}')
-            cb(event)
+            result = cb(event)
+            self.window._handle_callback_action(result, event, self)
 
     def handle_right_click(self, event: Event):
         if menu := self.right_click_menu:
             menu.parent = self  # Needed for style inheritance
             menu.show(event, self.widget.master)  # noqa
-
-    def handle_open_popup(self, event: Event):
-        log.debug(f'No popup action is configured for {self}')
 
     # endregion
 

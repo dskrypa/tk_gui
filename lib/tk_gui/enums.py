@@ -65,7 +65,6 @@ class BindEvent(MissingMixin, Enum):
 class BindTargets(MissingMixin, Enum):
     EXIT = 'exit'
     INTERRUPT = 'interrupt'
-    POPUP = 'popup'
 
 
 class CallbackAction(MissingMixin, Enum):
