@@ -22,7 +22,7 @@ from .assets import PYTHON_LOGO
 from .config import WindowConfig, WindowConfigProperty
 from .elements.menu import Menu
 from .enums import BindTargets, Anchor, Justify, Side, BindEvent, CallbackAction
-from .event_handling import BindMixin, BindMapping, BindMap
+from .event_handling import BindMixin, BindMapping, BindMap, BindManager
 from .exceptions import DuplicateKeyError
 from .positioning import positioner, Monitor
 from .pseudo_elements.row_container import RowContainer
@@ -132,10 +132,11 @@ class Window(BindMixin, RowContainer):
     _last_run: float = 0
     _motion_tracker: MotionTracker = None
     _motion_end_cb_id = None
+    _grab_anywhere_mgr: BindManager | None = None
+    _grab_anywhere: GrabAnywhere = False  #: Whether the window should move on mouse click + movement
     _root: Optional[Top] = None
     root: Optional[TkContainer] = None
     widget: Top = None
-    grab_anywhere: GrabAnywhere = False                 #: Whether the window should move on mouse click + movement
     is_popup: bool = False                              #: Whether the window is a popup
     closed: bool = False
     icon: bytes = PYTHON_LOGO
@@ -240,14 +241,8 @@ class Window(BindMixin, RowContainer):
             self.binds.add(BindEvent.RIGHT_CLICK, None)
         if exit_on_esc:
             self.binds.add('<Escape>', BindTargets.EXIT)
-
-        if grab_anywhere is True:
-            self.grab_anywhere = True
-        elif grab_anywhere:
-            if isinstance(grab_anywhere, str) and grab_anywhere.lower() == 'control':
-                self.grab_anywhere = 'control'
-            else:
-                raise ValueError(f'Unexpected {grab_anywhere=} value')
+        if grab_anywhere:
+            self.grab_anywhere = grab_anywhere
         # self.kill_others_on_close = kill_others_on_close
         if show and self.rows:
             self.show()
@@ -378,6 +373,12 @@ class Window(BindMixin, RowContainer):
             ele_map[key] = element
         else:
             raise DuplicateKeyError(key, old, element, self)
+
+    def unregister_element(self, key: Key):
+        try:
+            del self.element_map[key]
+        except KeyError:
+            pass
 
     # endregion
 
@@ -671,7 +672,7 @@ class Window(BindMixin, RowContainer):
 
     def update_style(self, style: StyleSpec):
         self.style = Style.get_style(style)
-        for element in self.all_elements:
+        for element in self.all_elements():
             element.apply_style()
 
     def _update_idle_tasks(self):
@@ -807,18 +808,52 @@ class Window(BindMixin, RowContainer):
 
     # region Grab Anywhere
 
+    @property
+    def grab_anywhere(self) -> GrabAnywhere:
+        return self._grab_anywhere
+
+    @grab_anywhere.setter
+    def grab_anywhere(self, value: GrabAnywhere):
+        if not value:
+            self._grab_anywhere = False
+            if bind_mgr := self._grab_anywhere_mgr:
+                bind_mgr.unbind_all(self._root)
+            return
+
+        old_value = self._grab_anywhere
+        if value is True:
+            self._grab_anywhere = True
+        else:
+            try:
+                is_control = value.lower() == 'control'
+            except (AttributeError, TypeError) as e:
+                raise TypeError(f'Unexpected type={value.__class__.__name__} for grab_anywhere {value=}') from e
+            if is_control:
+                self._grab_anywhere = 'control'
+            else:
+                raise ValueError(f'Unexpected grab_anywhere {value=}')
+
+        if old_value != self._grab_anywhere and (root := self._root):
+            if bind_mgr := self._grab_anywhere_mgr:
+                bind_mgr.unbind_all(root)
+            self._init_grab_anywhere()
+
     def _init_grab_anywhere(self):
         prefix = 'Control-' if self.grab_anywhere == 'control' else ''
-        root = self._root
-        root.bind(f'<{prefix}Button-1>', self._begin_grab_anywhere, add=True)
-        root.bind(f'<{prefix}B1-Motion>', self._handle_grab_anywhere_motion, add=True)
-        root.bind(f'<{prefix}ButtonRelease-1>', self._end_grab_anywhere, add=True)
+        event_cb_map = {
+            f'<{prefix}Button-1>': self._begin_grab_anywhere,
+            f'<{prefix}B1-Motion>': self._handle_grab_anywhere_motion,
+            f'<{prefix}ButtonRelease-1>': self._end_grab_anywhere,
+        }
+        self._grab_anywhere_mgr = bind_mgr = BindManager(event_cb_map)
+        bind_mgr.bind_all(self._root)
 
     def _begin_grab_anywhere(self, event: Event):
         widget: BaseWidget = event.widget
         if isinstance(widget, _GRAB_ANYWHERE_IGNORE):
             return
-        elif (element := self.widget_element_map.get(widget)) and element.ignore_grab:
+        widget_id = widget._w  # noqa
+        if (element := self.widget_id_element_map.get(widget_id)) and element.ignore_grab:
             return
         self._motion_tracker = MotionTracker(self.true_size_and_pos[1], event)
 
@@ -948,7 +983,8 @@ class Window(BindMixin, RowContainer):
     #     except AttributeError:
     #         element, widget, geometry, pack_info, config_str = None, None, '???', '???', '???'
     #     else:
-    #         element = self.widget_element_map.get(widget)
+    #         widget_id = widget._w
+    #         element = self.widget_id_element_map.get(widget_id)
     #         geometry = widget.winfo_geometry()
     #         # config = widget.configure()
     #         # config_str = '{\n' + ',\n'.join(f'        {k!r}: {v!r}' for k, v in sorted(config.items())) + '\n}'

@@ -35,9 +35,14 @@ class GuiTest(Command):
 
     def __init__(self):
         logging.getLogger('PIL.PngImagePlugin').setLevel(50)
-        log_fmt = '%(asctime)s %(levelname)s %(name)s %(lineno)d %(message)s' if self.verbose > 1 else '%(message)s'
-        level = logging.DEBUG if self.verbose else logging.INFO
-        logging.basicConfig(level=level, format=log_fmt)
+        try:
+            from ds_tools.logging import init_logging
+        except ImportError:
+            log_fmt = '%(asctime)s %(levelname)s %(name)s %(lineno)d %(message)s' if self.verbose > 1 else '%(message)s'
+            level = logging.DEBUG if self.verbose else logging.INFO
+            logging.basicConfig(level=level, format=log_fmt)
+        else:
+            init_logging(self.verbose, log_path=None, names=None)
 
     @action
     def about(self):
@@ -342,7 +347,7 @@ class GuiTest(Command):
         ]
 
         # multiline = Multiline(size=(40, 10), expand=True)
-        multiline = Multiline(size=(120, None), expand=True, read_only=True)
+        multiline = Multiline(size=(120, None), expand=True, read_only=True, auto_scroll=True)
         # multiline = Multiline(size=(120, None), expand=True)
         # multiline = Multiline(size=(120, None), expand=True, read_only=True, read_only_style=True)
 

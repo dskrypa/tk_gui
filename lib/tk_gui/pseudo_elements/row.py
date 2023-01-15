@@ -13,14 +13,14 @@ from tkinter import Frame, LabelFrame, Widget, BaseWidget
 from typing import TYPE_CHECKING, Optional, Union, Iterable, Sequence
 
 from tk_gui.caching import cached_property, clear_cached_properties
-from ..enums import Anchor, Justify, Side
-from ..styles import Style
-from ..utils import Inheritable
+from tk_gui.enums import Anchor, Justify, Side
+from tk_gui.styles import Style
+from tk_gui.utils import Inheritable
 
 if TYPE_CHECKING:
-    from ..elements.element import Element, ElementBase
-    from ..typing import Bool, XY
-    from ..window import Window
+    from tk_gui.elements.element import Element, ElementBase
+    from tk_gui.typing import Bool, XY
+    from tk_gui.window import Window
     from .row_container import RowContainer
 
 __all__ = ['Row']
@@ -36,6 +36,8 @@ class RowBase(ABC):
     element_size: XY = Inheritable(attr_name='parent_rc')
     style: Style = Inheritable(attr_name='parent_rc')
     auto_size_text: bool = Inheritable(attr_name='parent_rc')
+
+    # region Abstract Properties
 
     @property
     @abstractmethod
@@ -61,24 +63,26 @@ class RowBase(ABC):
         """
         raise NotImplementedError
 
+    # endregion
+
     @cached_property
     def widgets(self) -> list[BaseWidget]:
         return [self.frame, *(w for element in self.elements for w in element.widgets)]
 
     @cached_property
-    def widget_element_map(self) -> dict[BaseWidget, Union[RowBase, ElementBase]]:
-        """Used to populate this row's parent's :attr:`RowContainer.widget_element_map`."""
-        widget_ele_map = {self.frame: self}
+    def widget_id_element_map(self) -> dict[str, Union[RowBase, ElementBase]]:
+        """Used to populate this row's parent's :attr:`RowContainer.widget_id_element_map`."""
+        widget_ele_map = {self.frame._w: self}  # noqa
         setdefault = widget_ele_map.setdefault
         for ele in self.elements:
             try:
-                nested_map = ele.widget_element_map  # noqa
+                nested_map = ele.widget_id_element_map  # noqa
             except AttributeError:
                 for widget in ele.widgets:
-                    setdefault(widget, ele)
+                    setdefault(widget._w, ele)  # noqa
             else:
                 widget_ele_map.update(nested_map)
-                setdefault(ele.widget, ele)
+                setdefault(ele.widget._w, ele)  # noqa
 
         return widget_ele_map
 
@@ -89,28 +93,6 @@ class RowBase(ABC):
     @property
     def window(self) -> Window:
         return self.parent_rc.window
-
-    def __getitem__(self, index_or_id: Union[int, str]):
-        try:
-            return self.id_ele_map[index_or_id]
-        except KeyError:
-            pass
-        try:
-            return self.elements[index_or_id]
-        except (IndexError, TypeError):
-            pass
-        raise KeyError(f'Invalid column / index / element ID: {index_or_id!r}')
-
-    def __contains__(self, item: Union[Element, Widget]) -> bool:
-        if isinstance(item, Widget):
-            if self.frame is item:
-                return True
-            for element in self.elements:
-                if element.widget is item:
-                    return True
-            return False
-        else:
-            return item in self.elements
 
     def pack_elements(self, debug: Bool = False):
         if debug:

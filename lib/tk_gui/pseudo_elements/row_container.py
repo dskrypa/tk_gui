@@ -8,11 +8,11 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from functools import cached_property
 from itertools import count
 from tkinter import Toplevel, Frame, BaseWidget
-from typing import TYPE_CHECKING, Optional, Union, Any, overload
+from typing import TYPE_CHECKING, Optional, Union, Any, Iterator, overload
 
+from tk_gui.caching import cached_property
 from ..enums import Anchor, Justify, Side
 from ..styles import Style, StyleSpec
 from ..utils import call_with_popped
@@ -31,6 +31,8 @@ CONTAINER_PARAMS = {
     'anchor_elements', 'text_justification', 'element_side', 'element_padding', 'element_size',
     'scroll_y', 'scroll_x', 'scroll_y_div', 'scroll_x_div',
 }
+
+ElementLike = Union[RowBase, 'ElementBase', 'RowContainer']
 
 
 class RowContainer(ABC):
@@ -115,6 +117,8 @@ class RowContainer(ABC):
                     log.debug(f'Packing row {i} / {n_rows}')
                 row.pack(debug)
 
+    # region Abstract Properties
+
     @property
     @abstractmethod
     def widget(self) -> Union[Frame, Toplevel, ScrollableToplevel]:
@@ -130,10 +134,13 @@ class RowContainer(ABC):
     def window(self) -> Window:
         raise NotImplementedError
 
+    # endregion
+
     # region Widget / Element Contents
 
     @cached_property
     def widgets(self) -> list[BaseWidget]:
+        """Primarily used during population of ``widget_id_element_map`` properties."""
         widgets = [w for row in self.rows for w in row.widgets]
         try:
             widgets.extend(self.widget.widgets)
@@ -141,10 +148,11 @@ class RowContainer(ABC):
             widgets.append(self.widget)
         return widgets
 
-    def __iter_widget_eles(self):
+    def __iter_widget_eles(self) -> Iterator[tuple[str, ElementLike, ElementLike]]:
+        """Used to build :attr:`.widget_id_element_map`."""
         for row in self.rows:
-            for widget, ele in row.widget_element_map.items():
-                yield widget, ele, ele
+            for widget_id, ele in row.widget_id_element_map.items():
+                yield widget_id, ele, ele
 
         try:
             widgets = self.widget.widgets
@@ -152,16 +160,25 @@ class RowContainer(ABC):
             widgets = (self.widget,)
 
         for widget in widgets:
-            yield widget, self, widget
+            yield widget._w, self, widget  # noqa
 
     @cached_property
-    def widget_element_map(self) -> dict[BaseWidget, Union[RowBase, ElementBase, RowContainer]]:
+    def widget_id_element_map(self) -> dict[str, ElementLike]:
+        """
+        This mapping is used for the following use cases:
+            - Used by Window when grab_anywhere is enabled to find which Element was clicked, in case it was configured
+              to ``ignore_grab``.
+            - Used by the following attributes / methods:
+                - id_ele_map
+                - all_elements
+            - Used by :meth:`.__getitem__`
+        """
         widget_ele_map = {}
         setdefault = widget_ele_map.setdefault
         for widget, ele, maybe_has_map in self.__iter_widget_eles():
             setdefault(widget, ele)
             try:
-                nested_map = maybe_has_map.widget_element_map
+                nested_map = maybe_has_map.widget_id_element_map
             except AttributeError:
                 pass
             else:
@@ -170,69 +187,43 @@ class RowContainer(ABC):
         return widget_ele_map
 
     @cached_property
-    def element_widgets_map(self) -> dict[Union[RowBase, ElementBase, RowContainer], list[BaseWidget]]:
-        ele_widgets_map = {}
-        for key, val in self.widget_element_map.items():
-            try:
-                ele_widgets_map[val].append(key)
-            except KeyError:
-                ele_widgets_map[val] = [key]
-
-        return ele_widgets_map
-
-    @cached_property
-    def id_widget_map(self) -> dict[str, BaseWidget]:
-        return {w._w: w for w in self.widget_element_map}  # noqa
-
-    @cached_property
     def id_ele_map(self) -> dict[str, ElementBase]:
         id_ele_map = {}
-        for ele in self.widget_element_map.values():
+        for ele in self.widget_id_element_map.values():
             try:
                 id_ele_map[ele.id] = ele
             except AttributeError:
                 pass
         return id_ele_map
 
-    @cached_property
-    def all_elements(self) -> list[Union[ElementBase, Row]]:
+    def all_elements(self) -> Iterator[Union[ElementBase, Row]]:
         from ..elements.element import ElementBase
 
-        return [e for e in self.widget_element_map.values() if isinstance(e, (ElementBase, Row))]
+        yield from (e for e in self.widget_id_element_map.values() if isinstance(e, (ElementBase, Row)))
 
-    def __getitem__(self, item: Union[str, BaseWidget, tuple[int, int]]) -> ElementBase:
+    def __getitem__(self, item: Union[str, BaseWidget]) -> ElementBase:
+        """
+        :param item: A widget, widget ID (assigned by tk/tkinter), or element ID (assigned in
+          :meth:`ElementBase.__init__`).
+        :return: The Element associated with the given identifier/widget.
+        """
+        # log.warning(f'{self!r}[{item!r}]', extra={'color': 9}, stack_info=True)
+        orig_item = item
+        if isinstance(item, BaseWidget):
+            item = item._w  # noqa
         if isinstance(item, str):
             try:
                 return self.id_ele_map[item]
             except KeyError:
                 pass
             try:
-                return self.widget_element_map[self.id_widget_map[item]]
-            except KeyError:
-                pass
-        elif isinstance(item, BaseWidget):
-            try:
-                return self.widget_element_map[item]
+                return self.widget_id_element_map[item]
             except KeyError:
                 pass
         else:
-            try:
-                row, column = item
-            except (ValueError, TypeError):
-                pass
-            else:
-                try:
-                    return self.rows[row][column]
-                except (IndexError, TypeError, ValueError):
-                    pass
-        raise KeyError(f'Invalid element ID / (row, column) index: {item!r}')
+            raise TypeError(f'Unexpected type={orig_item.__class__.__name__} for element identifier={orig_item!r}')
 
-    def __contains__(self, item: Union[str, ElementBase, BaseWidget]) -> bool:
-        if isinstance(item, str):
-            return item in self.id_ele_map or item in self.id_widget_map
-        elif isinstance(item, BaseWidget):
-            return item in self.widget_element_map
-        return item in self.element_widgets_map
+        raise KeyError(f'Invalid element ID/key / widget: {orig_item!r}')
 
     # endregion
 
