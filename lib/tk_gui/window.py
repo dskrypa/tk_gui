@@ -723,7 +723,8 @@ class Window(BindMixin, RowContainer):
         if y_div <= 1 or not (monitor := self._get_monitor(True)):
             return None
 
-        inner.update()
+        # inner.update()
+        inner.update_idletasks()
         width: int = inner.winfo_reqwidth() // x_div  # noqa
         height = inner.winfo_reqheight()
         max_outer_height = monitor.height - 130
