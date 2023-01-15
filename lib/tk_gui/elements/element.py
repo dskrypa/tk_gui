@@ -43,7 +43,6 @@ class ElementBase(ClearableCachedPropertyMixin, ABC):
     _base_style_layer: str = None
     id: str
     parent: Optional[RowBase] = None
-    column: Optional[int] = None
     widget: Optional[Widget] = None
     fill: TkFill = None
     expand: bool = None
@@ -126,13 +125,12 @@ class ElementBase(ClearableCachedPropertyMixin, ABC):
             x, y = 5, 3
         return {'padx': x, 'pady': y}
 
-    def pack_into_row(self, row: Row, column: int):
+    def pack_into_row(self, row: Row):
         self.parent = row
-        self.column = column
-        self.pack_into(row, column)
+        self.pack_into(row)
 
     @abstractmethod
-    def pack_into(self, row: RowBase, column: int):
+    def pack_into(self, row: RowBase):
         raise NotImplementedError
 
     def pack_widget(self, *, expand: bool = None, fill: TkFill = None, **kwargs):
@@ -278,12 +276,11 @@ class Element(BindMixin, ElementBase, ABC):
 
     # region Pack Methods / Attributes
 
-    def pack_into_row(self, row: RowBase, column: int):
+    def pack_into_row(self, row: RowBase):
         self.parent = row
-        self.column = column
         if key := self._key:
             row.window.register_element(key, self)
-        self.pack_into(row, column)
+        self.pack_into(row)
         self.apply_binds()
         if tooltip := self.tooltip_text:
             self.add_tooltip(tooltip)
@@ -341,7 +338,6 @@ class Element(BindMixin, ElementBase, ABC):
     def show(self):
         settings = self._pack_settings or {}
         self.widget.pack(**settings)
-        # self.widget.pack(**self.pad_kw)
         self._visible = True
 
     def toggle_visibility(self, show: bool = None):

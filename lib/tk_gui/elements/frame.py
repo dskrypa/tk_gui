@@ -69,7 +69,7 @@ class FrameMixin:
 
         return config
 
-    def pack_into(self, row: Row, column: int):
+    def pack_into(self, row: Row):
         kwargs = self.style_config
         if title := self.title:
             kwargs['text'] = title
@@ -261,7 +261,7 @@ class ScrollFrame(Element, RowContainer, base_style_layer='frame'):
         outer_kw['inner_kwargs'] = inner_kw
         return outer_kw
 
-    def pack_into(self, row: Row, column: int):
+    def pack_into(self, row: Row):
         kwargs = self._prepare_pack_kwargs()
         labeled = self.title_mode in {'outer', 'both'}
         outer_cls = ScrollableLabelFrame if labeled else ScrollableFrame

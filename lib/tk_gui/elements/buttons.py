@@ -182,7 +182,7 @@ class Button(DisableableMixin, Interactive, base_style_layer='button'):
 
         return config
 
-    def pack_into(self, row: Row, column: int):
+    def pack_into(self, row: Row):
         # self.string_var = StringVar()
         # self.string_var.set(self._value)
         width, height = self._pack_size()

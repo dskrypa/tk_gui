@@ -381,7 +381,7 @@ class Menu(ContainerMixin, ElementBase, metaclass=MenuMeta, base_style_layer='me
 
         return menu
 
-    def pack_into(self, row: Row, column: int):
+    def pack_into(self, row: Row):
         root = row.window._root
         self.widget = menu = self.prepare(root)
         root.configure(menu=menu)

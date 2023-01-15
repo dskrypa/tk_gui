@@ -82,8 +82,8 @@ class Radio(DisableableMixin, CallbackCommandMixin, Interactive, Generic[T], bas
             return value
         return self.label
 
-    def pack_into_row(self, row: Row, column: int):
-        super().pack_into_row(row, column)
+    def pack_into_row(self, row: Row):
+        super().pack_into_row(row)
         group = self.group
         if not group._registered and (key := group.key):
             row.window.register_element(key, group)
@@ -105,7 +105,7 @@ class Radio(DisableableMixin, CallbackCommandMixin, Interactive, Generic[T], bas
             **self._style_config,
         }
 
-    def pack_into(self, row: Row, column: int):
+    def pack_into(self, row: Row):
         kwargs = {
             'text': self.label,
             'value': self.choice_id,
@@ -318,7 +318,7 @@ class CheckBox(DisableableMixin, CallbackCommandMixin, Interactive, base_style_l
             else:
                 self.__change_cb_name = tk_var.trace_add('write', value)
 
-    def pack_into(self, row: Row, column: int):
+    def pack_into(self, row: Row):
         self.tk_var = tk_var = BooleanVar(value=self.default)
         kwargs = {
             'text': self.label,
@@ -430,7 +430,7 @@ class Combo(DisableableMixin, Interactive, disabled_state='disable', enabled_sta
         if widget := self.widget:
             widget.bind('<<ComboboxSelected>>', self.normalize_callback(callback))
 
-    def pack_into(self, row: Row, column: int):
+    def pack_into(self, row: Row):
         self.tk_var = tk_var = StringVar()
         style, state = self.style, self.style_state
         kwargs = {
@@ -577,7 +577,7 @@ class ListBox(DisableableMixin, Interactive, base_style_layer='listbox'):
         else:
             self._callback = callback
 
-    def pack_into(self, row: Row, column: int):
+    def pack_into(self, row: Row):
         kwargs = {
             'exportselection': False,  # Prevent selections in this box from affecting others / the primary selection
             'selectmode': self.select_mode.value,

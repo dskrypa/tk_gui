@@ -227,7 +227,7 @@ class Label(TextValueMixin, LinkableMixin, Element, base_style_layer='text'):
             **self._style_config,
         }
 
-    def pack_into(self, row: Row, column: int):
+    def pack_into(self, row: Row):
         self.init_string_var()
         kwargs = {
             'textvariable': self.string_var,
@@ -313,7 +313,7 @@ class Text(TextValueMixin, LinkableMixin, Element):
         else:
             return self.style.text, StyleState.DEFAULT
 
-    def pack_into(self, row: Row, column: int):
+    def pack_into(self, row: Row):
         self.init_string_var()
         kwargs = {
             'highlightthickness': 0,
@@ -401,7 +401,7 @@ class Input(TextValueMixin, LinkableMixin, InteractiveText, disabled_state='read
             **self._style_config,
         }
 
-    def pack_into(self, row: Row, column: int):
+    def pack_into(self, row: Row):
         self.init_string_var()
         kwargs = {
             'textvariable': self.string_var,
@@ -544,7 +544,7 @@ class Multiline(InteractiveText, disabled_state='disabled'):
 
         return config
 
-    def pack_into(self, row: Row, column: int):
+    def pack_into(self, row: Row):
         kwargs = self.style_config
         kwargs['takefocus'] = int(self.allow_focus)
         try:

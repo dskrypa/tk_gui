@@ -352,11 +352,7 @@ class Window(BindMixin, RowContainer):
             return self.element_map[item]
         except KeyError:
             pass
-        try:
-            return super().__getitem__(item)
-        except KeyError:
-            pass
-        raise KeyError(f'Invalid element key/ID / (row, column) index: {item!r}')
+        return super().__getitem__(item)
 
     @property
     def results(self) -> dict[Key, Any]:
@@ -723,7 +719,6 @@ class Window(BindMixin, RowContainer):
         if y_div <= 1 or not (monitor := self._get_monitor(True)):
             return None
 
-        # inner.update()
         inner.update_idletasks()
         width: int = inner.winfo_reqwidth() // x_div  # noqa
         height = inner.winfo_reqheight()
@@ -1121,9 +1116,10 @@ def patch_call_wrapper():
     """Patch CallWrapper.__call__ to prevent it from suppressing KeyboardInterrupt"""
 
     def _cw_call(self, *args):
+        # log.debug(f'CallWrapper({self!r}, {args=})')
         try:
-            if self.subst:
-                args = self.subst(*args)
+            if subst := self.subst:
+                args = subst(*args)
             return self.func(*args)
         except Exception:  # noqa
             # The original implementation re-raises SystemExit, but uses a bare `except:` here

@@ -33,7 +33,7 @@ class Separator(ElementBase, base_style_layer='separator'):
         super().__init__(**kwargs)
         self.orientation = orientation
 
-    def pack_into(self, row: Row, column: int):
+    def pack_into(self, row: Row):
         style = self.style
         name, ttk_style = style.make_ttk_style('.Line.TSeparator')
         ttk_style.configure(name, background=style.separator.bg.default)
@@ -88,7 +88,7 @@ class ProgressBar(Element, base_style_layer='progress'):
         ttk_style.configure(name, **kwargs)
         return name
 
-    def pack_into(self, row: Row, column: int):
+    def pack_into(self, row: Row):
         horizontal = self.orientation == tkc.HORIZONTAL
         kwargs = {
             'style': self._prepare_ttk_style(),
@@ -178,7 +178,7 @@ class Slider(DisableableMixin, CallbackCommandMixin, Interactive, base_style_lay
         config.setdefault('relief', tkc.FLAT)
         return config
 
-    def pack_into(self, row: Row, column: int):
+    def pack_into(self, row: Row):
         min_val, max_val, interval, default = self.min_value, self.max_value, self.interval, self.default
         if _is_int(min_val) and _is_int(max_val) and _is_int(interval):
             self.tk_var = tk_var = IntVar(value=int(default) if default is not None else default)

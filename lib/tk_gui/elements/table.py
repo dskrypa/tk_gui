@@ -154,7 +154,7 @@ class Table(Element, base_style_layer='table'):
         ttk_style.configure(name, **config)
         return config
 
-    def pack_into(self, row: Row, column: int):
+    def pack_into(self, row: Row):
         columns, style = self.columns, self.style
         kwargs = {
             'columns': [col.key for col in columns.values()],

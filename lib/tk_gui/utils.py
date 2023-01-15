@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     'ON_WINDOWS', 'ON_LINUX', 'ON_MAC', 'Inheritable', 'ProgramMetadata', 'ViewLoggerAdapter',
-    'tcl_version', 'max_line_len', 'call_with_popped', 'resize_text_column', 'extract_kwargs', 'get_user_temp_dir',
+    'tcl_version', 'max_line_len', 'call_with_popped', 'extract_kwargs', 'get_user_temp_dir',
 ]
 log = logging.getLogger(__name__)
 
@@ -221,15 +221,6 @@ class ViewLoggerAdapter(logging.LoggerAdapter):
 
     def process(self, msg, kwargs):
         return f'[view={self._view_name}] {msg}', kwargs
-
-
-def resize_text_column(rows: Sequence[Sequence], column: int = 0):
-    if rows:
-        longest = max(map(len, (row[column].text for row in rows)))
-        for row in rows:
-            row[column].size = (longest, 1)
-
-    return rows
 
 
 def get_user_temp_dir(*sub_dirs, mode: int = 0o777) -> Path:

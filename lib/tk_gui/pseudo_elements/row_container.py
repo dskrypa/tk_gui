@@ -236,8 +236,7 @@ class RowContainer(ABC):
         return x_div, y_div
 
     def _update_scroll_region(self, outer: ScrollableContainer, inner: TkContainer, size: Optional[XY]):
-        # inner.update()
-        inner.update_idletasks()
+        inner.update_idletasks()  # Required for the required height/width to be correct
         try:
             width, height = size
         except TypeError:

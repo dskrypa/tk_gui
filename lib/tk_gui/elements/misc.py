@@ -26,7 +26,7 @@ class SizeGrip(ElementBase):
     def __init__(self, side: Union[str, Side] = tkc.BOTTOM, **kwargs):
         super().__init__(side=side, **kwargs)
 
-    def pack_into(self, row: Row, column: int):
+    def pack_into(self, row: Row):
         style = self.style
         name, ttk_style = style.make_ttk_style('.Sizegrip.TSizegrip')
         ttk_style.configure(name, background=style.base.bg.default)

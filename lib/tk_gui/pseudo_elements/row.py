@@ -12,7 +12,7 @@ from abc import ABC, abstractmethod
 from tkinter import Frame, LabelFrame, BaseWidget
 from typing import TYPE_CHECKING, Optional, Union, Iterable, Sequence
 
-from tk_gui.caching import cached_property, clear_cached_properties
+from tk_gui.caching import cached_property
 from tk_gui.enums import Anchor, Justify, Side
 from tk_gui.styles import Style
 from tk_gui.utils import Inheritable
@@ -100,13 +100,13 @@ class RowBase(ABC):
             for i, ele in enumerate(self.elements):
                 log.debug(f' > Packing element {i} / {n_eles}')
                 try:
-                    ele.pack_into_row(self, i)
+                    ele.pack_into_row(self)
                 except Exception:
                     log.error(f'Encountered unexpected error packing element={ele} into row={self}', exc_info=True)
                     raise
         else:
-            for i, ele in enumerate(self.elements):
-                ele.pack_into_row(self, i)
+            for ele in self.elements:
+                ele.pack_into_row(self)
 
 
 class Row(RowBase):
