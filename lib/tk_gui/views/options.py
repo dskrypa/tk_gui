@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 __all__ = ['GuiOptionsView']
 
 
-class GuiOptionsView(View, title='Options', primary=False):
+class GuiOptionsView(View, title='Options'):
     window_kwargs = {'exit_on_esc': True}
 
     def __init__(self, gui_options: GuiOptions, **kwargs):

@@ -7,6 +7,7 @@ Base View class
 from __future__ import annotations
 
 import logging
+from time import monotonic
 from typing import TYPE_CHECKING, Any, Union, Optional, Mapping
 
 from tk_gui.caching import cached_property
@@ -97,7 +98,10 @@ class View(HandlesEvents):
         return self.window.results
 
     def run(self) -> dict[Key, Any]:
+        start = monotonic()
         window = self.finalize_window()
+        elapsed = monotonic() - start
+        log.debug(f'Rendered layout for {self.__class__.__name__} in seconds={elapsed:,.3f}')
         with window(take_focus=True):
             window.run()
             return self.get_results()
