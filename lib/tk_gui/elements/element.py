@@ -251,8 +251,8 @@ class Element(BindMixin, ElementBase, ABC):
             elif key in _INHERITABLES:
                 setattr(self, key, val)
             else:
-                # The number of times one or more invalid options will be provided is extremely low compared to the
-                # number of times this exception will need to be raised, so the re-iteration over kwargs is acceptable.
+                # The number of times one or more invalid options will be provided is extremely low compared to how
+                # often this exception will not need to be raised, so the re-iteration over kwargs is acceptable.
                 # This also avoids creating the `bad` dict that would otherwise be thrown away on 99.9% of init calls.
                 bad = {k: v for k, v in kwargs.items() if k not in _DIRECT_ATTRS and k not in _INHERITABLES}
                 raise TypeError(f'Invalid options for {self.__class__.__name__}: {bad}')

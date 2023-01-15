@@ -300,8 +300,8 @@ class StyleLayer:
             if key in fields:
                 setattr(self, key, val)
             else:
-                # The number of times one or more invalid options will be provided is extremely low compared to the
-                # number of times this exception will need to be raised, so the re-iteration over kwargs is acceptable.
+                # The number of times one or more invalid options will be provided is extremely low compared to how
+                # often this exception will not need to be raised, so the re-iteration over kwargs is acceptable.
                 # This also avoids creating the `bad` dict that would otherwise be thrown away on 99.9% of init calls.
                 bad = {k: v for k, v in kwargs.items() if k not in fields}
                 raise TypeError(f'Invalid style layer options: {bad}')
