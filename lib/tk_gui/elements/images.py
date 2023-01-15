@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta
+from functools import lru_cache
 from inspect import Signature
 from pathlib import Path
 from tkinter import Label, TclError, Event
@@ -420,8 +421,7 @@ class _GuiImage:
     def _load_or_resize(cls, path: Path | None, src: PILImage, dst_size: XY) -> tuple[bool, PILImage, PhotoImage]:
         if path:
             try:
-                image = open_image(path)
-                log.debug(f'Loaded thumbnail from {path.as_posix()}')
+                image = _load_thumbnail(path)
                 return True, image, PhotoImage(image)
             except FileNotFoundError:
                 pass
@@ -442,6 +442,13 @@ class _GuiImage:
         except AttributeError:
             cls._thumbnail_dir = thumbnail_dir = get_user_temp_dir('tk_gui_thumbnails')
             return thumbnail_dir
+
+
+@lru_cache(20)
+def _load_thumbnail(path: Path) -> PILImage:
+    image = open_image(path)
+    log.debug(f'Loaded thumbnail from {path.as_posix()}')
+    return image
 
 
 def normalize_image_cycle(image: AnimatedType, size: XY = None, last_frame_num: int = 0) -> ImageCycle:
