@@ -5,7 +5,7 @@ Type annotations for the Tkinter GUI package.
 """
 
 from abc import abstractmethod
-from typing import TYPE_CHECKING, Protocol, TypeVar, Any, Union, Callable, Iterable, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, TypeVar, Any, Union, Callable, Iterable, Optional, runtime_checkable
 from typing import Literal, _ProtocolMeta  # noqa
 
 if TYPE_CHECKING:
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 # fmt: off
 __all__ = [
-    'Bool', 'XY', 'Key', 'HasParent', 'HasValue', 'Layout', 'Axis', 'Orientation', 'PathLike',
+    'Bool', 'XY', 'Key', 'HasParent', 'HasValue', 'Layout', 'Axis', 'Orientation', 'PathLike', 'OptInt',
     'BindCallback', 'EventCallback', 'TraceCallback', 'BindTarget', 'Bindable', 'ProvidesEventCallback',
     'TkFill', 'TkSide', 'TkJustify',
     'TkContainer',
@@ -39,6 +39,7 @@ Layout = Iterable[Iterable['Element']]
 Axis = Literal['x', 'y']
 Orientation = Literal['horizontal', 'vertical']
 PathLike = Union['Path', str]
+OptInt = Optional[int]
 
 TkFill = Union[Literal['none', 'x', 'y', 'both'], None, bool]
 TkSide = Literal['left', 'right', 'top', 'bottom']

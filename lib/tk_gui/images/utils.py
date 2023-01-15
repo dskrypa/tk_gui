@@ -6,6 +6,7 @@ Utilities for working with PIL images.
 
 from __future__ import annotations
 
+from hashlib import sha256
 from io import BytesIO
 from importlib.resources import path as get_data_path
 from math import floor, ceil
@@ -18,7 +19,9 @@ from PIL.JpegImagePlugin import RAWMODE
 if TYPE_CHECKING:
     from ..typing import XY, ImageType
 
-__all__ = ['as_image', 'image_path', 'image_to_bytes', 'scale_image', 'calculate_resize', 'prepare_dir']
+__all__ = [
+    'as_image', 'image_path', 'image_to_bytes', 'scale_image', 'calculate_resize', 'prepare_dir', 'get_image_and_hash'
+]
 
 
 with get_data_path('tk_gui', 'icons') as _icon_path:
@@ -35,7 +38,7 @@ def prepare_dir(path: Union[Path, str]) -> Path:
         if not path.is_dir():
             raise ValueError(f'Invalid path={path.as_posix()!r} - it must be a directory')
     else:
-        path.mkdir(parents=True)
+        path.mkdir(parents=True, exist_ok=True)
     return path
 
 
@@ -53,17 +56,38 @@ def as_image(image: ImageType) -> PILImage:
         raise TypeError(f'Image must be bytes, None, Path, str, or a PIL.Image.Image - found {type(image)}')
 
 
+def get_image_and_hash(image: ImageType) -> tuple[PILImage | None, str | None]:
+    if image is None:
+        return None, None
+    elif isinstance(image, bytes):
+        return open_image(BytesIO(image)), sha256(image).hexdigest()
+    elif isinstance(image, (Path, str)):
+        path = Path(image).expanduser()
+        if not path.is_file():
+            raise ValueError(f'Invalid image path={path.as_posix()!r} - it is not a file')
+
+        return open_image(path), sha256(path.read_bytes()).hexdigest()
+    elif isinstance(image, PILImage):
+        return image, sha256(_image_to_bytes(image)).hexdigest()
+    else:
+        raise TypeError(f'Image must be bytes, None, Path, str, or a PIL.Image.Image - found {type(image)}')
+
+
 def image_to_bytes(image: ImageType, format: str = None, size: XY = None, **kwargs) -> bytes:  # noqa
     image = as_image(image)
     if size:
         image = scale_image(image, *size, **kwargs)
-    if not (save_fmt := format or image.format):
-        save_fmt = 'png' if image.mode == 'RGBA' else 'jpeg'
-    if save_fmt == 'jpeg' and image.mode not in RAWMODE:
+    return _image_to_bytes(image, format)
+
+
+def _image_to_bytes(image: PILImage, img_format: str = None) -> bytes:
+    if not img_format:
+        img_format = image.format or ('png' if image.mode == 'RGBA' else 'jpeg')
+    if img_format == 'jpeg' and image.mode not in RAWMODE:
         image = image.convert('RGB')
 
     bio = BytesIO()
-    image.save(bio, save_fmt)
+    image.save(bio, img_format)
     return bio.getvalue()
 
 

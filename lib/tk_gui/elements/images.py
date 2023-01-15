@@ -13,19 +13,21 @@ from pathlib import Path
 from tkinter import Label, TclError, Event
 from typing import TYPE_CHECKING, Optional, Any, Union
 
-from PIL.Image import Image as PILImage, Resampling
+from PIL.Image import Image as PILImage, Resampling, open as open_image
 from PIL.ImageSequence import Iterator as FrameIterator
 from PIL.ImageTk import PhotoImage
 
 from ..images import SevenSegmentDisplay, calculate_resize, as_image
 from ..images.cycle import FrameCycle, PhotoImageCycle
 from ..images.spinner import Spinner
+from ..images.utils import get_image_and_hash
 from ..styles import Style, StyleSpec
+from ..utils import get_user_temp_dir
 from .element import Element
 
 if TYPE_CHECKING:
     from ..pseudo_elements import Row
-    from ..typing import XY, BindTarget, ImageType, Bool
+    from ..typing import XY, BindTarget, ImageType, Bool, OptInt
 
 __all__ = ['Image', 'Animation', 'SpinnerImage', 'ClockImage', 'get_size']
 log = logging.getLogger(__name__)
@@ -330,18 +332,18 @@ class ClockImage(Animation):
 
 
 class _GuiImage:
-    __slots__ = ('src_image', 'current', 'current_tk', 'src_size', 'size', 'path')
+    __slots__ = ('src_image', 'current', 'current_tk', 'src_size', 'size', 'path', 'src_hash', 'max_thumbnail_size')
+    src_image: PILImage | None
+    current: PILImage | None
+    current_tk: PhotoImage | None
 
-    def __init__(self, image: ImageType):
-        try:
-            self.path = _get_path(image)
-        except ValueError:
-            self.path = None
-        image = as_image(image)
+    def __init__(self, image: ImageType, max_thumbnail_size: XY = (500, 500)):
+        self.path = _get_path(image, True)
+        image, self.src_hash = get_image_and_hash(image)
         # log.debug(f'Loaded image={image!r}')
-        self.src_image: Optional[PILImage] = image
-        self.current: Optional[PILImage] = image
-        self.current_tk: Optional[PhotoImage] = None
+        self.src_image = image
+        self.current = image
+        self.current_tk = None
         try:
             size = image.size
         except AttributeError:  # image is None
@@ -349,14 +351,14 @@ class _GuiImage:
         self.src_size = size
         self.size = size
 
-    def _normalize(self, width: Optional[int], height: Optional[int]) -> XY:
+    def _normalize(self, width: OptInt, height: OptInt) -> XY:
         if width is None:
             width = self.size[0]
         if height is None:
             height = self.size[1]
         return width, height
 
-    def target_size(self, width: Optional[int], height: Optional[int]) -> XY:
+    def target_size(self, width: OptInt, height: OptInt) -> XY:
         width, height = self._normalize(width, height)
         cur_width, cur_height = self.size
         if self.current is None or (cur_width == width and cur_height == height):
@@ -366,7 +368,7 @@ class _GuiImage:
         else:
             return calculate_resize(*self.src_size, width, height)
 
-    def as_size(self, width: Optional[int], height: Optional[int]) -> ImageAndSize:
+    def as_size(self, width: OptInt, height: OptInt) -> ImageAndSize:
         width, height = self._normalize(width, height)
         if (current := self.current) is None:
             return None, width, height
@@ -383,16 +385,63 @@ class _GuiImage:
             src = self.src_image
             dst_width, dst_height = calculate_resize(*self.src_size, width, height)
 
+        return self._as_size(src, width, height, dst_width, dst_height)
+
+    def _as_size(self, src: PILImage, width: OptInt, height: OptInt, dst_width: int, dst_height: int) -> ImageAndSize:
+        thumbnail_path = self.get_thumbnail_path(width, height, dst_width, dst_height)
         dst_size = (dst_width, dst_height)
+        last_tk = self.current_tk
         try:
-            self.current = image = src.resize(dst_size, Resampling.LANCZOS)
-            self.current_tk = tk_image = PhotoImage(image)
+            used_cache, image, tk_image = self._load_or_resize(thumbnail_path, src, dst_size)
+            self.current = image
+            self.current_tk = tk_image
         except OSError as e:
             log.warning(f'Error resizing image={src}: {e}')
             return src, width, height
         else:
             self.size = dst_size
+            if thumbnail_path and not used_cache and not last_tk:  # Only save initial thumbnails, not misc resizes
+                self._save_thumbnail(image, thumbnail_path)
             return tk_image, dst_width, dst_height
+
+    @classmethod
+    def _save_thumbnail(cls, image: PILImage, path: Path):
+        if not (save_fmt := image.format):
+            save_fmt = 'png' if image.mode == 'RGBA' else 'jpeg'
+        try:
+            with path.open('wb') as f:
+                image.save(f, save_fmt)
+        except OSError as e:
+            log.debug(f'Error saving thumbnail to path={path.as_posix()}: {e}')
+        else:
+            log.debug(f'Saved thumbnail to {path.as_posix()}')
+
+    @classmethod
+    def _load_or_resize(cls, path: Path | None, src: PILImage, dst_size: XY) -> tuple[bool, PILImage, PhotoImage]:
+        if path:
+            try:
+                image = open_image(path)
+                log.debug(f'Loaded thumbnail from {path.as_posix()}')
+                return True, image, PhotoImage(image)
+            except FileNotFoundError:
+                pass
+            except OSError as e:
+                log.debug(f'Error loading cached thumbnail from path={path.as_posix()}: {e}')
+        image = src.resize(dst_size, Resampling.LANCZOS)
+        return False, image, PhotoImage(image)
+
+    def get_thumbnail_path(self, width: OptInt, height: OptInt, dst_width: int, dst_height: int) -> Path | None:
+        if not (src_hash := self.src_hash) or (width and width < dst_width) or (height and height < dst_height):
+            return None
+        return self._get_thumbnail_dir().joinpath(f'{src_hash}_{width}x{height}_{dst_width}x{dst_height}.thumb')
+
+    @classmethod
+    def _get_thumbnail_dir(cls) -> Path:
+        try:
+            return cls._thumbnail_dir  # noqa
+        except AttributeError:
+            cls._thumbnail_dir = thumbnail_dir = get_user_temp_dir('tk_gui_thumbnails')
+            return thumbnail_dir
 
 
 def normalize_image_cycle(image: AnimatedType, size: XY = None, last_frame_num: int = 0) -> ImageCycle:
@@ -441,13 +490,15 @@ def normalize_image_cycle(image: AnimatedType, size: XY = None, last_frame_num: 
     return frame_cycle
 
 
-def _get_path(image: ImageType) -> Path:
+def _get_path(image: ImageType, no_path_ok: bool = False) -> Path | None:
     if isinstance(image, Path):
         return image
     elif isinstance(image, str):
         return Path(image).expanduser()
     elif path := getattr(image, 'filename', None) or getattr(getattr(image, 'fp', None), 'name', None):
         return Path(path)
+    if no_path_ok:
+        return None
     raise ValueError(f'Unexpected image type for {image=}')
 
 

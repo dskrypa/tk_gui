@@ -9,8 +9,10 @@ from __future__ import annotations
 import logging
 import platform
 import sys
+from getpass import getuser
 from inspect import stack
 from pathlib import Path
+from tempfile import gettempdir
 from typing import TYPE_CHECKING, Optional, Type, Any, Callable, Collection, Iterable, Sequence
 
 from .constants import STYLE_CONFIG_KEYS
@@ -20,7 +22,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     'ON_WINDOWS', 'ON_LINUX', 'ON_MAC', 'Inheritable', 'ProgramMetadata', 'ViewLoggerAdapter',
-    'tcl_version', 'max_line_len', 'call_with_popped', 'resize_text_column', 'extract_kwargs',
+    'tcl_version', 'max_line_len', 'call_with_popped', 'resize_text_column', 'extract_kwargs', 'get_user_temp_dir',
 ]
 log = logging.getLogger(__name__)
 
@@ -228,3 +230,22 @@ def resize_text_column(rows: Sequence[Sequence], column: int = 0):
             row[column].size = (longest, 1)
 
     return rows
+
+
+def get_user_temp_dir(*sub_dirs, mode: int = 0o777) -> Path:
+    """
+    On Windows, returns `~/AppData/Local/Temp` or a sub-directory named after the current user of another temporary
+    directory.  On Linux, returns a sub-directory named after the current user in `/tmp`, `/var/tmp`, or `/usr/tmp`.
+
+    :param sub_dirs: Child directories of the chosen directory to include/create
+    :param mode: Permissions to set if the directory needs to be created (0o777 by default, which matches the default
+      for :meth:`pathlib.Path.mkdir`)
+    """
+    path = Path(gettempdir())
+    if not ON_WINDOWS or not path.as_posix().endswith('AppData/Local/Temp'):
+        path = path.joinpath(getuser())
+    if sub_dirs:
+        path = path.joinpath(*sub_dirs)
+    if not path.exists():
+        path.mkdir(mode=mode, parents=True, exist_ok=True)
+    return path
