@@ -923,6 +923,24 @@ class Window(BindMixin, RowContainer):
 
     # region Event Handling
 
+    def _handle_callback_action(
+        self, cb_result: CallbackAction | Any, event: Event = None, element: ElementBase = None
+    ) -> bool:
+        """
+        :param cb_result: The result of a callback
+        :param event: The event that triggered the callback that produced the given result
+        :param element: The element that handled the event / returned the given result
+        :return: True if this Window is closing due to the result, False otherwise
+        """
+        if isinstance(cb_result, CallbackAction):
+            if cb_result == CallbackAction.EXIT:
+                self.close(event)
+                return True
+            elif cb_result == CallbackAction.INTERRUPT:
+                self.interrupt(event, element)
+
+        return False
+
     @_tk_event_handler('<Configure>', True)
     def handle_config_changed(self, event: Event):
         # log.debug(f'{self}: Config changed: {event=}')
@@ -969,8 +987,7 @@ class Window(BindMixin, RowContainer):
     def _handle_menu_callback(self, event: Event):
         result = Menu.results.pop(event.state, None)
         log.debug(f'Menu {result=}')
-        if result == CallbackAction.EXIT:
-            self.close(event)
+        if self._handle_callback_action(result, event):
             return
 
         for cb in self._iter_event_callbacks(BindEvent.MENU_RESULT):

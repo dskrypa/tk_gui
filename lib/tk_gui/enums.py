@@ -70,6 +70,7 @@ class BindTargets(MissingMixin, Enum):
 
 class CallbackAction(MissingMixin, Enum):
     EXIT = 'exit'
+    INTERRUPT = 'interrupt'
 
 
 class Side(MissingMixin, Enum, aliases={'l': 'LEFT', 'r': 'RIGHT', 't': 'TOP', 'b': 'BOTTOM'}):

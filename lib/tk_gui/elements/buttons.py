@@ -240,7 +240,8 @@ class Button(DisableableMixin, Interactive, base_style_layer='button'):
         if self.action == ButtonAction.SUBMIT:
             self.window.interrupt(event, self)
         elif (cb := self.callback) is not None:
-            cb(event)
+            result = cb(event)
+            self.window._handle_callback_action(result, event, self)
         else:
             log.warning(f'No action configured for button={self}')
 
