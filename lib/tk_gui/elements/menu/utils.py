@@ -86,6 +86,11 @@ class ContainerMixin:
     def copy(self: T) -> T:
         clone = copy(self)
         for member in clone.members:
+            try:
+                member.members = [m.copy() for m in member.members]
+            except AttributeError:
+                pass
+
             member.parent = clone
         return clone
 
