@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Optional, Union, Type, Any, Sequence, Generic,
 from ..element import ElementBase
 from ..exceptions import CallbackError, CallbackAlreadyRegistered, NoCallbackRegistered
 from .._utils import normalize_underline
-from .utils import MenuMode, ContainerMixin, MenuMeta, get_current_menu_group, wrap_menu_cb, find_member
+from .utils import MenuMode, ContainerMixin, MenuMeta, get_current_menu_group, wrap_menu_cb, find_member, copy_menu_obj
 
 if TYPE_CHECKING:
     from tk_gui.pseudo_elements import Row
@@ -84,9 +84,7 @@ class MenuEntry(ABC):
         return f'<{self.__class__.__name__}({self.label!r}, {underline=}, {enabled=}, {show=})>'
 
     def copy(self: T) -> T:
-        clone = copy(self)
-        clone.parent = None
-        return clone
+        return copy_menu_obj(self, None)
 
     @property
     def root_menu(self) -> Optional[Menu]:

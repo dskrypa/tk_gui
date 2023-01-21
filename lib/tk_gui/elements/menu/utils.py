@@ -24,6 +24,7 @@ if TYPE_CHECKING:
 __all__ = ['MenuMode', 'CallbackMetadata']
 log = logging.getLogger(__name__)
 
+_NotSet = object()
 _menu_group_stack = ContextVar('tk_gui.elements.menu.stack', default=[])
 T = TypeVar('T')
 
@@ -84,15 +85,18 @@ class ContainerMixin:
         yield from self.members
 
     def copy(self: T) -> T:
-        clone = copy(self)
-        for member in clone.members:
-            try:
-                member.members = [m.copy() for m in member.members]
-            except AttributeError:
-                pass
+        return copy_menu_obj(self)
 
-            member.parent = clone
-        return clone
+
+def copy_menu_obj(menu_obj, parent=_NotSet):
+    clone = copy(menu_obj)
+    try:
+        clone.members = [copy_menu_obj(m, clone) for m in clone.members]
+    except AttributeError:
+        pass
+    if parent is not _NotSet:
+        clone.parent = parent
+    return clone
 
 
 def find_member(
