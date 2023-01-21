@@ -152,6 +152,13 @@ class MenuMeta(ABCMeta, type):
         del container
         return cls
 
+    def clone(cls):
+        ns = cls.__dict__.copy()
+        members = ns.pop('members')
+        clone = super().__new__(cls.__class__, cls.__name__, cls.__bases__, ns)  # Skip container handling
+        clone.members = [m.copy() for m in members]
+        return clone
+
 
 class CallbackMetadata:
     __slots__ = ('menu_item', 'result', 'event', 'args', 'kwargs')

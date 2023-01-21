@@ -330,7 +330,7 @@ class GuiTest(Command):
                 MenuItem('About', AboutPopup)
 
         frame_layout = [
-            [MenuBar()],
+            [MenuBar.clone()()],
             [table1], [table2],
             [HorizontalSeparator()],
             # [inpt, Button('Submit', bind_enter=True), Button(image=search_path, shortcut='s', size=(30, 30))],

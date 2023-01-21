@@ -404,8 +404,8 @@ class Menu(ContainerMixin, ElementBase, metaclass=MenuMeta, base_style_layer='me
 class MenuProperty(Generic[M]):
     __slots__ = ('menu_cls',)
 
-    def __init__(self, menu_cls: Type[M]):
-        self.menu_cls = menu_cls
+    def __init__(self, menu_cls: Type[M], clone: Bool = True):
+        self.menu_cls = menu_cls.clone() if clone else menu_cls
 
     def __get__(self, instance, owner) -> MenuProperty | M:
         if instance is None:
