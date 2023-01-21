@@ -451,3 +451,7 @@ class Interactive(InteractiveMixin, Element, ABC):
     def __init__(self, disabled: Bool = False, focus: Bool = False, valid: Bool = True, **kwargs):
         super().__init__(**kwargs)
         self.init_interactive(disabled, focus, valid)
+
+    def __repr__(self) -> str:
+        size, visible, disabled = self.size, self._visible, self.disabled
+        return f'<{self.__class__.__name__}[id={self.id}, {size=}, {visible=}, {disabled=}]>'

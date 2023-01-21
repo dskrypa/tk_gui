@@ -16,6 +16,7 @@ from tk_gui.elements.menu.items import ToUpperCase, ToTitleCase, ToLowerCase, Op
 from tk_gui.elements.menu.items import CloseWindow
 from tk_gui.elements.text import Multiline, gui_log_handler
 from tk_gui.elements.rating import Rating
+from tk_gui.images.icons import Icons
 from tk_gui.images.utils import ICONS_DIR
 from tk_gui.options import GuiOptions
 from tk_gui.popups import ImagePopup, AnimatedPopup, SpinnerPopup, ClockPopup, BasicPopup, Popup
@@ -101,6 +102,21 @@ class GuiTest(Command):
     def max_size(self):
         layout = [[Text(f'test_{i:03d}')] for i in range(100)]
         Window(layout, 'Auto Max Size Test', exit_on_esc=True).run()
+
+    @action
+    def icons(self):
+        icons = Icons(30)
+        layout, row = [], []
+        for i, name in enumerate(icons.char_names):
+            if row and i % 5 == 0:
+                layout.append(row[:-1])
+                row = []
+
+            row += [Image(icons.draw(name)), Text(name, size=(30, 1)), VerticalSeparator()]
+        if row:
+            layout.append(row[:-1])
+
+        Window(layout, 'Icon Test', size=(300, 500), exit_on_esc=True, scroll_y=True).run()
 
     # region Input Tests
 
@@ -282,12 +298,14 @@ class GuiTest(Command):
         table2 = Table.from_data(
             [{'a': n, 'b': n + 1, 'c': n + 2} for n in range(1, 21, 3)], show_row_nums=True, size=(4, 4)
         )
-        inpt = Input('test', size=(15, 1))
+        inpt = Input('test', size=(15, 1), disabled=True)
         # inpt = Input('test', size=(15, 1), link='https://google.com')
 
         gif_path = ICONS_DIR.joinpath('spinners', 'ring_gray_segments.gif')
         png_path = ICONS_DIR.joinpath('exclamation-triangle-yellow.png')
         search_path = ICONS_DIR.joinpath('search.png')
+
+        toggle_button = Button(image=Icons(20).draw('arrow-repeat'), cb=lambda e: inpt.toggle_enabled())
 
         # layout = [
         #     [table1, table2],
@@ -334,7 +352,7 @@ class GuiTest(Command):
             [table1], [table2],
             [HorizontalSeparator()],
             # [inpt, Button('Submit', bind_enter=True), Button(image=search_path, shortcut='s', size=(30, 30))],
-            [inpt, Button('Submit'), Button(image=search_path, shortcut='s', size=(30, 30))],
+            [inpt, Button('Submit'), Button(image=search_path, shortcut='s', size=(30, 30)), toggle_button],
             [Animation(gif_path)], [SpinnerImage()], [ClockImage(right_click_menu=EleRightClickMenu())],
             [
                 Text('test'),

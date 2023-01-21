@@ -996,7 +996,7 @@ class Window(BindMixin, RowContainer):
     #     try:
     #         widget = event.widget
     #     except AttributeError:
-    #         element, widget, geometry, pack_info, config_str = None, None, '???', '???', '???'
+    #         element, widget, geometry, pack_info, config_str, state = None, None, '???', '???', '???', '???'
     #     else:
     #         widget_id = widget._w
     #         element = self.widget_id_element_map.get(widget_id)
@@ -1007,12 +1007,17 @@ class Window(BindMixin, RowContainer):
     #             pack_info = widget.pack_info()
     #         except AttributeError:  # Toplevel does not extend Pack
     #             pack_info = None
+    #         try:
+    #             state = widget['state']
+    #         except TclError:
+    #             state = '???'
     #
     #     log.info(
-    #         f'Tkinter {event=}\n    {element=}\n    {widget=}\n'
+    #         f'Tkinter Click: {{\n    {event=}\n    {element=}\n    {widget=}\n'
+    #         f'    {state=}, {geometry=}\n'
     #         # f'    event.__dict__={event.__dict__}\n'
     #         # f'    {geometry=}  {pack_info=}\n    config={config_str}\n',
-    #         f'    {geometry=}  {pack_info=}\n',
+    #         f'    {pack_info=}\n}}',
     #     )
 
     # endregion

@@ -414,6 +414,8 @@ class Input(TextValueMixin, LinkableMixin, InteractiveText, disabled_state='read
             kwargs['width'] = self.size[0]
         except TypeError:
             pass
+        if self.disabled:
+            kwargs['state'] = self._disabled_state
 
         self.widget = entry = Entry(row.frame, **kwargs)
         self.pack_widget()
