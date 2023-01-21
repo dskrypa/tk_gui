@@ -503,7 +503,7 @@ class ListBox(DisableableMixin, Interactive, base_style_layer='listbox'):
         try:
             return [choices[i] for i in list_box.curselection()]
         except TclError as e:
-            log.debug(f'Using cached listbox selection due to error obtaining current selection: {e}')
+            log.log(9, f'Using cached listbox selection due to error obtaining current selection: {e}')
             prev, last = self._prev_selection, self._last_selection
             if self.window.closed and prev and not last:
                 # An empty selection is registered while closing, before anything can be set to indicate it is happening
