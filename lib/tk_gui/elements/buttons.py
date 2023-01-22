@@ -241,7 +241,7 @@ class Button(CustomEventResultsMixin, DisableableMixin, Interactive, base_style_
         if (action := self.action) == ButtonAction.SUBMIT:
             self.window.interrupt(event, self)
         elif action == ButtonAction.BIND_EVENT:
-            num = self.add_result(self.key)
+            num = self.add_result(self)
             self.widget.event_generate('<<Custom:ButtonCallback>>', state=num)
         elif (cb := self.callback) is not None:
             result = cb(event)

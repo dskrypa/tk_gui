@@ -326,15 +326,18 @@ class HandlesEvents(metaclass=HandlesEventsMeta):
 
     def _handle_button_clicked_(self, event: Event):
         button_cls: Type[Button] = CustomEventResultsMixin._fqn_cls_map['tk_gui.elements.buttons.Button']
-        key = button_cls.get_result(event)
+        button: Button = button_cls.get_result(event)
+        key = button.key
         try:
-            handlers = self._button_handler_map[key]
+            handlers = self._button_handler_map[key]  # noqa
         except KeyError:
             log.debug(f'No button handlers found for {key=}: {self._button_handler_map=}')
             return
 
+        window = button.window
         for handler in handlers:
-            handler(event, key)
+            result = handler(event, key)
+            window._handle_callback_action(result, event, button)
 
 
 class BindManager:
