@@ -375,6 +375,7 @@ class GuiTest(Command):
             # [ScrollFrame(frame_layout, 'test frame', scroll_y=True, border=True, border_mode='inner')],
             [ScrollFrame(frame_layout, scroll_y=True)],
             [CheckBox('A', key='A', default=True), CheckBox('B', key='B'), CheckBox('C', key='C')],
+            [CheckBox('D', disabled=True), CheckBox('E', disabled=True, default=True)],
             [Image(png_path, popup=True, size=(150, 150))],
             [Text(Path(__file__).resolve().as_posix())],
             # [Multiline('\n'.join(map(chr, range(97, 123))), size=(40, 10)), SizeGrip()],

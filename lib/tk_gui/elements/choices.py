@@ -445,7 +445,7 @@ class Combo(DisableableMixin, Interactive, disabled_state='disable', enabled_sta
         except TypeError:
             kwargs['width'] = max_line_len(self.choices) + 1
 
-        if self.disabled:
+        if self.disabled:  # TODO: Neither of these seem to have any effect...
             kwargs['state'] = self._disabled_state
         elif self.read_only:
             kwargs['state'] = 'readonly'

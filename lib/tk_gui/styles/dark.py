@@ -20,6 +20,8 @@ DarkGrey10 = Style(
     button_bg=(BLU_MD_0, None, None, BLU_ML_0),
     selected_fg=(GREY_D_0, GREY_ML_0, RED_MD_0),
     selected_bg=(GREY_L_1, BLACK, WHITE),
+    checkbox_fg=(GREY_L_1, BLACK, RED_MD_0, None, GREY_D_0),
+    checkbox_bg=(GREY_D_0, GREY_D_0, GREY_D_0, None, GREY_L_1),
     table_alt_fg=BLU_ML_0,
     table_alt_bg=GREY_D_1,
 )
