@@ -9,12 +9,20 @@ from abc import ABCMeta, ABC
 from collections.abc import MutableMapping, ItemsView, KeysView, ValuesView, Iterable
 from contextvars import ContextVar
 from functools import partial, update_wrapper
-from tkinter import TclError, BaseWidget
-from typing import Any, Optional, Callable, Mapping, Collection, Iterator
+from itertools import count
+from tkinter import TclError, BaseWidget, Event
+from typing import TYPE_CHECKING, Any, Optional, Callable, Mapping, Collection, Iterator, Type
 
-from .typing import BindCallback, Bindable, BindTarget, Bool
+from .caching import cached_property
+from .enums import BindEvent
+from .typing import BindCallback, ButtonEventCB, Bindable, BindTarget, Bool
 
-__all__ = ['BindMap', 'BindMixin', 'HandlesEventsMeta', 'HandlesEvents', 'event_handler', 'BindManager']
+if TYPE_CHECKING:
+    from .elements.buttons import Button
+
+__all__ = [
+    'BindMap', 'BindMixin', 'HandlesEventsMeta', 'HandlesEvents', 'event_handler', 'BindManager', 'button_handler'
+]
 log = logging.getLogger(__name__)
 
 _stack = ContextVar('tk_gui.event_handling.stack', default=[])
@@ -24,6 +32,9 @@ BindMapping = Mapping[Bindable, _BindVal]
 
 
 class BindMap(MutableMapping[Bindable, list[BindTarget]]):
+    __slots__ = ('_data',)
+    # TODO: This should probably be renamed to something like MultiValDict or similar
+
     def __init__(self, binds: BindMapping | BindMap = None, **kwargs: _BindVal):
         self._data = {}
         self._update(binds, kwargs, True)
@@ -64,6 +75,9 @@ class BindMap(MutableMapping[Bindable, list[BindTarget]]):
         obj = BindMap(other)
         obj.update_add(self)
         return obj
+
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}({self._data})'
 
     def copy(self) -> BindMap:
         clone = BindMap()
@@ -176,13 +190,16 @@ class BindMixin:
 
 
 class EventHandler:
-    def __init__(self, handler: BindCallback, binds: tuple[str, ...], method: bool = True, add: bool = True):
+    def __init__(
+        self, handler: BindCallback, binds: tuple[str, ...], method: bool = True, add: bool = True, _auto: bool = True
+    ):
         self.handler = handler
         self.binds = binds
         self.method = method
         self.add = add
         update_wrapper(self, handler)
-        _stack.get()[-1].append(self)  # Store in the event_handlers list for the class being defined
+        if _auto:
+            _stack.get()[-1].append(self)  # Store in the event_handlers list for the class being defined
 
     def __repr__(self) -> str:
         return f'<{self.__class__.__name__}[{self.handler}, binds={self.binds!r}]>'
@@ -198,6 +215,26 @@ def event_handler(*binds: str, method: bool = True, add: bool = True) -> Callabl
     return partial(EventHandler, binds=binds, method=method, add=add)
 
 
+class ButtonHandler(EventHandler):
+    def __init__(self, handler: ButtonEventCB, keys: tuple[str, ...], method: bool = True, add: bool = True):
+        super().__init__(handler, (), method=method, add=add)
+        self.keys = keys
+
+    def __repr__(self) -> str:
+        return f'<{self.__class__.__name__}[{self.handler}, keys={self.keys!r}]>'
+
+
+def button_handler(*keys: str, method: bool = True, add: bool = True) -> Callable[[ButtonEventCB], ButtonHandler]:
+    """
+    Decorator that registers the decorated function/method as the handler for the specified buttons.  The function
+    must accept two positional args - a :class:`python:tkinter.Event`, and the key of the :class:`Button` that was
+    activated.
+    """
+    if not keys:
+        raise ValueError('At least one Button key is required to bind to')
+    return partial(ButtonHandler, keys=keys, method=method, add=add)
+
+
 class HandlesEventsMeta(ABCMeta, type):
     @classmethod
     def __prepare__(mcs, name: str, bases: tuple[type, ...], **kwargs) -> dict:
@@ -210,7 +247,14 @@ class HandlesEventsMeta(ABCMeta, type):
 
     def __new__(mcs, name: str, bases: tuple[type, ...], namespace: dict[str, Any], **kwargs):
         cls = super().__new__(mcs, name, bases, namespace, **kwargs)
-        cls._event_handlers_ = _stack.get().pop()
+        event_handlers, button_handlers = [], []
+        for handler in _stack.get().pop():
+            if isinstance(handler, ButtonHandler):
+                button_handlers.append(handler)
+            else:
+                event_handlers.append(handler)
+        cls._event_handlers_ = event_handlers
+        cls._button_handlers_ = button_handlers
         return cls
 
     @classmethod
@@ -220,6 +264,16 @@ class HandlesEventsMeta(ABCMeta, type):
                 return parent_cls
         return None
 
+    def _iter_event_handlers(cls) -> Iterator[EventHandler]:
+        if cls._button_handlers_:
+            try:
+                yield EventHandler(cls._handle_button_clicked_, (BindEvent.BUTTON_CLICKED.value,), _auto=False)  # noqa
+            except AttributeError as e:
+                raise TypeError(
+                    f'Unable to register button handlers for {cls=} - it is missing a _handle_button_clicked_ method'
+                ) from e
+        yield from cls._event_handlers_
+
     def event_handler_binds(cls: HandlesEventsMeta, he_obj) -> BindMap:
         mcs = cls.__class__
         if parent := mcs.get_parent_hem(cls):
@@ -227,7 +281,7 @@ class HandlesEventsMeta(ABCMeta, type):
         else:
             bind_map = BindMap()
 
-        for handler in cls._event_handlers_:  # type: EventHandler
+        for handler in cls._iter_event_handlers():
             cb = partial(handler.handler, he_obj) if handler.method else handler.handler
             add = handler.add
             for bind in handler.binds:
@@ -235,13 +289,52 @@ class HandlesEventsMeta(ABCMeta, type):
 
         return bind_map
 
+    def button_handler_binds(cls: HandlesEventsMeta, he_obj) -> BindMap:
+        mcs = cls.__class__
+        if parent := mcs.get_parent_hem(cls):
+            bind_map = mcs.button_handler_binds(parent, he_obj).copy()
+        else:
+            bind_map = BindMap()
+
+        for handler in cls._button_handlers_:  # type: ButtonHandler
+            cb = partial(handler.handler, he_obj) if handler.method else handler.handler
+            add = handler.add
+            for key in handler.keys:
+                bind_map.add(key, cb, add)
+
+        return bind_map
+
 
 class HandlesEvents(metaclass=HandlesEventsMeta):
     _event_handlers_: list[EventHandler]
+    _button_handlers_: list[ButtonHandler]
+    __button_handler_map = None
 
     def event_handler_binds(self) -> BindMap:
         cls: HandlesEventsMeta = self.__class__
         return cls.__class__.event_handler_binds(cls, self)
+
+    def button_handler_binds(self) -> BindMap:
+        cls: HandlesEventsMeta = self.__class__
+        return cls.__class__.button_handler_binds(cls, self)
+
+    @cached_property
+    def _button_handler_map(self) -> BindMap:
+        if (bh_map := self.__button_handler_map) is None:
+            self.__button_handler_map = bh_map = self.button_handler_binds()
+        return bh_map
+
+    def _handle_button_clicked_(self, event: Event):
+        button_cls: Type[Button] = CustomEventResultsMixin._fqn_cls_map['tk_gui.elements.buttons.Button']
+        key = button_cls.get_result(event)
+        try:
+            handlers = self._button_handler_map[key]
+        except KeyError:
+            log.debug(f'No button handlers found for {key=}: {self._button_handler_map=}')
+            return
+
+        for handler in handlers:
+            handler(event, key)
 
 
 class BindManager:
@@ -274,3 +367,27 @@ class BindManager:
     def replace(self, event_pat: str, callback: BindCallback | None, widget: BaseWidget, add: Bool = True):
         self.unbind(event_pat, widget)
         self.bind(event_pat, callback, widget, add)
+
+
+class CustomEventResultsMixin:
+    __slots__ = ()
+    _fqn_cls_map = {}
+    __result_counter: count
+    _results_: dict[int, Any]
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        if not hasattr(cls, '_results_'):
+            cls._fqn_cls_map[f'{cls.__module__}.{cls.__qualname__}'] = cls
+            cls.__result_counter = count()
+            cls._results_ = {}  # noqa
+
+    @classmethod
+    def add_result(cls, result: Any) -> int:
+        num = next(cls.__result_counter)
+        cls._results_[num] = result
+        return num
+
+    @classmethod
+    def get_result(cls, event: Event):
+        return cls._results_.pop(event.state, None)

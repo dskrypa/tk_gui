@@ -905,13 +905,22 @@ class Window(BindMixin, RowContainer):
         return cb
 
     def _bind_event(self, bind_event: BindEvent, cb: Optional[EventCallback], add: bool = True):
-        if cb is not None:
-            self._event_cbs.add(bind_event, cb)
-        if (tk_event := getattr(bind_event, 'event', bind_event)) not in self._bound_for_events:
-            method = getattr(self, self._tk_event_handlers[tk_event])
-            log.debug(f'Binding event={tk_event!r} to {method=}')
-            self._root.bind(tk_event, method, add=add)
-            self._bound_for_events.add(tk_event)
+        tk_event = getattr(bind_event, 'event', bind_event)
+        try:
+            window_method_name = self._tk_event_handlers[tk_event]
+        except KeyError:
+            if cb is None:
+                raise TypeError(f'Invalid {cb=} for {bind_event=}')
+            log.debug(f'Binding event={tk_event!r} for {cb=}')
+            self._root.bind(tk_event, cb, add=add)
+        else:
+            if tk_event not in self._bound_for_events:
+                method = getattr(self, window_method_name)
+                log.debug(f'Binding event={tk_event!r} to {method=}')
+                self._root.bind(tk_event, method, add=add)
+                self._bound_for_events.add(tk_event)
+            if cb is not None:
+                self._event_cbs.add(bind_event, cb)
 
     def _iter_event_callbacks(self, bind_event: BindEvent) -> Iterator[EventCallback]:
         if cbs := self._event_cbs.get(bind_event):
@@ -983,7 +992,7 @@ class Window(BindMixin, RowContainer):
 
     @_tk_event_handler(BindEvent.MENU_RESULT, True)
     def _handle_menu_callback(self, event: Event):
-        result = Menu.results.pop(event.state, None)
+        result = Menu.get_result(event)
         log.debug(f'Menu {result=}')
         if self._handle_callback_action(result, event):
             return

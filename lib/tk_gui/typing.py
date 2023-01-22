@@ -29,9 +29,10 @@ T_co = TypeVar('T_co', covariant=True)
 
 BindCallback = Callable[['Event'], Any]
 EventCallback = Callable[['Event', ...], Any]
+ButtonEventCB = Callable[['Event', 'Key'], Any]
 TraceCallback = Callable[[str, str, str], Any]
 Bindable = Union['BindEvent', str]
-BindTarget = Union[BindCallback, EventCallback, 'BindTargets', str, None]
+BindTarget = Union[BindCallback, EventCallback, ButtonEventCB, 'BindTargets', str, None]
 
 Bool = Union[bool, Any]
 XY = tuple[int, int]

@@ -8,12 +8,11 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from copy import copy
 from functools import partial
-from itertools import count
 from tkinter import Event, BaseWidget, Menu as TkMenu
 from typing import TYPE_CHECKING, Optional, Union, Type, Any, Sequence, Generic, TypeVar
 
+from ...event_handling import CustomEventResultsMixin
 from ..element import ElementBase
 from ..exceptions import CallbackError, CallbackAlreadyRegistered, NoCallbackRegistered
 from .._utils import normalize_underline
@@ -321,11 +320,9 @@ class MenuGroup(ContainerMixin, MenuEntry):
         return True
 
 
-class Menu(ContainerMixin, ElementBase, metaclass=MenuMeta, base_style_layer='menu'):
+class Menu(CustomEventResultsMixin, ContainerMixin, ElementBase, metaclass=MenuMeta, base_style_layer='menu'):
     """A menu bar or right-click menu"""
 
-    _result_counter = count()
-    results = {}
     widget: TkMenu
     members: Sequence[Union[MenuEntry, MenuItem, MenuGroup]]
 
@@ -347,11 +344,6 @@ class Menu(ContainerMixin, ElementBase, metaclass=MenuMeta, base_style_layer='me
                 self.members = members
         for member in self.members:
             member.parent = self
-
-    def add_result(self, result: Any) -> int:
-        num = next(self._result_counter)
-        self.results[num] = result
-        return num
 
     def __enter__(self) -> Menu:
         super().__enter__()

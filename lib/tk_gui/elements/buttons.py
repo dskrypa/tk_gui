@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Union, Optional, Any
 from PIL.ImageTk import PhotoImage
 
 from ..enums import Justify
-from ..event_handling import BindMap, BindMapping
+from ..event_handling import BindMap, BindMapping, CustomEventResultsMixin
 from ..images import as_image, scale_image
 from .element import Interactive
 from .mixins import DisableableMixin
@@ -34,6 +34,7 @@ log = logging.getLogger(__name__)
 class ButtonAction(Enum):
     SUBMIT = 'submit'
     CALLBACK = 'callback'
+    BIND_EVENT = 'bind_event'
 
     @classmethod
     def _missing_(cls, value: str):
@@ -43,7 +44,7 @@ class ButtonAction(Enum):
             return None
 
 
-class Button(DisableableMixin, Interactive, base_style_layer='button'):
+class Button(CustomEventResultsMixin, DisableableMixin, Interactive, base_style_layer='button'):
     widget: _Button
     separate: bool = False
     bind_enter: bool = False
@@ -237,8 +238,11 @@ class Button(DisableableMixin, Interactive, base_style_layer='button'):
     def handle_activated(self, event: Event = None):
         self._last_activated = monotonic()
         log.debug(f'handle_activated: {event=}')
-        if self.action == ButtonAction.SUBMIT:
+        if (action := self.action) == ButtonAction.SUBMIT:
             self.window.interrupt(event, self)
+        elif action == ButtonAction.BIND_EVENT:
+            num = self.add_result(self.key)
+            self.widget.event_generate('<<Custom:ButtonCallback>>', state=num)
         elif (cb := self.callback) is not None:
             result = cb(event)
             self.window._handle_callback_action(result, event, self)

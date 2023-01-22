@@ -60,6 +60,7 @@ class BindEvent(MissingMixin, Enum):
     LEFT_CLICK = '<ButtonRelease-1>'
     RIGHT_CLICK = '<ButtonRelease-2>' if ON_MAC else '<ButtonRelease-3>'
     MENU_RESULT = '<<Custom:MenuCallback>>'
+    BUTTON_CLICKED = '<<Custom:ButtonCallback>>'
 
 
 class BindTargets(MissingMixin, Enum):

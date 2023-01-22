@@ -6,9 +6,10 @@ from pathlib import Path
 from cli_command_parser import Command, Action, Counter, Option, main
 
 from tk_gui.__version__ import __author_email__, __version__, __author__, __url__  # noqa
-from tk_gui.elements import Table, Input, Button, Text, ScrollFrame, SizeGrip
+from tk_gui.elements import Table, Input, Text, ScrollFrame, SizeGrip
 from tk_gui.elements.choices import Radio, RadioGroup, CheckBox, Combo, ListBox
 from tk_gui.elements.bars import HorizontalSeparator, VerticalSeparator, ProgressBar, Slider
+from tk_gui.elements.buttons import Button, ButtonAction
 from tk_gui.elements.images import Image, Animation, SpinnerImage, ClockImage
 from tk_gui.elements.menu.menu import Menu, MenuGroup, MenuItem, MenuProperty
 from tk_gui.elements.menu.items import CopySelection, GoogleSelection, SearchKpopFandom, SearchGenerasia, PasteClipboard
@@ -16,6 +17,7 @@ from tk_gui.elements.menu.items import ToUpperCase, ToTitleCase, ToLowerCase, Op
 from tk_gui.elements.menu.items import CloseWindow
 from tk_gui.elements.text import Multiline, gui_log_handler
 from tk_gui.elements.rating import Rating
+from tk_gui.event_handling import button_handler
 from tk_gui.images.icons import Icons
 from tk_gui.images.utils import ICONS_DIR
 from tk_gui.options import GuiOptions
@@ -288,7 +290,13 @@ class GuiTest(Command):
                 yield [self.menu]
 
             def get_post_window_layout(self):
+                BE = ButtonAction.BIND_EVENT
                 yield [Input(key='test_input', size=(40, 1))]
+                yield [Button('A', key='A', action=BE), Button('B', key='B', action=BE)]
+
+            @button_handler('A', 'B')
+            def handle_button_clicked(self, event, key):
+                popup_ok(f'You clicked the button with {key=}: {event}')
 
         TestView().run()
 
