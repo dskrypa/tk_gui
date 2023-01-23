@@ -271,7 +271,7 @@ class HandlesEventsMeta(ABCMeta, type):
     def _iter_event_handlers(cls) -> Iterator[EventHandler]:
         if cls._button_handlers_:
             try:
-                yield EventHandler(cls._handle_button_clicked_, (BindEvent.BUTTON_CLICKED.value,))  # noqa
+                yield EventHandler(cls._handle_button_clicked_, (BindEvent.BUTTON_CLICKED.value,), add=False)  # noqa
             except AttributeError as e:
                 raise TypeError(
                     f'Unable to register button handlers for {cls=} - it is missing a _handle_button_clicked_ method'
