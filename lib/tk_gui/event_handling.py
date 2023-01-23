@@ -259,6 +259,16 @@ class HandlesEventsMeta(ABCMeta, type):
     def __new__(mcs, name: str, bases: tuple[type, ...], namespace: dict[str, Any], **kwargs):
         cls = super().__new__(mcs, name, bases, namespace, **kwargs)
         cls._event_handlers_, cls._button_handlers_ = _stack.get().pop()
+        if cls._button_handlers_:
+            try:
+                cls._event_handlers_.append(
+                    EventHandler(cls._handle_button_clicked_, (BindEvent.BUTTON_CLICKED.value,))  # noqa
+                )
+            except AttributeError as e:
+                raise TypeError(
+                    f'Unable to register button handlers for {cls=} - it is missing a _handle_button_clicked_ method'
+                ) from e
+
         return cls
 
     @classmethod
@@ -267,16 +277,6 @@ class HandlesEventsMeta(ABCMeta, type):
             if isinstance(parent_cls, mcs) and (include_abc or ABC not in parent_cls.__bases__):
                 return parent_cls
         return None
-
-    def _iter_event_handlers(cls) -> Iterator[EventHandler]:
-        if cls._button_handlers_:
-            try:
-                yield EventHandler(cls._handle_button_clicked_, (BindEvent.BUTTON_CLICKED.value,), add=False)  # noqa
-            except AttributeError as e:
-                raise TypeError(
-                    f'Unable to register button handlers for {cls=} - it is missing a _handle_button_clicked_ method'
-                ) from e
-        yield from cls._event_handlers_
 
     def __get_bind_map(cls: HandlesEventsMeta, he_obj, method_name: str) -> BindMap:
         mcs = cls.__class__
@@ -287,7 +287,7 @@ class HandlesEventsMeta(ABCMeta, type):
 
     def event_handler_binds(cls: HandlesEventsMeta, he_obj) -> BindMap:
         bind_map = cls.__get_bind_map(he_obj, 'event_handler_binds')
-        for handler in cls._iter_event_handlers():
+        for handler in cls._event_handlers_:
             cb = partial(handler.handler, he_obj) if handler.method else handler.handler
             add = handler.add
             for bind in handler.binds:
