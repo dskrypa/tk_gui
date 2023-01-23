@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 from abc import ABC
 from tkinter import Frame as TkFrame, LabelFrame
-from typing import TYPE_CHECKING, Optional, Union, Type, Literal, Any, Callable
+from typing import TYPE_CHECKING, Optional, Union, Type, Literal, Any, Callable, Sequence
 
 from ..enums import Anchor
 from ..pseudo_elements.row import RowBase
@@ -23,7 +23,15 @@ if TYPE_CHECKING:
     from ..typing import Layout, Bool, XY
     from ..pseudo_elements.row import Row
 
-__all__ = ['RowFrame', 'InteractiveRowFrame', 'Frame', 'InteractiveFrame', 'ScrollFrame']
+__all__ = [
+    'RowFrame',
+    'InteractiveRowFrame',
+    'Frame',
+    'InteractiveFrame',
+    'ScrollFrame',
+    'BasicRowFrame',
+    'BasicInteractiveRowFrame',
+]
 log = logging.getLogger(__name__)
 
 TkFrameType = Type[Union[TkFrame, LabelFrame]]
@@ -32,23 +40,31 @@ _Anchor = Union[str, Anchor]
 
 
 class FrameMixin:
+    # Element attributes / methods
     widget: Union[TkFrame, LabelFrame]
+    size: Optional[XY]
     style: Style
     _style_config: dict[str, Any]
     allow_focus: bool
+    pack_rows: Callable
+    pack_widget: Callable
+    # Mixin-specific attributes
     border: Bool
     title: Optional[str]
     anchor_title: Anchor
-    pack_rows: Callable
-    pack_widget: Callable
+    pack_propagate: Bool = None
 
-    def init_frame(self, title: str = None, anchor_title: _Anchor = None, border: Bool = False):
+    def init_frame(
+        self, title: str = None, anchor_title: _Anchor = None, border: Bool = False, pack_propagate: Bool = None
+    ):
         self.title = title
         self.anchor_title = Anchor(anchor_title)
         self.border = border
+        if pack_propagate is not None:
+            self.pack_propagate = pack_propagate
 
     def init_frame_from_kwargs(self, kwargs: dict[str, Any]):
-        call_with_popped(self.init_frame, ('title', 'anchor_title', 'border'), kwargs)
+        call_with_popped(self.init_frame, ('title', 'anchor_title', 'border', 'pack_propagate'), kwargs)
 
     @property
     def tk_container(self) -> Union[TkFrame, LabelFrame]:
@@ -78,10 +94,19 @@ class FrameMixin:
             frame_cls = LabelFrame
         else:
             frame_cls = TkFrame
+        try:
+            kwargs['width'], kwargs['height'] = self.size
+        except TypeError:
+            pass
 
-        self.widget = frame_cls(row.frame, takefocus=int(self.allow_focus), **kwargs)
+        self.widget = frame = frame_cls(row.frame, takefocus=int(self.allow_focus), **kwargs)
         self.pack_rows()
         self.pack_widget()
+        if (pack_propagate := self.pack_propagate) is not None:
+            frame.pack_propagate(pack_propagate)
+
+
+# region RowFrame
 
 
 class RowFrame(FrameMixin, RowBase, Element, ABC, base_style_layer='frame'):
@@ -106,6 +131,14 @@ class RowFrame(FrameMixin, RowBase, Element, ABC, base_style_layer='frame'):
 
     def pack_rows(self, debug: Bool = False):
         self.pack_elements(debug)
+
+
+class BasicRowFrame(RowFrame):
+    elements: Sequence[Element] = None  # Necessary to satisfy the ABC
+
+    def __init__(self, elements: Sequence[Element], **kwargs):
+        super().__init__(**kwargs)
+        self.elements = elements
 
 
 class InteractiveRowFrame(InteractiveMixin, RowFrame, ABC):
@@ -136,6 +169,17 @@ class InteractiveRowFrame(InteractiveMixin, RowFrame, ABC):
                 pass
 
         self.disabled = True
+
+
+class BasicInteractiveRowFrame(InteractiveRowFrame):
+    elements: Sequence[Element] = None  # Necessary to satisfy the ABC
+
+    def __init__(self, elements: Sequence[Element], **kwargs):
+        super().__init__(**kwargs)
+        self.elements = elements
+
+
+# endregion
 
 
 class Frame(FrameMixin, Element, RowContainer, base_style_layer='frame'):
