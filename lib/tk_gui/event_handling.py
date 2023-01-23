@@ -8,7 +8,7 @@ import logging
 from abc import ABCMeta, ABC
 from collections.abc import MutableMapping, ItemsView, KeysView, ValuesView, Iterable
 from contextvars import ContextVar
-from functools import partial, update_wrapper
+from functools import partial
 from itertools import count
 from tkinter import TclError, BaseWidget, Event
 from typing import TYPE_CHECKING, Any, Optional, Callable, Mapping, Collection, Iterator, Type
@@ -190,16 +190,13 @@ class BindMixin:
 
 
 class EventHandler:
-    def __init__(
-        self, handler: BindCallback, binds: tuple[str, ...], method: bool = True, add: bool = True, _auto: bool = True
-    ):
+    __slots__ = ('handler', 'binds', 'method', 'add')
+
+    def __init__(self, handler: BindCallback, binds: tuple[str, ...], method: bool = True, add: bool = True):
         self.handler = handler
         self.binds = binds
         self.method = method
         self.add = add
-        update_wrapper(self, handler)
-        if _auto:
-            _stack.get()[-1].append(self)  # Store in the event_handlers list for the class being defined
 
     def __repr__(self) -> str:
         return f'<{self.__class__.__name__}[{self.handler}, binds={self.binds!r}]>'
@@ -212,10 +209,18 @@ def event_handler(*binds: str, method: bool = True, add: bool = True) -> Callabl
     """
     if not binds:
         raise ValueError('At least one tkinter event key is required to bind to')
-    return partial(EventHandler, binds=binds, method=method, add=add)
+
+    def _event_handler(func):
+        # Store in the event_handlers list for the class being defined
+        _stack.get()[-1][0].append(EventHandler(func, binds, method, add))
+        return func
+
+    return _event_handler
 
 
 class ButtonHandler(EventHandler):
+    __slots__ = ('keys',)
+
     def __init__(self, handler: ButtonEventCB, keys: tuple[str, ...], method: bool = True, add: bool = True):
         super().__init__(handler, (), method=method, add=add)
         self.keys = keys
@@ -232,7 +237,12 @@ def button_handler(*keys: str, method: bool = True, add: bool = True) -> Callabl
     """
     if not keys:
         raise ValueError('At least one Button key is required to bind to')
-    return partial(ButtonHandler, keys=keys, method=method, add=add)
+
+    def _button_handler(func):
+        _stack.get()[-1][1].append(ButtonHandler(func, keys, method, add))
+        return func
+
+    return _button_handler
 
 
 class HandlesEventsMeta(ABCMeta, type):
@@ -242,19 +252,13 @@ class HandlesEventsMeta(ABCMeta, type):
         Called before ``__new__`` and before evaluating the contents of a class, which enables the establishment of a
         custom context to handle event handler registration.
         """
-        _stack.get().append([])  # This list becomes the _event_handlers_ class attr for the HandlesEvents subclass
+        # These lists become the _event_handlers_ and _button_handlers_ class attrs for the HandlesEvents subclass
+        _stack.get().append(([], []))
         return {}
 
     def __new__(mcs, name: str, bases: tuple[type, ...], namespace: dict[str, Any], **kwargs):
         cls = super().__new__(mcs, name, bases, namespace, **kwargs)
-        event_handlers, button_handlers = [], []
-        for handler in _stack.get().pop():
-            if isinstance(handler, ButtonHandler):
-                button_handlers.append(handler)
-            else:
-                event_handlers.append(handler)
-        cls._event_handlers_ = event_handlers
-        cls._button_handlers_ = button_handlers
+        cls._event_handlers_, cls._button_handlers_ = _stack.get().pop()
         return cls
 
     @classmethod
@@ -267,20 +271,22 @@ class HandlesEventsMeta(ABCMeta, type):
     def _iter_event_handlers(cls) -> Iterator[EventHandler]:
         if cls._button_handlers_:
             try:
-                yield EventHandler(cls._handle_button_clicked_, (BindEvent.BUTTON_CLICKED.value,), _auto=False)  # noqa
+                yield EventHandler(cls._handle_button_clicked_, (BindEvent.BUTTON_CLICKED.value,))  # noqa
             except AttributeError as e:
                 raise TypeError(
                     f'Unable to register button handlers for {cls=} - it is missing a _handle_button_clicked_ method'
                 ) from e
         yield from cls._event_handlers_
 
-    def event_handler_binds(cls: HandlesEventsMeta, he_obj) -> BindMap:
+    def __get_bind_map(cls: HandlesEventsMeta, he_obj, method_name: str) -> BindMap:
         mcs = cls.__class__
         if parent := mcs.get_parent_hem(cls):
-            bind_map = mcs.event_handler_binds(parent, he_obj).copy()
+            return getattr(mcs, method_name)(parent, he_obj).copy()
         else:
-            bind_map = BindMap()
+            return BindMap()
 
+    def event_handler_binds(cls: HandlesEventsMeta, he_obj) -> BindMap:
+        bind_map = cls.__get_bind_map(he_obj, 'event_handler_binds')
         for handler in cls._iter_event_handlers():
             cb = partial(handler.handler, he_obj) if handler.method else handler.handler
             add = handler.add
@@ -290,12 +296,7 @@ class HandlesEventsMeta(ABCMeta, type):
         return bind_map
 
     def button_handler_binds(cls: HandlesEventsMeta, he_obj) -> BindMap:
-        mcs = cls.__class__
-        if parent := mcs.get_parent_hem(cls):
-            bind_map = mcs.button_handler_binds(parent, he_obj).copy()
-        else:
-            bind_map = BindMap()
-
+        bind_map = cls.__get_bind_map(he_obj, 'button_handler_binds')
         for handler in cls._button_handlers_:  # type: ButtonHandler
             cb = partial(handler.handler, he_obj) if handler.method else handler.handler
             add = handler.add
