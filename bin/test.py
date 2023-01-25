@@ -24,11 +24,21 @@ from tk_gui.options import GuiOptions
 from tk_gui.popups import ImagePopup, AnimatedPopup, SpinnerPopup, ClockPopup, BasicPopup, Popup
 from tk_gui.popups.about import AboutPopup
 from tk_gui.popups.base import TextPromptPopup, LoginPromptPopup
-from tk_gui.popups.common import popup_warning, popup_error, popup_yes_no, popup_no_yes, popup_ok, popup_get_text
-from tk_gui.popups.raw import PickFolder, PickColor, PickFile
+from tk_gui.popups.common import popup_warning, popup_error, popup_yes_no, popup_no_yes, popup_ok
+from tk_gui.popups.raw import PickFolder, PickColor, PickFile, pick_folder_popup
 from tk_gui.popups.style import StylePopup
 from tk_gui.views.view import View
 from tk_gui.window import Window
+
+
+class BaseRightClickMenu(Menu):
+    MenuItem('Test A', print)
+    CopySelection()
+    PasteClipboard()
+    with MenuGroup('Update'):
+        ToLowerCase()
+        ToUpperCase()
+        ToTitleCase()
 
 
 class GuiTest(Command):
@@ -300,6 +310,29 @@ class GuiTest(Command):
 
         TestView().run()
 
+    @action
+    def view_chain(self):
+        class TestView(View, title='Test'):
+            window_kwargs = {'exit_on_esc': True, 'right_click_menu': BaseRightClickMenu()}
+
+            def __init__(self, path: Path = None, **kwargs):
+                super().__init__(**kwargs)
+                self.path = path
+
+            def get_post_window_layout(self):
+                path_str = self.path.as_posix() if self.path else 'N/A'
+                yield [Text(f'Current path: {path_str}', size=(40, 1))]
+                yield [Button('Open...', key='open', action=ButtonAction.BIND_EVENT)]
+
+            @button_handler('open')
+            def pick_next_album(self, event, key=None):
+                init_dir = self.path.parent if self.path else None
+                if path := pick_folder_popup(init_dir, 'Pick A Directory', parent=self.window):
+                    return self.set_next_view(path)
+                return None
+
+        TestView.run_all()
+
     @action(default=True)
     def window(self):
         table1 = Table.from_data([{'a': 1, 'b': 2}, {'a': 3, 'b': 4}], show_row_nums=True)
@@ -323,15 +356,6 @@ class GuiTest(Command):
         #     [Image(png_path, popup=True, size=(150, 150))],
         #     [Multiline('\n'.join(map(chr, range(97, 123))), size=(40, 10))],
         # ]
-
-        class BaseRightClickMenu(Menu):
-            MenuItem('Test A', print)
-            CopySelection()
-            PasteClipboard()
-            with MenuGroup('Update'):
-                ToLowerCase()
-                ToUpperCase()
-                ToTitleCase()
 
         class RightClickMenu(BaseRightClickMenu):
             with MenuGroup('Search'):

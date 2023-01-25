@@ -8,44 +8,40 @@ from __future__ import annotations
 
 import logging
 from time import monotonic
-from typing import TYPE_CHECKING, Any, Union, Optional, Mapping
+from typing import TYPE_CHECKING, Any, Union, Optional, Type, Sequence, Mapping
 
 from tk_gui.caching import cached_property
+from tk_gui.enums import CallbackAction
 from ..event_handling import HandlesEvents, event_handler, BindMap
 from ..window import Window
 
 if TYPE_CHECKING:
     from tkinter import Event
-    from ..typing import PathLike, Layout, Key
+    from ..typing import Layout, Key
 
 __all__ = ['View']
 log = logging.getLogger(__name__)
 
 
 class View(HandlesEvents):
+    __next: Optional[tuple[Type[View], Sequence[Any], Mapping[Any]]] = None
     window_kwargs: Optional[dict[str, Any]] = None
     parent: Union[View, Window] = None
-    # primary: bool = True
     title: str = None
 
-    def __init_subclass__(  # noqa
-        cls,
-        title: str = None,
-        # primary: bool = True,
-        # config_path: PathLike = None,
-        # config: Mapping[str, Any] = None,
-    ):
+    def __init_subclass__(cls, title: str = None, **kwargs):
+        super().__init_subclass__(**kwargs)
         if title:
             cls.title = title
-        # cls.primary = primary
 
     def __init__(self, parent: Union[View, Window] = None):
         if parent is not None:
             self.parent = parent
 
     def __repr__(self) -> str:
-        # return f'<{self.__class__.__name__}[{self.title}][{self.primary=!r}][handlers: {len(self._event_handlers_)}]>'
         return f'<{self.__class__.__name__}[{self.title}][handlers: {len(self._event_handlers_)}]>'
+
+    # region Layout / Window Creation Methods
 
     def get_pre_window_layout(self) -> Layout:  # noqa
         """
@@ -67,6 +63,7 @@ class View(HandlesEvents):
     def init_window(self) -> Window:
         if (window_kwargs := self.window_kwargs) is None:
             window_kwargs = {}
+        window_kwargs = window_kwargs.copy()  # Prevent mutating a shared dict stored on a View subclass
         if binds := BindMap.pop_and_normalize(window_kwargs) | self.event_handler_binds():
             window_kwargs['binds'] = binds
         return Window(self.get_pre_window_layout(), title=self.title, **window_kwargs)
@@ -78,24 +75,56 @@ class View(HandlesEvents):
     def finalize_window(self) -> Window:
         window = self.window
         if layout := self.get_post_window_layout():
-            window.add_rows(layout, pack=True)
-            window._update_idle_tasks()
+            window.add_rows(layout, pack=window.was_shown)
             try:
-                window.update_scroll_region()
-            except TypeError:  # It was not scrollable
-                pass
+                window._update_idle_tasks()
+            except AttributeError:  # There was no init layout, so .show() was not called in Window.__init__
+                window.show()
+            else:                   # The scroll region only needs to be updated if the window was already shown
+                try:
+                    window.update_scroll_region()
+                except TypeError:  # It was not scrollable
+                    pass
         if parent := self.parent:
             if isinstance(parent, View):
                 parent = parent.window
             window.move_to_center(parent)
         return window
 
-    def get_results(self):
+    # endregion
+
+    # region Next View Methods
+
+    def set_next_view(self, *args, view_cls: Type[View] = None, **kwargs) -> CallbackAction:
         """
-        Called by :meth:`.run` to provide the results of running this view.  May be overridden by subclasses to handle
-        custom finalization / form submission logic.
+        Set the next view that should be displayed.  From a Button callback, ``return self.set_next_view(...)`` can be
+        used to trigger the advancement to that view immediately.  If that behavior is not desired, then it can simply
+        be called without returning the value that is returned by this method.
+
+        :param args: Positional arguments to use when initializing the next view
+        :param view_cls: The class for the next View that should be displayed (defaults to the current class)
+        :param kwargs: Keyword arguments to use when initializing the next view
+        :return: The ``CallbackAction.EXIT`` callback action
         """
-        return self.window.results
+        if view_cls is None:
+            view_cls = self.__class__
+        self.__next = (view_cls, args, kwargs)
+        return CallbackAction.EXIT
+
+    def get_next_view(self) -> View | None:
+        """
+        If another view should be run after this one exits, this method should return that view.  By default, works
+        with :meth:`.set_next_view`.
+        """
+        try:
+            view_cls, args, kwargs = self.__next
+        except TypeError:
+            return None
+        return view_cls(*args, **kwargs)
+
+    # endregion
+
+    # region Run Methods
 
     def run(self) -> dict[Key, Any]:
         start = monotonic()
@@ -106,12 +135,12 @@ class View(HandlesEvents):
             window.run()
             return self.get_results()
 
-    def get_next_view(self) -> View | None:  # noqa
+    def get_results(self):
         """
-        Intended to be overwritten by subclasses.  If another view should be run after this one exits, this method
-        should return that view.
+        Called by :meth:`.run` to provide the results of running this view.  May be overridden by subclasses to handle
+        custom finalization / form submission logic.
         """
-        return None
+        return self.window.results
 
     @classmethod
     def run_all(cls, view: View = None, *args, **kwargs) -> Optional[dict[Key, Any]]:
@@ -134,6 +163,8 @@ class View(HandlesEvents):
             log.debug(f'Next {view=}')
 
         return results
+
+    # endregion
 
 
 class TestView(View, title='Test'):

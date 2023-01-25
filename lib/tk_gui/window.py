@@ -802,6 +802,10 @@ class Window(BindMixin, RowContainer):
         self.__focus_widget = widget
         return True
 
+    @property
+    def was_shown(self) -> bool:
+        return self._root is not None
+
     # endregion
 
     # region Grab Anywhere

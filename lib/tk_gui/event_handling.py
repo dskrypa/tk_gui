@@ -199,7 +199,8 @@ class EventHandler:
         self.add = add
 
     def __repr__(self) -> str:
-        return f'<{self.__class__.__name__}[{self.handler}, binds={self.binds!r}]>'
+        binds, method, add = self.binds, self.method, self.add
+        return f'<{self.__class__.__name__}[{self.handler}, {binds=}, {method=}, {add=}]>'
 
 
 def event_handler(*binds: str, method: bool = True, add: bool = True) -> Callable[[BindCallback], EventHandler]:
@@ -226,7 +227,8 @@ class ButtonHandler(EventHandler):
         self.keys = keys
 
     def __repr__(self) -> str:
-        return f'<{self.__class__.__name__}[{self.handler}, keys={self.keys!r}]>'
+        keys, method, add = self.binds, self.method, self.add
+        return f'<{self.__class__.__name__}[{self.handler}, {keys=}, {method=}, {add=}]>'
 
 
 def button_handler(*keys: str, method: bool = True, add: bool = True) -> Callable[[ButtonEventCB], ButtonHandler]:
@@ -299,6 +301,7 @@ class HandlesEventsMeta(ABCMeta, type):
         bind_map = cls.__get_bind_map(he_obj, 'button_handler_binds')
         for handler in cls._button_handlers_:  # type: ButtonHandler
             cb = partial(handler.handler, he_obj) if handler.method else handler.handler
+            # log.debug(f'Found {handler=} -> {cb=}', extra={'color': 14})
             add = handler.add
             for key in handler.keys:
                 bind_map.add(key, cb, add)
