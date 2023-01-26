@@ -22,7 +22,7 @@ from .assets import PYTHON_LOGO
 from .config import WindowConfig, WindowConfigProperty
 from .elements.menu import Menu
 from .enums import BindTargets, Anchor, Justify, Side, BindEvent, CallbackAction
-from .event_handling import BindMixin, BindMapping, BindMap, BindManager
+from .event_handling import BindMixin, BindMapping, BindMap, BindManager, log_widget_data  # noqa
 from .exceptions import DuplicateKeyError
 from .positioning import positioner, Monitor
 from .pseudo_elements.row_container import RowContainer
@@ -766,7 +766,6 @@ class Window(BindMixin, RowContainer):
         root.protocol('WM_DESTROY_WINDOW', self.close)
         root.protocol('WM_DELETE_WINDOW', self.close)
         self.apply_binds()
-        # root.after(250, self._sigint_fix)
         root.update_idletasks()
 
     @classmethod
@@ -1006,32 +1005,7 @@ class Window(BindMixin, RowContainer):
 
     # @_tk_event_handler(BindEvent.LEFT_CLICK, True)
     # def _handle_left_click(self, event: Event):
-    #     try:
-    #         widget = event.widget
-    #     except AttributeError:
-    #         element, widget, geometry, pack_info, config_str, state = None, None, '???', '???', '???', '???'
-    #     else:
-    #         widget_id = widget._w
-    #         element = self.widget_id_element_map.get(widget_id)
-    #         geometry = widget.winfo_geometry()
-    #         # config = widget.configure()
-    #         # config_str = '{\n' + ',\n'.join(f'        {k!r}: {v!r}' for k, v in sorted(config.items())) + '\n}'
-    #         try:
-    #             pack_info = widget.pack_info()
-    #         except AttributeError:  # Toplevel does not extend Pack
-    #             pack_info = None
-    #         try:
-    #             state = widget['state']
-    #         except TclError:
-    #             state = '???'
-    #
-    #     log.info(
-    #         f'Tkinter Click: {{\n    {event=}\n    {element=}\n    {widget=}\n'
-    #         f'    {state=}, {geometry=}\n'
-    #         # f'    event.__dict__={event.__dict__}\n'
-    #         # f'    {geometry=}  {pack_info=}\n    config={config_str}\n',
-    #         f'    {pack_info=}\n}}',
-    #     )
+    #     log_widget_data(self, event, prefix='Tkinter Click')
 
     # endregion
 
@@ -1105,10 +1079,6 @@ class Window(BindMixin, RowContainer):
     #     #         window.close()
 
     # endregion
-
-    # def _sigint_fix(self):
-    #     """Continuously re-registers itself to be called every 250ms so that Ctrl+C is able to exit tk's mainloop"""
-    #     self._root.after(250, self._sigint_fix)
 
     def get_screenshot(self) -> PILImage:
         (width, height), (x, y) = self.true_size_and_pos
