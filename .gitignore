@@ -1,4 +1,5 @@
 venv/
+build/
 .idea/
 __pycache__/
 *.pyc
