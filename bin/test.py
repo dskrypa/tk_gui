@@ -23,7 +23,8 @@ from tk_gui.images.utils import ICONS_DIR
 from tk_gui.options import GuiOptions
 from tk_gui.popups import ImagePopup, AnimatedPopup, SpinnerPopup, ClockPopup, BasicPopup, Popup
 from tk_gui.popups.about import AboutPopup
-from tk_gui.popups.base import TextPromptPopup, LoginPromptPopup
+from tk_gui.popups.basic_prompts import TextPromptPopup, LoginPromptPopup
+from tk_gui.popups.choices import ChooseImagePopup, choose_item
 from tk_gui.popups.common import popup_warning, popup_error, popup_yes_no, popup_no_yes, popup_ok
 from tk_gui.popups.raw import PickFolder, PickColor, PickFile, pick_folder_popup
 from tk_gui.popups.style import StylePopup
@@ -254,6 +255,20 @@ class GuiTest(Command):
     def popup_login(self):
         user, pw = LoginPromptPopup('Enter your login info', cancel_text='Cancel').run()
         print(f'{user=}, {pw=}')
+
+    @action
+    def popup_img_choice(self):
+        icons = Icons(500)
+        items = {name: icons.draw(name) for name in tuple(icons.char_names)[:10]}
+        # items = {name: ICONS_DIR.joinpath(name) for name in ('exclamation-triangle-yellow.png', 'search.png')}
+        result = ChooseImagePopup.with_auto_prompt(items, img_title_fmt='Example image: {title}').run()
+        print(f'{result=}')
+
+    @action
+    def popup_choice(self):
+        items = [f'Letter: {c}' for c in 'abcdefghijklmnopqrstuvwxyz']
+        result = choose_item(items, item_name='Letter')
+        print(f'{result=}')
 
     # endregion
 

@@ -11,10 +11,10 @@ from abc import ABC, abstractmethod
 from concurrent.futures import Future
 from queue import Queue
 from threading import current_thread, main_thread
-from typing import TYPE_CHECKING, Union, Optional, Collection, Mapping, Callable, Literal, Any
+from typing import TYPE_CHECKING, Union, Collection, Mapping, Callable, Any
 
 from tk_gui.caching import cached_property
-from ..elements import Element, Button, Text, Image, Input, Multiline
+from ..elements import Button, Text, Image, Multiline
 from ..event_handling import HandlesEvents, BindMap
 from ..positioning import positioner
 from ..styles import Style, StyleSpec
@@ -23,9 +23,10 @@ from ..window import Window
 
 if TYPE_CHECKING:
     from tkinter import Event
+    from screeninfo import Monitor
     from ..typing import XY, Layout, Bool, ImageType, Key
 
-__all__ = ['Popup', 'POPUP_QUEUE', 'BasicPopup', 'BoolPopup', 'TextPromptPopup', 'LoginPromptPopup']
+__all__ = ['Popup', 'POPUP_QUEUE', 'BasicPopup']
 log = logging.getLogger(__name__)
 
 _NotSet = object()
@@ -68,6 +69,12 @@ class BasePopup(ABC):
     @abstractmethod
     def _run(self) -> dict[Key, Any]:
         raise NotImplementedError
+
+    def _get_monitor(self) -> Monitor | None:
+        if parent := self.parent:
+            return positioner.get_monitor(*parent.position)
+        else:
+            return positioner.get_monitor(0, 0)
 
     def run(self):
         if current_thread() == main_thread():
@@ -164,11 +171,7 @@ class BasicPopup(Popup):
         lines = self.lines
         n_lines = len(lines)
         if self.multiline:
-            if parent := self.parent:
-                monitor = positioner.get_monitor(*parent.position)
-            else:
-                monitor = positioner.get_monitor(0, 0)
-
+            monitor = self._get_monitor()
             lines_to_show = max(1, min(monitor.height // self.style.char_height(), n_lines) + 1)
         else:
             lines_to_show = 1
@@ -203,7 +206,7 @@ class BasicPopup(Popup):
 
         return buttons
 
-    def get_layout(self) -> list[list[Element]]:
+    def prepare_text(self) -> Layout:
         if self.multiline:
             width, height = size = self.text_size
             text_kwargs = self.text_kwargs.copy()
@@ -214,91 +217,11 @@ class BasicPopup(Popup):
         else:
             text = Text(self.text, **self.text_kwargs)
 
-        layout: list[list[Element]] = [[text], self.prepare_buttons()]
         if image := self.image:
-            layout[0].insert(0, Image(image, size=self.image_size))
-
-        return layout
-
-
-class BoolPopup(BasicPopup):
-    def __init__(
-        self,
-        text: str,
-        true: str = 'OK',
-        false: str = 'Cancel',
-        order: Literal['TF', 'FT'] = 'FT',
-        select: Optional[bool] = True,
-        **kwargs,
-    ):
-        self.true_key = true
-        self.false_key = false
-        tf = order.upper() == 'TF'
-        tside, fside = ('left', 'right') if tf else ('right', 'left')
-        te, fe = (True, False) if select else (False, True) if select is False else (False, False)
-        tb = Button(true, key=true, side=tside, bind_enter=te)
-        fb = Button(false, key=false, side=fside, bind_enter=fe)
-        buttons = (tb, fb) if tf else (fb, tb)
-        super().__init__(text, buttons=buttons, **kwargs)
-
-    def run(self) -> Optional[bool]:
-        results = super().run()
-        if results[self.true_key]:
-            return True
-        elif results[self.false_key]:
-            return False
-        return None  # exited without clicking either button
-
-
-class SubmitOrCancelPopup(BasicPopup):
-    submit_key = 'submit'
-
-    def __init__(self, text: str, button_text: str = 'Submit', cancel_text: str = None, **kwargs):
-        submit = Button(button_text, key=self.submit_key, bind_enter=True, focus=False, side='right')
-        if cancel_text:
-            # The order here is counter-intuitive - Submit will be to the left of Cancel because when both have
-            # side=right, they are packed right-to-left, where earlier elements end up further right.
-            buttons = (Button(cancel_text, side='right'), submit)
+            yield [Image(image, size=self.image_size), text]
         else:
-            buttons = (submit,)
-        super().__init__(text, buttons=buttons, **kwargs)
+            yield [text]
 
-
-class TextPromptPopup(SubmitOrCancelPopup):
-    input_key = 'input'
-
-    def get_layout(self) -> list[list[Element]]:
-        layout = super().get_layout()
-        layout.insert(1, [Input(key=self.input_key, focus=True)])
-        return layout
-
-    def run(self) -> Optional[str]:
-        results = super().run()
-        if results[self.submit_key]:
-            return results[self.input_key]
-        else:
-            return None
-
-
-class LoginPromptPopup(SubmitOrCancelPopup, title='Login'):
-    user_key = 'username'
-    pw_key = 'password'
-
-    def __init__(
-        self, text: str, button_text: str = 'Submit', password_char: str = '\u2b24', cancel_text: str = None, **kwargs
-    ):
-        super().__init__(text, button_text=button_text, cancel_text=cancel_text, **kwargs)
-        self.password_char = password_char
-
-    def get_layout(self) -> list[list[Element]]:
-        layout = super().get_layout()
-        layout.insert(1, [Text('Username:'), Input(key=self.user_key, focus=True)])
-        layout.insert(2, [Text('Password:'), Input(key=self.pw_key, password_char=self.password_char)])
-        return layout
-
-    def run(self) -> tuple[Optional[str], Optional[str]]:
-        results = super().run()
-        if results[self.submit_key]:
-            return results[self.user_key], results[self.pw_key]
-        else:
-            return None, None
+    def get_layout(self) -> Layout:
+        yield from self.prepare_text()
+        yield self.prepare_buttons()

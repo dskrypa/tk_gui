@@ -11,7 +11,8 @@ from typing import TYPE_CHECKING, Optional
 
 from ..elements.buttons import OK
 from ..images import image_path
-from .base import BasicPopup, BoolPopup, TextPromptPopup, LoginPromptPopup
+from .base import BasicPopup
+from .basic_prompts import BoolPopup, TextPromptPopup, LoginPromptPopup, PasswordPromptPopup
 
 if TYPE_CHECKING:
     from ..typing import Bool, TkSide
@@ -19,7 +20,7 @@ if TYPE_CHECKING:
 __all__ = [
     'popup_ok', 'popup_error', 'popup_warning', 'popup_input_invalid',
     'popup_yes_no', 'popup_no_yes', 'popup_ok_cancel', 'popup_cancel_ok',
-    'popup_get_text', 'popup_login',
+    'popup_get_text', 'popup_login', 'popup_get_password',
 ]
 log = logging.getLogger(__name__)
 
@@ -87,6 +88,22 @@ def popup_login(
 ) -> tuple[Optional[str], Optional[str]]:
     """A popup with a prompt and user name / password input fields."""
     popup = LoginPromptPopup(
+        text, title=title, bind_esc=bind_esc, button_text=button_text, cancel_text=cancel_text, **kwargs
+    )
+    return popup.run()
+
+
+def popup_get_password(
+    text: str,
+    title: str = None,
+    *,
+    bind_esc: Bool = False,
+    button_text: str = 'Submit',
+    cancel_text: str = None,
+    **kwargs,
+) -> Optional[str]:
+    """A popup with a prompt and a password input field."""
+    popup = PasswordPromptPopup(
         text, title=title, bind_esc=bind_esc, button_text=button_text, cancel_text=cancel_text, **kwargs
     )
     return popup.run()
