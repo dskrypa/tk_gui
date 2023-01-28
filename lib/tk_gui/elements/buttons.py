@@ -25,9 +25,9 @@ from .mixins import DisableableMixin
 if TYPE_CHECKING:
     from PIL.Image import Image as PILImage
     from ..pseudo_elements import Row
-    from ..typing import XY, BindCallback, Bool, ImageType
+    from ..typing import XY, BindCallback, Bool, ImageType, Key
 
-__all__ = ['Button', 'OK', 'Cancel', 'Yes', 'No', 'Submit']
+__all__ = ['Button', 'OK', 'Cancel', 'Yes', 'No', 'Submit', 'EventButton']
 log = logging.getLogger(__name__)
 
 
@@ -270,3 +270,10 @@ def No(text: str = 'No', **kwargs) -> Button:
 
 def Submit(text: str = 'Submit', bind_enter: Bool = True, **kwargs) -> Button:
     return Button(text, bind_enter=bind_enter, **kwargs)
+
+
+def EventButton(text: str = '', image: ImageType = None, *, key: Key = None, **kwargs) -> Button:
+    kwargs.setdefault('action', ButtonAction.BIND_EVENT)
+    if text and not key:
+        key = text
+    return Button(text, image, key=key, **kwargs)

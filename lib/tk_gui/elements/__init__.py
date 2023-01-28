@@ -5,7 +5,7 @@ from .frame import (
 )
 
 from .bars import HorizontalSeparator, VerticalSeparator, ProgressBar, Slider
-from .buttons import Button, ButtonAction, OK, Cancel, Yes, No, Submit
+from .buttons import Button, ButtonAction, OK, Cancel, Yes, No, Submit, EventButton
 from .choices import Radio, RadioGroup, Combo, CheckBox, ListBox
 from .images import Image, Animation, SpinnerImage, ClockImage
 from .menu import Menu, MenuGroup, MenuItem, MenuProperty
