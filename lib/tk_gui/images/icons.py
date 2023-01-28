@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from base64 import b64encode
 from io import BytesIO
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING, Optional, Union, TypeVar
 
 from PIL.Image import Image as PILImage, new as new_image
 from PIL.ImageDraw import ImageDraw, Draw
@@ -19,13 +19,14 @@ from .color import color_to_rgb, find_unused_color
 from .utils import ICONS_DIR, calculate_resize
 
 if TYPE_CHECKING:
-    from ..typing import XY, Color
+    from ..typing import XY, Color, ImageType  # noqa
 
-__all__ = ['Icons']
+__all__ = ['Icons', 'PlaceholderCache', 'placeholder_icon_cache']
 
 ICON_DIR = ICONS_DIR.joinpath('bootstrap')
 
 Icon = Union[str, int]
+IMG = TypeVar('IMG', bound='ImageType')
 
 
 class Icons:
@@ -134,3 +135,35 @@ def _calculate_redraw_size(image: PILImage, exp_width: int, exp_height: int) -> 
     target_size = calculate_resize(x2 - x1, y2 - y1, trg_width, trg_height)  # Necessary to stay within bounds
     # log.debug(f'Using {target_size=} {trg_width=} x {trg_height=}')
     return target_size
+
+
+class PlaceholderCache:
+    __slots__ = ('_cache', '_icon')
+
+    def __init__(self, icon: Icon = 'x'):
+        self._cache = {}
+        self._icon = icon
+
+    def get_placeholder(self, size: XY | float | int) -> PILImage:
+        try:
+            size = int(max(size))
+        except TypeError:  # int/float is not iterable
+            size = int(size)
+        try:
+            return self._cache[size]
+        except KeyError:
+            self._cache[size] = image = Icons(size).draw_alpha_cropped(self._icon)
+            return image
+
+    def image_or_placeholder(self, image: Optional[IMG], size: XY | float | int) -> IMG | PILImage:
+        """
+        :param image: An image or falsey value if a placeholder should be rendered instead
+        :param size: The size of the placeholder image that should be rendered for use in place of the missing image
+        :return: The provided image, unchanged, if it was truthy, otherwise a placeholder PIL Image
+        """
+        if image:
+            return image
+        return self.get_placeholder(size)
+
+
+placeholder_icon_cache: PlaceholderCache = PlaceholderCache()

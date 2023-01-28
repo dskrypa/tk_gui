@@ -141,7 +141,7 @@ class Image(Element, base_style_layer='image'):
         from ..popups.image import ImagePopup
 
         img = self._image
-        title = self.popup_title or img.path.name if img.path else None
+        title = self.popup_title or (img.path.name if img.path else None)
         ImagePopup(img.src_image, title, parent=self.window).run()
 
 
