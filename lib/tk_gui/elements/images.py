@@ -447,7 +447,7 @@ class _GuiImage:
 @lru_cache(20)
 def _load_thumbnail(path: Path) -> PILImage:
     image = open_image(path)
-    log.debug(f'Loaded thumbnail from {path.as_posix()}')
+    log.log(9, f'Loaded thumbnail from {path.as_posix()}')
     return image
 
 
