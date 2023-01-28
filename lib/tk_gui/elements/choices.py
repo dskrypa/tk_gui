@@ -133,12 +133,14 @@ class RadioGroup(TraceCallbackMixin):
     _counter = count()
     choices: dict[int, Radio]
 
-    def __init__(self, key: str = None, change_cb: BindTarget = None):
+    def __init__(self, key: str = None, *, change_cb: BindTarget = None, include_label: Bool = False):
         """
         :param key: Key to use in Window results for the result of this radio group
         :param change_cb: Callback that should be called when a selection is made in this group.  If the currently
           selected item is clicked again, then the callback will be called again, even though the selection did not
           change.
+        :param include_label: If True, :meth:`.value` will return a tuple of (label, value) for the selected member,
+          otherwise only the selected member's value will be returned.
         """
         self.id = next(self._counter)
         self.key = key
@@ -148,6 +150,7 @@ class RadioGroup(TraceCallbackMixin):
         self.default: Optional[Radio] = None
         if change_cb:
             self.var_change_cb = change_cb
+        self.include_label = include_label
 
     @property
     def tk_var(self) -> IntVar | None:
@@ -197,7 +200,7 @@ class RadioGroup(TraceCallbackMixin):
     @property
     def value(self) -> Any:
         if choice := self.get_choice():
-            return choice.value
+            return (choice.label, choice.value) if self.include_label else choice.value
         return None
 
     def __repr__(self) -> str:
