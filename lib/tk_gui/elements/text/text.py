@@ -21,18 +21,18 @@ from tk_gui.pseudo_elements.scroll import ScrollableText
 from tk_gui.styles import Style, Font, StyleState, StyleLayer
 from tk_gui.utils import max_line_len, call_with_popped
 from ..element import Element, Interactive
-from ..mixins import DisableableMixin
+from ..mixins import DisableableMixin, TraceCallbackMixin
 from .links import LinkTarget, _Link
 
 if TYPE_CHECKING:
     from tk_gui.pseudo_elements import Row
-    from tk_gui.typing import Bool, XY, BindTarget
+    from tk_gui.typing import Bool, XY, BindTarget, TraceCallback
 
 __all__ = ['Text', 'Link', 'Input', 'Multiline', 'Label']
 log = logging.getLogger(__name__)
 
 
-class TextValueMixin:
+class TextValueMixin(TraceCallbackMixin):
     string_var: Optional[StringVar] = None
     widget: Union[TkLabel, Entry]
     size: XY
@@ -67,6 +67,11 @@ class TextValueMixin:
     def init_string_var(self):
         self.string_var = StringVar()
         self.string_var.set(self._value)
+        self._maybe_add_var_trace()
+
+    @property
+    def tk_var(self) -> StringVar | None:
+        return self.string_var
 
     @property
     def expected_width(self) -> int:
@@ -202,6 +207,7 @@ class Label(TextValueMixin, LinkableMixin, Element, base_style_layer='text'):
         anchor: Union[str, Anchor] = None,
         link_bind: str = None,
         auto_size: Bool = True,
+        change_cb: TraceCallback = None,
         **kwargs,
     ):
         self.value = value
@@ -210,6 +216,8 @@ class Label(TextValueMixin, LinkableMixin, Element, base_style_layer='text'):
             justify = Justify.LEFT
             anchor = Justify.LEFT.as_anchor()
         super().__init__(justify_text=justify, anchor=anchor, **kwargs)
+        if change_cb:
+            self.var_change_cb = change_cb
         self._auto_size = auto_size
 
     @property
@@ -269,6 +277,7 @@ class Text(TextValueMixin, LinkableMixin, Element):
         link_bind: str = None,
         auto_size: Bool = True,
         use_input_style: Bool = False,
+        change_cb: TraceCallback = None,
         **kwargs,
     ):
         self.value = value
@@ -276,6 +285,8 @@ class Text(TextValueMixin, LinkableMixin, Element):
         if justify is anchor is None:
             justify = Justify.LEFT
         super().__init__(justify_text=justify, anchor=anchor, **kwargs)
+        if change_cb:
+            self.var_change_cb = change_cb
         self._auto_size = auto_size
         self._use_input_style = use_input_style
 
@@ -380,7 +391,8 @@ class Input(TextValueMixin, LinkableMixin, InteractiveText, disabled_state='read
         link_bind: str = None,
         password_char: str = None,
         justify_text: Union[str, Justify, None] = Justify.LEFT,
-        callback: BindTarget = None,
+        callback: BindTarget = None,                                # Key press callback
+        change_cb: TraceCallback = None,                            # Value change callback
         **kwargs,
     ):
         self.value = value
@@ -389,6 +401,8 @@ class Input(TextValueMixin, LinkableMixin, InteractiveText, disabled_state='read
         self._callback = callback
         if password_char:
             self.password_char = password_char
+        if change_cb:
+            self.var_change_cb = change_cb
 
     @property
     def style_config(self) -> dict[str, Any]:

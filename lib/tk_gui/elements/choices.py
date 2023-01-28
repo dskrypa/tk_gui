@@ -23,7 +23,7 @@ from tk_gui.utils import max_line_len
 from ._utils import normalize_underline
 from .element import Interactive
 from .exceptions import NoActiveGroup, BadGroupCombo
-from .mixins import DisableableMixin, CallbackCommandMixin
+from .mixins import DisableableMixin, CallbackCommandMixin, TraceCallbackMixin
 
 if TYPE_CHECKING:
     from tk_gui.pseudo_elements import Row
@@ -128,27 +128,42 @@ class Radio(DisableableMixin, CallbackCommandMixin, Interactive, Generic[T], bas
             self.select()
 
 
-class RadioGroup:
+class RadioGroup(TraceCallbackMixin):
     _instances: MutableMapping[int, RadioGroup] = WeakValueDictionary()
     _counter = count()
-    __slots__ = ('id', 'key', 'selection_var', 'choices', 'default', '_registered', '__weakref__')
     choices: dict[int, Radio]
 
-    def __init__(self, key: str = None):
+    def __init__(self, key: str = None, change_cb: BindTarget = None):
+        """
+        :param key: Key to use in Window results for the result of this radio group
+        :param change_cb: Callback that should be called when a selection is made in this group.  If the currently
+          selected item is clicked again, then the callback will be called again, even though the selection did not
+          change.
+        """
         self.id = next(self._counter)
         self.key = key
         self._instances[self.id] = self
         self.choices = {}
         self._registered = False
         self.default: Optional[Radio] = None
+        if change_cb:
+            self.var_change_cb = change_cb
+
+    @property
+    def tk_var(self) -> IntVar | None:
+        try:
+            return self.selection_var
+        except AttributeError:
+            return None
 
     def get_selection_var(self) -> IntVar:
         # The selection var cannot be initialized before a root window exists
         try:
-            return self.selection_var
+            return self.selection_var  # noqa
         except AttributeError:
-            self.selection_var = var = IntVar()  # noqa
-            return var
+            self.selection_var = tk_var = IntVar()  # noqa
+            self._maybe_add_var_trace()
+            return tk_var
 
     @classmethod
     def get_group(cls, group: Union[RadioGroup, int, None]) -> RadioGroup:
@@ -220,8 +235,7 @@ def get_current_radio_group(silent: bool = False) -> Optional[RadioGroup]:
 # region CheckBox
 
 
-class CheckBox(DisableableMixin, CallbackCommandMixin, Interactive, base_style_layer='checkbox'):
-    __change_cb_name: str | None = None
+class CheckBox(DisableableMixin, CallbackCommandMixin, TraceCallbackMixin, Interactive, base_style_layer='checkbox'):
     widget: Checkbutton
     tk_var: Optional[BooleanVar] = None
     _values: Optional[tuple[B, A]] = None
@@ -243,7 +257,8 @@ class CheckBox(DisableableMixin, CallbackCommandMixin, Interactive, base_style_l
         self.default = default
         self._underline = underline
         self._callback = callback
-        self._change_cb = change_cb
+        if change_cb:
+            self.var_change_cb = change_cb
         if not (true_value is false_value is None):
             self._values = (false_value, true_value)
 
@@ -304,20 +319,6 @@ class CheckBox(DisableableMixin, CallbackCommandMixin, Interactive, base_style_l
 
     # endregion
 
-    @property
-    def change_cb(self) -> TraceCallback | None:
-        return self._change_cb
-
-    @change_cb.setter
-    def change_cb(self, value: TraceCallback | None):
-        self._change_cb = value
-        if tk_var := self.tk_var:
-            if value is None:
-                if cb_name := self.__change_cb_name:
-                    tk_var.trace_remove('write', cb_name)
-            else:
-                self.__change_cb_name = tk_var.trace_add('write', value)
-
     def pack_into(self, row: Row):
         self.tk_var = tk_var = BooleanVar(value=self.default)
         kwargs = {
@@ -336,12 +337,10 @@ class CheckBox(DisableableMixin, CallbackCommandMixin, Interactive, base_style_l
             pass
         if self.disabled:
             kwargs['state'] = self._disabled_state
-
         if (callback := self._callback) is not None:
             kwargs['command'] = self.normalize_callback(callback)
-        if (change_cb := self._change_cb) is not None:
-            self.__change_cb_name = tk_var.trace_add('write', change_cb)
 
+        self._maybe_add_var_trace()
         self.widget = Checkbutton(row.frame, **kwargs)
         self.pack_widget()
 

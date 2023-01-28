@@ -49,7 +49,6 @@ class Rating(InteractiveRowFrame):
         width, height = self._star_size = star_size or (12, 12)
         self._star_full_size = (width * 5 + 4, height)
         self._show_value = show_value
-        self._val_change_cb = None
         self._last_cb_rating = self._rating
         self._button_down = False
         self._change_cb = change_cb
@@ -214,7 +213,8 @@ class Rating(InteractiveRowFrame):
         self._bind_manager.bind_all(self.star_element.widget)
         if rating_input := self.rating_input:
             rating_input.enable()
-            self._val_change_cb = rating_input.string_var.trace_add('write', self._handle_value_changed)
+            rating_input.var_change_cb = self._handle_value_changed
+
         self.disabled = False
 
     def disable(self):
@@ -222,8 +222,7 @@ class Rating(InteractiveRowFrame):
             return
         self._bind_manager.unbind_all(self.star_element.widget)
         if rating_input := self.rating_input:
-            rating_input.string_var.trace_remove('write', self._val_change_cb)
-            self._val_change_cb = None
+            del rating_input.var_change_cb
             rating_input.disable()
         self.disabled = True
 

@@ -8,9 +8,10 @@ from typing import TYPE_CHECKING, Optional, Callable
 
 if TYPE_CHECKING:
     from tkinter import Widget, Button, Checkbutton, Menu, Radiobutton, Scale, Scrollbar, Text, OptionMenu, Spinbox
-    from tk_gui.typing import BindTarget, BindCallback
+    from tkinter import Variable
+    from tk_gui.typing import BindTarget, BindCallback, TraceCallback
 
-__all__ = ['DisableableMixin', 'CallbackCommandMixin']
+__all__ = ['DisableableMixin', 'CallbackCommandMixin', 'TraceCallbackMixin']
 
 
 class DisableableMixin:
@@ -53,3 +54,35 @@ class CallbackCommandMixin:
         self._callback = callback
         if widget := self.widget:
             widget.configure(command=self.normalize_callback(callback))
+
+
+class TraceCallbackMixin:
+    __change_cb_name: str | None = None
+    __var_change_cb: TraceCallback | None = None
+    tk_var: Variable | None
+
+    @property
+    def var_change_cb(self) -> TraceCallback | None:
+        return self.__var_change_cb
+
+    @var_change_cb.setter
+    def var_change_cb(self, value: TraceCallback | None):
+        self.__var_change_cb = value
+        if value is None:
+            self._maybe_remove_var_trace()
+        else:
+            self._maybe_add_var_trace()
+
+    @var_change_cb.deleter
+    def var_change_cb(self):
+        self._maybe_remove_var_trace()
+        self.__var_change_cb = None
+
+    def _maybe_add_var_trace(self):
+        if (var_change_cb := self.__var_change_cb) and (tk_var := self.tk_var):
+            self.__change_cb_name = tk_var.trace_add('write', var_change_cb)
+
+    def _maybe_remove_var_trace(self):
+        if (cb_name := self.__change_cb_name) and (tk_var := self.tk_var):
+            tk_var.trace_remove('write', cb_name)
+            self.__change_cb_name = None
