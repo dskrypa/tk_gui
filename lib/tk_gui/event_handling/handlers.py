@@ -5,10 +5,10 @@
 from __future__ import annotations
 
 import logging
-from abc import ABCMeta, ABC
+from abc import ABCMeta
 from contextvars import ContextVar
 from functools import partial
-from typing import TYPE_CHECKING, Any, Optional, Callable, Type
+from typing import TYPE_CHECKING, Any, Callable, Type, Iterator
 
 from tk_gui.caching import cached_property
 from tk_gui.enums import BindEvent
@@ -45,7 +45,7 @@ def event_handler(*binds: str, method: bool = True, add: bool = True) -> Callabl
     return _event_handler
 
 
-def button_handler(*keys: str, method: bool = True, add: bool = True) -> Callable[[ButtonEventCB], ButtonHandler]:
+def button_handler(*keys: str, method: bool = True, add: bool = False) -> Callable[[ButtonEventCB], ButtonHandler]:
     """
     Decorator that registers the decorated function/method as the handler for the specified buttons.  The function
     must accept two positional args - a :class:`python:tkinter.Event`, and the key of the :class:`Button` that was
@@ -74,17 +74,34 @@ class EventHandler:
         binds, method, add = self.binds, self.method, self.add
         return f'<{self.__class__.__name__}[{self.handler}, {binds=}, {method=}, {add=}]>'
 
+    def __iter__(self) -> Iterator[tuple[str, bool]]:
+        add = self.add
+        for bind in self.binds:
+            yield bind, add
+
+
+class ButtonEventHandler(EventHandler):
+    __slots__ = ()
+
+    def __init__(self, handler: BindCallback):
+        super().__init__(handler, (BindEvent.BUTTON_CLICKED.value,))
+
 
 class ButtonHandler(EventHandler):
     __slots__ = ('keys',)
 
-    def __init__(self, handler: ButtonEventCB, keys: tuple[str, ...], method: bool = True, add: bool = True):
+    def __init__(self, handler: ButtonEventCB, keys: tuple[str, ...], method: bool = True, add: bool = False):
         super().__init__(handler, (), method=method, add=add)
         self.keys = keys
 
     def __repr__(self) -> str:
         keys, method, add = self.binds, self.method, self.add
         return f'<{self.__class__.__name__}[{self.handler}, {keys=}, {method=}, {add=}]>'
+
+    def __iter__(self) -> Iterator[tuple[str, bool]]:
+        add = self.add
+        for key in self.keys:
+            yield key, add
 
 
 # endregion
@@ -103,12 +120,18 @@ class HandlesEventsMeta(ABCMeta, type):
 
     def __new__(mcs, name: str, bases: tuple[type, ...], namespace: dict[str, Any], **kwargs):
         cls = super().__new__(mcs, name, bases, namespace, **kwargs)
-        cls._event_handlers_, cls._button_handlers_ = _stack.get().pop()
+        event_handlers, button_handlers = _stack.get().pop()
+        try:
+            parent_ehs, parent_bhs = cls._event_handlers_, cls._button_handlers_
+        except AttributeError:
+            cls._event_handlers_, cls._button_handlers_ = event_handlers, button_handlers
+        else:
+            cls._event_handlers_ = [eh for eh in parent_ehs if not isinstance(eh, ButtonEventHandler)] + event_handlers
+            cls._button_handlers_ = parent_bhs + button_handlers
+
         if cls._button_handlers_:
             try:
-                cls._event_handlers_.append(
-                    EventHandler(cls._handle_button_clicked_, (BindEvent.BUTTON_CLICKED.value,))  # noqa
-                )
+                cls._event_handlers_.append(ButtonEventHandler(cls._handle_button_clicked_))  # noqa
             except AttributeError as e:
                 raise TypeError(
                     f'Unable to register button handlers for {cls=} - it is missing a _handle_button_clicked_ method'
@@ -116,38 +139,19 @@ class HandlesEventsMeta(ABCMeta, type):
 
         return cls
 
-    @classmethod
-    def get_parent_hem(mcs, cls: HandlesEventsMeta, include_abc: bool = True) -> Optional[HandlesEventsMeta]:
-        for parent_cls in type.mro(cls)[1:]:
-            if isinstance(parent_cls, mcs) and (include_abc or ABC not in parent_cls.__bases__):
-                return parent_cls
-        return None
-
-    def __get_bind_map(cls: HandlesEventsMeta, he_obj, method_name: str) -> BindMap:
-        mcs = cls.__class__
-        if parent := mcs.get_parent_hem(cls):
-            return getattr(mcs, method_name)(parent, he_obj).copy()
-        else:
-            return BindMap()
-
     def event_handler_binds(cls: HandlesEventsMeta, he_obj) -> BindMap:
-        bind_map = cls.__get_bind_map(he_obj, 'event_handler_binds')
-        for handler in cls._event_handlers_:
-            cb = partial(handler.handler, he_obj) if handler.method else handler.handler
-            add = handler.add
-            for bind in handler.binds:
-                bind_map.add(bind, cb, add)
-
-        return bind_map
+        return cls._get_bind_map(he_obj, '_event_handlers_')
 
     def button_handler_binds(cls: HandlesEventsMeta, he_obj) -> BindMap:
-        bind_map = cls.__get_bind_map(he_obj, 'button_handler_binds')
-        for handler in cls._button_handlers_:  # type: ButtonHandler
+        return cls._get_bind_map(he_obj, '_button_handlers_')
+
+    def _get_bind_map(cls: HandlesEventsMeta, he_obj, attr_name: str) -> BindMap:
+        bind_map = BindMap()
+        for handler in getattr(cls, attr_name):  # type: EventHandler | ButtonHandler
             cb = partial(handler.handler, he_obj) if handler.method else handler.handler
             # log.debug(f'Found {handler=} -> {cb=}', extra={'color': 14})
-            add = handler.add
-            for key in handler.keys:
-                bind_map.add(key, cb, add)
+            for key_or_bind, add in handler:
+                bind_map.add(key_or_bind, cb, add)
 
         return bind_map
 
