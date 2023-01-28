@@ -236,6 +236,8 @@ class Button(CustomEventResultsMixin, DisableableMixin, Interactive, base_style_
         self.handle_activated(event)
 
     def handle_activated(self, event: Event = None):
+        if self.disabled:  # When enter is bound, for example, this may be called despite the fact it is disabled.
+            return
         self._last_activated = monotonic()
         log.debug(f'handle_activated: {event=}')
         if (action := self.action) == ButtonAction.SUBMIT:
