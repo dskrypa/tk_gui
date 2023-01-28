@@ -66,6 +66,9 @@ class BindMap(MutableMapping[Bindable, list[BindTarget]]):
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}({self._data})'
 
+    def __rich_repr__(self):
+        yield self._data
+
     def copy(self) -> BindMap:
         clone = BindMap()
         clone._data = {k: v[:] for k, v in self._data.items()}
