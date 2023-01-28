@@ -346,8 +346,6 @@ class GuiTest(Command):
         png_path = ICONS_DIR.joinpath('exclamation-triangle-yellow.png')
         search_path = ICONS_DIR.joinpath('search.png')
 
-        toggle_button = Button(image=Icons(20).draw('arrow-repeat'), cb=lambda e: inpt.toggle_enabled())
-
         # layout = [
         #     [table1, table2],
         #     [inpt, Button('Submit', bind_enter=True), Button(image=search_path, shortcut='s', size=(30, 30))],
@@ -384,7 +382,12 @@ class GuiTest(Command):
             [table1], [table2],
             [HorizontalSeparator()],
             # [inpt, Button('Submit', bind_enter=True), Button(image=search_path, shortcut='s', size=(30, 30))],
-            [inpt, Button('Submit'), Button(image=search_path, shortcut='s', size=(30, 30)), toggle_button],
+            [
+                inpt,
+                Button('Submit', bind_enter=True),
+                Button(image=search_path, shortcut='s', size=(30, 30)),
+                Button(image=Icons(20).draw('arrow-repeat'), cb=lambda e: inpt.toggle_enabled()),
+            ],
             [Animation(gif_path)], [SpinnerImage()], [ClockImage(right_click_menu=EleRightClickMenu())],
             [
                 Text('test'),

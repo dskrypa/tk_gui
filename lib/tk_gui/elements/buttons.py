@@ -220,11 +220,9 @@ class Button(CustomEventResultsMixin, DisableableMixin, Interactive, base_style_
     # region Event Handling
 
     def _bind(self, event_pat: str, cb: BindCallback, add: Bool = True):
+        if self.bind_enter and event_pat == '<Return>' and self.window._maybe_bind_return_key(cb):
+            return  # Skip bind on the button itself when it was bound on the window to avoid double activation
         super()._bind(event_pat, cb, add)
-        if self.bind_enter and event_pat == '<Return>' and event_pat not in self.window._bound_for_events:
-            # TODO: This should be refactored...
-            self.window.bind(event_pat, cb)
-            self.window._bound_for_events.add(event_pat)
 
     def handle_press(self, event: Event):
         self._last_press = monotonic()

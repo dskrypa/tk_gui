@@ -929,6 +929,14 @@ class Window(BindMixin, RowContainer):
         if cbs := self._event_cbs.get(bind_event):
             yield from cbs
 
+    def _maybe_bind_return_key(self, cb: BindCallback) -> bool:
+        tk_event = '<Return>'
+        if tk_event in self._bound_for_events:
+            return False
+        self.bind(tk_event, cb)
+        self._bound_for_events.add(tk_event)
+        return True
+
     # endregion
 
     # region Event Handling
