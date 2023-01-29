@@ -14,17 +14,24 @@ from typing import TYPE_CHECKING, Optional, Union, Iterable, Sequence
 
 from tk_gui.caching import cached_property
 from tk_gui.enums import Anchor, Justify, Side
-from tk_gui.styles import Style
+from tk_gui.styles import Style, StyleSpec
 from tk_gui.utils import Inheritable
 
 if TYPE_CHECKING:
-    from tk_gui.elements.element import Element, ElementBase
-    from tk_gui.typing import Bool, XY
+    from tk_gui.elements.element import Element, ElementBase  # noqa
+    from tk_gui.typing import Bool, XY, TkFill
     from tk_gui.window import Window
     from .row_container import RowContainer
 
 __all__ = ['Row']
 log = logging.getLogger(__name__)
+
+_NotSet = object()
+_CENTER_ANCHORS = {tkc.CENTER, None}
+_HORIZONTAL_CENTER_ANCHORS = {tkc.CENTER, tkc.N, tkc.S, None}
+_VERTICAL_CENTER_ANCHORS = {tkc.CENTER, tkc.W, tkc.E, None}
+AnyEle = Union['ElementBase', 'Element']
+Elements = Iterable[AnyEle]
 
 
 class RowBase(ABC):
@@ -51,7 +58,7 @@ class RowBase(ABC):
 
     @property
     @abstractmethod
-    def elements(self) -> Sequence[Element]:
+    def elements(self) -> Sequence[AnyEle]:
         """
         Intended to be overridden by subclasses to provide a standardized way of defining custom element members for
         compound elements.
@@ -70,7 +77,7 @@ class RowBase(ABC):
         return [self.frame, *(w for element in self.elements for w in element.widgets)]
 
     @cached_property
-    def widget_id_element_map(self) -> dict[str, Union[RowBase, ElementBase]]:
+    def widget_id_element_map(self) -> dict[str, Union[RowBase, AnyEle]]:
         """Used to populate this row's parent's :attr:`RowContainer.widget_id_element_map`."""
         widget_ele_map = {self.frame._w: self}  # noqa
         setdefault = widget_ele_map.setdefault
@@ -87,7 +94,7 @@ class RowBase(ABC):
         return widget_ele_map
 
     @cached_property
-    def id_ele_map(self) -> dict[str, Element]:
+    def id_ele_map(self) -> dict[str, AnyEle]:
         return {ele.id: ele for ele in self.elements}
 
     @property
@@ -110,38 +117,90 @@ class RowBase(ABC):
 
 
 class Row(RowBase):
+    _anchor: Optional[Anchor] = None
     ignore_grab: bool = False
     frame: Optional[Frame] = None       # This satisfies the abstract property req while letting it be assigned in pack
     expand: Optional[bool] = None       # Set to True only for Column elements
     fill: Optional[bool] = None         # Changes for Column, Separator, StatusBar
-    elements: tuple[Element, ...] = ()  # This satisfies the abstract property req while letting it be assigned in init
+    elements: tuple[AnyEle, ...] = ()   # This satisfies the abstract property req while letting it be assigned in init
 
-    def __init__(self, parent: RowContainer, elements: Iterable[Element]):
+    def __init__(self, parent: RowContainer, elements: Elements):
         self.parent = parent
         self.elements = tuple(elements)
+
+    def __repr__(self) -> str:
+        parent_cls = self.parent.__class__.__name__
+        n_eles = len(self.elements)
+        anchor, expand, fill = self._anchor_expand_and_fill()
+        return f'<{self.__class__.__name__}[{parent_cls=!s}, {n_eles=}, {anchor=}, {expand=}, {fill=}]>'
+
+    @classmethod
+    def custom(
+        cls,
+        parent: RowContainer,
+        elements: Elements,
+        *,
+        anchor: Union[str, Anchor] = _NotSet,
+        expand: bool = None,
+        fill: TkFill = None,
+        style: StyleSpec = None,
+    ) -> Row:
+        self = cls(parent, elements)
+        if anchor is not _NotSet:
+            self._anchor = Anchor(anchor)
+        if expand is not None:
+            self.expand = expand
+        if fill is not None:
+            self.fill = fill
+        if style:
+            self.style = Style.get_style(style)
+        return self
 
     @property
     def parent_rc(self) -> RowContainer:
         return self.parent
 
     @property
-    def anchor(self):
-        return self.anchor_elements.value
+    def anchor(self) -> Anchor:
+        if (anchor := self._anchor) is not None:
+            return anchor
+        return self.anchor_elements
+
+    def _anchor_expand_and_fill(self) -> tuple[Anchor, bool, TkFill]:
+        anchor, expand, fill = self.anchor, self.expand, self.fill
+        if expand is fill is None:
+            # if anchor.is_abs_center:
+            #     return anchor, True, tkc.BOTH
+            return anchor, anchor.is_any_center, anchor.abs_fill_axis
+
+        if expand is None:
+            if fill and fill != tkc.NONE:
+                expand = True
+            else:
+                expand = anchor.is_abs_center
+        if fill is None:
+            fill = anchor.abs_fill_axis if expand else tkc.NONE
+        return anchor, expand, fill
 
     def pack(self, debug: Bool = False):
         # log.debug(f'Packing row {self.num} in {self.parent=} {self.parent.tk_container=}')
-        self.frame = frame = Frame(self.parent.tk_container)
-        self.pack_elements(debug)
-        anchor = self.anchor
-        center = anchor == tkc.CENTER or anchor is None
-        if (expand := self.expand) is None:
-            expand = center
-        if (fill := self.fill) is None:
-            fill = tkc.BOTH if center else tkc.NONE
-        # log.debug(f'Packing row with {anchor=}, {center=}, {expand=}, {fill=}')
-        frame.pack(side=tkc.TOP, anchor=anchor, padx=0, pady=0, expand=expand, fill=fill)
         if bg := self.style.base.bg.default:
-            frame.configure(background=bg)
+            kwargs = {'background': bg}
+        else:
+            kwargs = {}
+        self.frame = frame = Frame(self.parent.tk_container, **kwargs)
+        self.pack_elements(debug)
+
+        anchor, expand, fill = self._anchor_expand_and_fill()
+        # anchor = self.anchor
+        # if (expand := self.expand) is None:
+        #     expand = anchor.is_abs_center
+        # if (fill := self.fill) is None:
+        #     fill = anchor.abs_fill_axis
+
+        # log.debug(f'Packing row with {anchor=}, {center=}, {expand=}, {fill=}')
+        # log.debug(f'Packing {self!r}', extra={'color': 14})
+        frame.pack(side=tkc.TOP, anchor=anchor.value, padx=0, pady=0, expand=expand, fill=fill)
 
     def apply_style(self):
         if bg := self.style.base.bg.default:
