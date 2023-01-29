@@ -46,6 +46,12 @@ class HorizontalSeparator(Separator):
     def __init__(self, **kwargs):
         super().__init__(tkc.HORIZONTAL, **kwargs)
 
+    def pack_into(self, row: Row):
+        if len(row.elements) == 1 and row.anchor.is_horizontal_center:
+            row.expand = True
+            row.fill = tkc.X
+        super().pack_into(row)
+
 
 class VerticalSeparator(Separator):
     def __init__(self, **kwargs):

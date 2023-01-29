@@ -24,13 +24,9 @@ if TYPE_CHECKING:
     from ..pseudo_elements.row import Row
 
 __all__ = [
-    'RowFrame',
-    'InteractiveRowFrame',
-    'Frame',
-    'InteractiveFrame',
-    'ScrollFrame',
-    'BasicRowFrame',
-    'BasicInteractiveRowFrame',
+    'RowFrame', 'InteractiveRowFrame', 'BasicRowFrame', 'BasicInteractiveRowFrame',
+    'Frame', 'InteractiveFrame',
+    'ScrollFrame', 'YScrollFrame', 'XScrollFrame',
 ]
 log = logging.getLogger(__name__)
 
@@ -120,6 +116,7 @@ class RowFrame(FrameMixin, RowBase, Element, ABC, base_style_layer='frame'):
     def __init__(self, **kwargs):
         self.init_frame_from_kwargs(kwargs)
         Element.__init__(self, **kwargs)
+        # Note: self.parent is set in Element.pack_into_row
 
     @property
     def parent_rc(self) -> RowContainer:
@@ -317,3 +314,13 @@ class ScrollFrame(Element, RowContainer, base_style_layer='frame'):
 
     def update_scroll_region(self, size: Optional[XY] = None):
         self._update_scroll_region(self.widget, self.inner_frame, size)
+
+
+def YScrollFrame(layout: Layout = None, title: str = None, **kwargs) -> ScrollFrame:
+    kwargs.setdefault('scroll_y', True)
+    return ScrollFrame(layout, title, **kwargs)
+
+
+def XScrollFrame(layout: Layout = None, title: str = None, **kwargs) -> ScrollFrame:
+    kwargs.setdefault('scroll_x', True)
+    return ScrollFrame(layout, title, **kwargs)
