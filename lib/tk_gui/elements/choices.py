@@ -618,3 +618,15 @@ class ListBox(DisableableMixin, Interactive, base_style_layer='listbox'):
     @cached_property
     def widgets(self) -> list[BaseWidget]:
         return self.widget.widgets
+
+    def enable(self):
+        if not self.disabled:
+            return
+        self.widget.inner_widget['state'] = self._enabled_state
+        self.disabled = False
+
+    def disable(self):
+        if self.disabled:
+            return
+        self.widget.inner_widget['state'] = self._disabled_state
+        self.disabled = True
