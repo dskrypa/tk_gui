@@ -19,12 +19,14 @@ if TYPE_CHECKING:
     from tkinter import Event
     from ..typing import Layout, Key
 
-__all__ = ['View']
+__all__ = ['View', 'ViewSpec']
 log = logging.getLogger(__name__)
+
+ViewSpec = tuple[Type['View'], Sequence[Any], Mapping[Any]]
 
 
 class View(HandlesEvents):
-    __next: Optional[tuple[Type[View], Sequence[Any], Mapping[Any]]] = None
+    __next: Optional[ViewSpec] = None
     window_kwargs: Optional[dict[str, Any]] = None
     parent: Union[View, Window] = None
     title: str = None
