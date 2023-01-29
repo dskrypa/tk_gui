@@ -21,7 +21,7 @@ from .popups import PickFolder
 
 if TYPE_CHECKING:
     from tkinter import Event
-    from .typing import Key
+    from .typing import Key, TraceCallback, Layout
 
 __all__ = [
     'GuiOptions',
@@ -31,6 +31,7 @@ log = logging.getLogger(__name__)
 
 _NotSet = object()
 COMMON_PARAMS = ('size', 'tooltip', 'pad', 'enable_events')
+OptionTuples = Iterator[tuple[Optional[int], int, Element]]
 
 
 # region Option Types
@@ -85,9 +86,9 @@ class Option(ABC):
     def value_key(self) -> str:
         return f'opt::{self.name}'
 
-    def common_kwargs(self, disable_all: bool) -> dict[str, Any]:
+    def common_kwargs(self, disable_all: bool, change_cb: TraceCallback = None) -> dict[str, Any]:
         disabled = disable_all or self.disabled
-        common = {'key': self.value_key, 'disabled': disabled}
+        common = {'key': self.value_key, 'disabled': disabled, 'change_cb': change_cb}
         if kwargs := self.kwargs:
             if opt_kwargs := kwargs.get('kwargs'):
                 common.update(opt_kwargs)
@@ -99,7 +100,7 @@ class Option(ABC):
         return common
 
     @abstractmethod
-    def prepare_layout(self, disable_all: bool) -> Iterator[tuple[Optional[int], int, Element]]:
+    def prepare_layout(self, disable_all: bool, change_cb: TraceCallback = None) -> OptionTuples:
         raise NotImplementedError
 
     def validate(self, value):
@@ -109,15 +110,15 @@ class Option(ABC):
 
 
 class CheckboxOption(Option, opt_type='checkbox'):
-    def prepare_layout(self, disable_all: bool) -> Iterator[tuple[Optional[int], int, Element]]:
-        yield self.col, self.row, CheckBox(self.label, default=self.value, **self.common_kwargs(disable_all))
+    def prepare_layout(self, disable_all: bool, change_cb: TraceCallback = None) -> OptionTuples:
+        yield self.col, self.row, CheckBox(self.label, default=self.value, **self.common_kwargs(disable_all, change_cb))
 
 
 class InputOption(Option, opt_type='input'):
-    def prepare_layout(self, disable_all: bool) -> Iterator[tuple[Optional[int], int, Element]]:
+    def prepare_layout(self, disable_all: bool, change_cb: TraceCallback = None) -> OptionTuples:
         col_num, row_num, val = self.col, self.row, self.value
         yield col_num, row_num, Text(self.label, key=f'lbl::{self.name}')
-        yield col_num, row_num, Input('' if val is _NotSet else val, **self.common_kwargs(disable_all))
+        yield col_num, row_num, Input('' if val is _NotSet else val, **self.common_kwargs(disable_all, change_cb))
 
     def validate(self, value):
         if isinstance(value, str):
@@ -132,10 +133,12 @@ class InputOption(Option, opt_type='input'):
 
 
 class DropdownOption(Option, opt_type='dropdown'):
-    def prepare_layout(self, disable_all: bool) -> Iterator[tuple[Optional[int], int, Element]]:
+    def prepare_layout(self, disable_all: bool, change_cb: TraceCallback = None) -> OptionTuples:
         col_num, row_num, val = self.col, self.row, self.value
         yield col_num, row_num, Text(self.label, key=f'lbl::{self.name}')
-        yield col_num, row_num, Combo(self.kwargs['choices'], default_value=val, **self.common_kwargs(disable_all))
+        yield col_num, row_num, Combo(
+            self.kwargs['choices'], default_value=val, **self.common_kwargs(disable_all, change_cb)
+        )
 
 
 class ListboxOption(Option, opt_type='listbox'):
@@ -166,7 +169,12 @@ class ListboxOption(Option, opt_type='listbox'):
             **kwargs
         )
 
-    def prepare_layout(self, disable_all: bool) -> Iterator[tuple[Optional[int], int, Element]]:
+    def common_kwargs(self, disable_all: bool, change_cb: TraceCallback = None) -> dict[str, Any]:
+        kwargs = super().common_kwargs(disable_all, change_cb)
+        kwargs['callback'] = kwargs.pop('change_cb')  # ListBox is the only one that doesn't support change_cb
+        return kwargs
+
+    def prepare_layout(self, disable_all: bool, change_cb: TraceCallback = None) -> OptionTuples:
         col_num, row_num, val = self.col, self.row, self.value
         yield col_num, row_num, Text(self.label, key=f'lbl::{self.name}')
         kwargs = self.kwargs
@@ -176,7 +184,7 @@ class ListboxOption(Option, opt_type='listbox'):
             default=val or choices,
             # scroll_y=False,
             select_mode=kwargs['select_mode'],
-            **self.common_kwargs(disable_all),
+            **self.common_kwargs(disable_all, change_cb),
         )
         if kwargs['extendable']:
             yield col_num, row_num, Button('Add...', key=f'btn::{self.name}', disabled=disable_all or self.disabled)
@@ -199,14 +207,14 @@ class PopupOption(Option, opt_type='popup'):
         self.popup_kwargs = popup_kwargs or {}
         self.button_text = button
 
-    def prepare_layout(self, disable_all: bool) -> Iterator[tuple[Optional[int], int, Element]]:
+    def prepare_layout(self, disable_all: bool, change_cb: TraceCallback = None) -> OptionTuples:
         col_num, row_num, val = self.col, self.row, self.value
         if val is _NotSet:
             val = None
 
         yield col_num, row_num, Text(self.label, key=f'lbl::{self.name}')
 
-        input_ele = Input('' if val is None else val, **self.common_kwargs(disable_all))  # key=f'opt::{self.name}'
+        input_ele = Input('' if val is None else val, **self.common_kwargs(disable_all, change_cb))
         yield col_num, row_num, input_ele
 
         def update_value(event: Event):
@@ -410,11 +418,11 @@ class GuiOptions:
 
     # region Render Methods
 
-    def _generate_layout(self, disable_all: bool) -> Iterator[tuple[Optional[int], int, Element]]:
+    def _generate_layout(self, disable_all: bool, change_cb: TraceCallback = None) -> OptionTuples:
         for name, opt in self.options.items():
-            yield from opt.prepare_layout(disable_all)
+            yield from opt.prepare_layout(disable_all, change_cb)
 
-    def _pack(self, layout: list[list[Element]], columns: list[list[list[Element]]]) -> list[list[Element]]:
+    def _pack(self, layout: list[list[Element]], columns: list[Layout]) -> Layout:
         if self.align_text or self.align_checkboxes:
             if columns:
                 row_sets = [layout + columns[0], columns[1:]] if len(columns) > 1 else [layout + columns[0]]
@@ -439,7 +447,9 @@ class GuiOptions:
 
         return layout
 
-    def layout(self, submit_key: str = None, disable_all: bool = None, submit_row: int = None) -> list[list[Element]]:
+    def layout(
+        self, submit_key: str = None, disable_all: bool = None, submit_row: int = None, change_cb: TraceCallback = None
+    ) -> Layout:
         if disable_all is None:
             disable_all = self.disable_on_parsed and self.parsed
         log.debug(f'Building option layout with {self.parsed=!r} {submit_key=!r} {disable_all=!r}')
@@ -447,7 +457,7 @@ class GuiOptions:
         rows_per_column = sorted(((col, val) for col, val in self._rows_per_column.items() if col is not None))
         layout = [[] for _ in range(none_cols)] if (none_cols := self._rows_per_column.get(None)) else []
         columns = [[[] for _ in range(r)] for c, r in rows_per_column]
-        for col_num, row_num, ele in self._generate_layout(disable_all):
+        for col_num, row_num, ele in self._generate_layout(disable_all, change_cb):
             if col_num is None:
                 layout[row_num].append(ele)
             else:
@@ -466,8 +476,15 @@ class GuiOptions:
 
         return layout
 
-    def as_frame(self, submit_key: str = None, disable_all: bool = None, submit_row: int = None, **kwargs) -> Frame:
-        frame = Frame(self.layout(submit_key, disable_all, submit_row), title=self.title, key='frame::options')
+    def as_frame(
+        self,
+        submit_key: str = None,
+        disable_all: bool = None,
+        submit_row: int = None,
+        change_cb: TraceCallback = None,
+        # **kwargs,
+    ) -> Frame:
+        frame = Frame(self.layout(submit_key, disable_all, submit_row, change_cb), title=self.title)
         # return Column([[frame]], key='col::frame_options', justification='center', **kwargs)
         return frame
 

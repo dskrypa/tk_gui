@@ -369,7 +369,10 @@ def make_checkbox_grid(rows: list[Sequence[CheckBox]]):
 # endregion
 
 
-class Combo(DisableableMixin, Interactive, disabled_state='disable', enabled_state='enable', base_style_layer='combo'):
+class Combo(
+    DisableableMixin, TraceCallbackMixin, Interactive,
+    disabled_state='disable', enabled_state='enable', base_style_layer='combo',
+):
     """A form element that provides a drop down list of items to select.  Only 1 item may be selected."""
     widget: Combobox
     tk_var: Optional[StringVar] = None
@@ -381,6 +384,7 @@ class Combo(DisableableMixin, Interactive, disabled_state='disable', enabled_sta
         *,
         read_only: Bool = False,
         callback: BindTarget = None,
+        change_cb: TraceCallback = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -388,6 +392,8 @@ class Combo(DisableableMixin, Interactive, disabled_state='disable', enabled_sta
         self.default = default
         self.read_only = read_only
         self._callback = callback
+        if change_cb:
+            self.var_change_cb = change_cb
 
     @property
     def value(self) -> Any:
@@ -452,6 +458,7 @@ class Combo(DisableableMixin, Interactive, disabled_state='disable', enabled_sta
         elif self.read_only:
             kwargs['state'] = 'readonly'
 
+        self._maybe_add_var_trace()
         self.widget = combo_box = Combobox(row.frame, **kwargs)
         fg, bg = style.combo.fg[state], style.combo.bg[state]
         if fg and bg:  # This sets colors for drop-down formatting
