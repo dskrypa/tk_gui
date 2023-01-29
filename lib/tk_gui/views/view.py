@@ -113,13 +113,16 @@ class View(HandlesEvents):
         self.__next = (view_cls, args, kwargs)
         return CallbackAction.EXIT
 
+    def get_next_view_spec(self) -> ViewSpec | None:
+        return self.__next
+
     def get_next_view(self) -> View | None:
         """
         If another view should be run after this one exits, this method should return that view.  By default, works
         with :meth:`.set_next_view`.
         """
         try:
-            view_cls, args, kwargs = self.__next
+            view_cls, args, kwargs = self.get_next_view_spec()
         except TypeError:
             return None
         return view_cls(*args, **kwargs)
