@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 __all__ = ['View', 'ViewSpec']
 log = logging.getLogger(__name__)
 
-ViewSpec = tuple[Type['View'], Sequence[Any], Mapping[Any]]
+ViewSpec = tuple[Type['View'], Sequence[Any], Mapping[str, Any]]
 
 
 class View(HandlesEvents):
