@@ -10,7 +10,7 @@ import logging
 from abc import ABC, abstractmethod
 from itertools import count
 from tkinter import Toplevel, Frame, BaseWidget
-from typing import TYPE_CHECKING, Optional, Union, Any, Iterator, overload
+from typing import TYPE_CHECKING, Optional, Union, Any, Iterator, Type, overload
 
 from tk_gui.caching import cached_property
 from ..enums import Anchor, Justify, Side
@@ -97,7 +97,7 @@ class RowContainer(ABC):
         self.element_side = Side(element_side) if element_side else Side.LEFT
         self.element_padding = element_padding
         self.element_size = element_size
-        self.rows = [Row(self, row) for row in layout] if layout else []
+        self.rows = [row for row in self._normalize_rows(layout)] if layout else []
         self.scroll_y = scroll_y
         self.scroll_x = scroll_x
         self.scroll_y_div = scroll_y_div
@@ -106,9 +106,17 @@ class RowContainer(ABC):
     def __repr__(self) -> str:
         return f'<{self.__class__.__name__}[{self._id}]>'
 
+    def _normalize_rows(self, layout: Layout, row_cls: Type[Row] = Row) -> Iterator[Row]:
+        for raw_row in layout:
+            if isinstance(raw_row, row_cls):
+                log.debug(f'Found pre-built row={raw_row!r}', extra={'color': 11})
+                yield raw_row
+            else:
+                yield row_cls(self, raw_row)
+
     def add_rows(self, layout: Layout, pack: Bool = False, debug: Bool = False, update: Bool = False):
         if not pack:
-            self.rows.extend(Row(self, raw_row) for raw_row in layout)
+            self.rows.extend(self._normalize_rows(layout))
         elif debug:
             update_idletasks = self.widget.update_idletasks
             n_rows = len(self.rows)
@@ -129,8 +137,7 @@ class RowContainer(ABC):
 
     def _add_rows(self, layout: Layout):
         rows = self.rows
-        new_rows = (Row(self, raw_row) for raw_row in layout)
-        for row in new_rows:
+        for row in self._normalize_rows(layout):
             rows.append(row)
             yield row
 

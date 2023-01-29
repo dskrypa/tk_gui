@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from PIL.Image import Image as PILImage
     from .elements import Element
     from .enums import BindTargets, BindEvent
+    from .pseudo_elements import Row
 
 # fmt: off
 __all__ = [
@@ -36,7 +37,7 @@ BindTarget = Union[BindCallback, EventCallback, ButtonEventCB, 'BindTargets', st
 
 Bool = Union[bool, Any]
 XY = tuple[int, int]
-Layout = Iterable[Iterable['Element']]
+Layout = Iterable[Iterable['Element'] | 'Row']
 Axis = Literal['x', 'y']
 Orientation = Literal['horizontal', 'vertical']
 PathLike = Union['Path', str]

@@ -8,9 +8,13 @@ from __future__ import annotations
 
 import tkinter.constants as tkc
 from enum import Enum, IntEnum
-from typing import Type
+from typing import TYPE_CHECKING, Type
 
+from .caching import cached_property
 from .utils import ON_MAC
+
+if TYPE_CHECKING:
+    from .typing import TkFill
 
 __all__ = ['BindTargets', 'Anchor', 'BindEvent', 'CallbackAction', 'Justify', 'Side', 'StyleState', 'ListBoxSelectMode']
 
@@ -130,6 +134,40 @@ class Anchor(MissingMixin, Enum, aliases=ANCHOR_ALIASES):
 
     def as_sticky(self):
         return SIDE_STICKY_MAP.get(self.as_side())
+
+    @cached_property
+    def is_abs_center(self) -> bool:
+        return self in (Anchor.NONE, Anchor.MID_CENTER)
+
+    @cached_property
+    def is_horizontal_center(self) -> bool:
+        return self in (Anchor.NONE, Anchor.MID_CENTER, Anchor.TOP_CENTER, Anchor.BOTTOM_CENTER)
+
+    @cached_property
+    def is_vertical_center(self) -> bool:
+        return self in (Anchor.NONE, Anchor.MID_CENTER, Anchor.MID_LEFT, Anchor.MID_RIGHT)
+
+    @cached_property
+    def is_any_center(self) -> bool:
+        return self.is_horizontal_center or self.is_vertical_center
+
+    @cached_property
+    def fill_axis(self) -> TkFill:
+        if self.is_abs_center:
+            return tkc.BOTH
+        elif self.is_horizontal_center:
+            return tkc.X
+        elif self.is_vertical_center:
+            return tkc.Y
+        else:
+            return tkc.NONE
+
+    @cached_property
+    def abs_fill_axis(self) -> TkFill:
+        if self.is_abs_center:
+            return tkc.BOTH
+        else:
+            return tkc.NONE
 
 
 class StyleState(MissingMixin, IntEnum):
