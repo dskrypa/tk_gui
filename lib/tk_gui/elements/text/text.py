@@ -459,7 +459,7 @@ class Input(TextValueMixin, LinkableMixin, InteractiveText, disabled_state='read
     def _refresh_colors(self):
         bg_key = 'readonlybackground' if self.disabled else 'bg'
         kwargs = self.style.get_map('input', self.style_state, fg='fg', **{bg_key: 'bg'})
-        log.debug(f'Refreshing colors for {self} with {self.style_state=}: {kwargs}')
+        log.log(9, f'Refreshing colors for {self} with {self.style_state=}: {kwargs}')
         self.widget.configure(**kwargs)
 
     # endregion
@@ -654,7 +654,7 @@ class Multiline(InteractiveText, disabled_state='disabled'):
     def _refresh_colors(self):
         with self:
             kwargs = self.style.get_map('text', self.style_state, fg='fg', bg='bg')
-            log.debug(f'Refreshing colors for {self} with {self.style_state=}: {kwargs}')
+            log.log(9, f'Refreshing colors for {self} with {self.style_state=}: {kwargs}')
             self.widget.configure(**kwargs)
 
 

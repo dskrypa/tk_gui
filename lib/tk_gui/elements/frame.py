@@ -118,6 +118,11 @@ class RowFrame(FrameMixin, RowBase, Element, ABC, base_style_layer='frame'):
         Element.__init__(self, **kwargs)
         # Note: self.parent is set in Element.pack_into_row
 
+    def __repr__(self) -> str:
+        key, size, visible, elements = self._key, self.size, self._visible, len(self.elements)
+        key_str = f'{key=}, ' if key else ''
+        return f'<{self.__class__.__name__}[id={self.id}, {key_str}{size=}, {visible=}, {elements=}]>'
+
     @property
     def parent_rc(self) -> RowContainer:
         return self.parent.parent_rc  # self.parent is a Row
@@ -142,6 +147,11 @@ class InteractiveRowFrame(InteractiveMixin, RowFrame, ABC):
     def __init__(self, **kwargs):
         self.init_interactive_from_kwargs(kwargs)
         super().__init__(**kwargs)
+
+    def __repr__(self) -> str:
+        key, size, visible, elements, disabled = self._key, self.size, self._visible, len(self.elements), self.disabled
+        key_str = f'{key=}, ' if key else ''
+        return f'<{self.__class__.__name__}[id={self.id}, {key_str}{size=}, {visible=}, {elements=}, {disabled=}]>'
 
     def enable(self):
         if not self.disabled:
@@ -185,6 +195,11 @@ class Frame(FrameMixin, Element, RowContainer, base_style_layer='frame'):
         self.init_container_from_kwargs(layout, kwargs=kwargs)
         Element.__init__(self, **kwargs)
 
+    def __repr__(self) -> str:
+        key, size, visible, rows = self._key, self.size, self._visible, len(self.rows)
+        key_str = f'{key=}, ' if key else ''
+        return f'<{self.__class__.__name__}[id={self.id}, {key_str}{size=}, {visible=}, {rows=}]>'
+
     def get_custom_layout(self) -> Layout:  # noqa
         """
         Intended to be overridden by subclasses to provide a standardized way of defining additional rows / a custom
@@ -207,6 +222,11 @@ class InteractiveFrame(InteractiveMixin, Frame, ABC):
     def __init__(self, layout: Layout = None, **kwargs):
         self.init_interactive_from_kwargs(kwargs)
         super().__init__(layout, **kwargs)
+
+    def __repr__(self) -> str:
+        key, size, visible, rows, disabled = self._key, self.size, self._visible, len(self.rows), self.disabled
+        key_str = f'{key=}, ' if key else ''
+        return f'<{self.__class__.__name__}[id={self.id}, {key_str}{size=}, {visible=}, {rows=}, {disabled=}]>'
 
     def enable(self):
         if not self.disabled:
@@ -261,6 +281,13 @@ class ScrollFrame(Element, RowContainer, base_style_layer='frame'):
         self.border_mode = border_mode
         if inner_style:
             self.inner_style = Style.get_style(inner_style)
+
+    def __repr__(self) -> str:
+        key, size, visible, rows = self._key, self.size, self._visible, len(self.rows)
+        scroll_x, scroll_y = self.scroll_x, self.scroll_y
+        key_str = f'{key=}, ' if key else ''
+        cls_name = self.__class__.__name__
+        return f'<{cls_name}[id={self.id}, {key_str}{size=}, {visible=}, {rows=}, {scroll_x=}, {scroll_y=}]>'
 
     @property
     def tk_container(self) -> TkFrame:

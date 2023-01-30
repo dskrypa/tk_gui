@@ -256,7 +256,9 @@ class Element(BindMixin, ElementBase, ABC):
                 raise TypeError(f'Invalid options for {self.__class__.__name__}: {bad}')
 
     def __repr__(self) -> str:
-        return f'<{self.__class__.__name__}[id={self.id}, size={self.size}, visible={self._visible}]>'
+        key, size, visible = self._key, self.size, self._visible
+        key_str = f'{key=}, ' if key else ''
+        return f'<{self.__class__.__name__}[id={self.id}, {key_str}{size=}, {visible=}]>'
 
     @property
     def key(self) -> Key:
@@ -312,10 +314,13 @@ class Element(BindMixin, ElementBase, ABC):
             try:
                 widget.configure(anchor=anchor)  # noqa
             except TclError:  # Not all widgets support anchor in configure
+                # TODO: Avoid the extra call for widgets it's known to not work with?
                 pack_kwargs['anchor'] = anchor
 
         widget.pack(**pack_kwargs)
         if not self._visible:
+            self._pack_settings = widget.pack_info()
+            # log.debug(f'Hiding {self} - saved pack settings={self._pack_settings}')
             widget.pack_forget()
 
     def add_tooltip(
@@ -332,11 +337,14 @@ class Element(BindMixin, ElementBase, ABC):
     def hide(self):
         widget = self.widget
         self._pack_settings = widget.pack_info()
+        # log.debug(f'Hiding {self} - saved pack settings={self._pack_settings}')
         widget.pack_forget()
         self._visible = False
 
     def show(self):
-        settings = self._pack_settings or {}
+        if (settings := self._pack_settings) is None:
+            settings = {}
+        # log.debug(f'Showing {self} with {settings=}')
         self.widget.pack(**settings)
         self._visible = True
 
