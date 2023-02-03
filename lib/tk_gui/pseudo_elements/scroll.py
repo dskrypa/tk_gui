@@ -160,6 +160,8 @@ def find_scroll_cb(event: Event, axis: Axis) -> Optional[BindCallback]:
     if not (scrollable := get_scrollable(event.widget)):  # Another window, or scrolling away from a scrollable area
         return None
     elif not isinstance(scrollable, ScrollableContainer):  # it's a ScrollableWidget
+        # TODO: If the mouse is over a ScrollableWidget that has no scroll bar for this axis, but is inside a
+        #  scrollable container, then that parent should be discovered here, and its scroll cb should be called
         return None
     elif not getattr(scrollable, f'scroll_bar_{axis}'):  # no scroll bar for this axis is configured
         return None
