@@ -7,7 +7,7 @@ from cli_command_parser import Command, Action, Counter, Option, main
 
 from tk_gui.__version__ import __author_email__, __version__, __author__, __url__  # noqa
 from tk_gui.elements import Table, Input, Text, ScrollFrame, SizeGrip
-from tk_gui.elements.choices import CheckBox, Combo, ListBox
+from tk_gui.elements.choices import CheckBox
 from tk_gui.elements.bars import HorizontalSeparator, VerticalSeparator
 from tk_gui.elements.buttons import Button
 from tk_gui.elements.images import Image, Animation, SpinnerImage, ClockImage

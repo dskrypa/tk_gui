@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 __all__ = [
     'RowFrame', 'InteractiveRowFrame', 'BasicRowFrame', 'BasicInteractiveRowFrame',
     'Frame', 'InteractiveFrame',
-    'ScrollFrame', 'YScrollFrame', 'XScrollFrame',
+    'ScrollFrame', 'InteractiveScrollFrame', 'YScrollFrame', 'XScrollFrame',
 ]
 log = logging.getLogger(__name__)
 
@@ -218,15 +218,8 @@ class Frame(FrameMixin, Element, RowContainer, base_style_layer='frame'):
         super().pack_rows(debug)
 
 
-class InteractiveFrame(InteractiveMixin, Frame, ABC):
-    def __init__(self, layout: Layout = None, **kwargs):
-        self.init_interactive_from_kwargs(kwargs)
-        super().__init__(layout, **kwargs)
-
-    def __repr__(self) -> str:
-        key, size, visible, rows, disabled = self._key, self.size, self._visible, len(self.rows), self.disabled
-        key_str = f'{key=}, ' if key else ''
-        return f'<{self.__class__.__name__}[id={self.id}, {key_str}{size=}, {visible=}, {rows=}, {disabled=}]>'
+class InteractiveFrameMixin(InteractiveMixin):
+    rows: list[Row]
 
     def enable(self):
         if not self.disabled:
@@ -253,6 +246,17 @@ class InteractiveFrame(InteractiveMixin, Frame, ABC):
                     pass
 
         self.disabled = True
+
+
+class InteractiveFrame(InteractiveFrameMixin, Frame, ABC):
+    def __init__(self, layout: Layout = None, **kwargs):
+        self.init_interactive_from_kwargs(kwargs)
+        super().__init__(layout, **kwargs)
+
+    def __repr__(self) -> str:
+        key, size, visible, rows, disabled = self._key, self.size, self._visible, len(self.rows), self.disabled
+        key_str = f'{key=}, ' if key else ''
+        return f'<{self.__class__.__name__}[id={self.id}, {key_str}{size=}, {visible=}, {rows=}, {disabled=}]>'
 
 
 class ScrollFrame(Element, RowContainer, base_style_layer='frame'):
@@ -341,6 +345,21 @@ class ScrollFrame(Element, RowContainer, base_style_layer='frame'):
 
     def update_scroll_region(self, size: Optional[XY] = None):
         self._update_scroll_region(self.widget, self.inner_frame, size)
+
+
+class InteractiveScrollFrame(InteractiveFrameMixin, ScrollFrame):
+    def __init__(self, layout: Layout = None, title: str = None, **kwargs):
+        self.init_interactive_from_kwargs(kwargs)
+        super().__init__(layout, title, **kwargs)
+
+    def __repr__(self) -> str:
+        key, size, visible, rows, disabled = self._key, self.size, self._visible, len(self.rows), self.disabled
+        scroll_x, scroll_y = self.scroll_x, self.scroll_y
+        key_str = f'{key=}, ' if key else ''
+        cls_name = self.__class__.__name__
+        return (
+            f'<{cls_name}[id={self.id}, {key_str}{size=}, {visible=}, {rows=}, {scroll_x=}, {scroll_y=}, {disabled=}]>'
+        )
 
 
 def YScrollFrame(layout: Layout = None, title: str = None, **kwargs) -> ScrollFrame:

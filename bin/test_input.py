@@ -5,7 +5,7 @@ import logging
 from cli_command_parser import Command, Action, Counter, Option, main
 
 from tk_gui.__version__ import __author_email__, __version__, __author__, __url__  # noqa
-from tk_gui.elements import Text
+from tk_gui.elements import Text, InteractiveScrollFrame
 from tk_gui.elements.choices import Radio, RadioGroup, Combo, ListBox
 from tk_gui.elements.bars import ProgressBar, Slider
 from tk_gui.elements.buttons import Button
@@ -101,6 +101,26 @@ class GuiInputTest(Command):
 
         layout = [[a], [b], [Button('Toggle', cb=toggle_cb)]]
         results = Window(layout, 'Rating Test', exit_on_esc=True).run().results
+        print(f'Results: {results}')
+
+    @action(default=True)
+    def styles(self):
+        choices = [c * 10 for c in map(chr, range(97, 123))]
+        with RadioGroup():
+            radios = [[Radio(c, disabled=True)] for c in choices]
+        inputs = [
+            Button('Example', disabled=True),
+            ListBox(choices, size=(40, 5), disabled=True),
+            Combo(choices, size=(40, 10), disabled=True),
+            InteractiveScrollFrame(radios, size=(300, 100), scroll_y=True, disabled=True),
+        ]
+
+        def toggle_enabled(*args):
+            for ele in inputs:
+                ele.toggle_enabled()
+
+        layout = [[Button('Toggle Enabled', cb=toggle_enabled, anchor='c', side='t')], *([ele] for ele in inputs)]
+        results = Window(layout, 'Combo Test', exit_on_esc=True).run().results
         print(f'Results: {results}')
 
 

@@ -2,7 +2,7 @@ from .exceptions import ElementGroupError, NoActiveGroup, BadGroupCombo
 from .element import Element
 from .frame import (
     RowFrame, InteractiveRowFrame, BasicRowFrame, BasicInteractiveRowFrame,
-    Frame, InteractiveFrame, ScrollFrame, YScrollFrame, XScrollFrame,
+    Frame, InteractiveFrame, ScrollFrame, InteractiveScrollFrame, YScrollFrame, XScrollFrame,
 )
 from .bars import HorizontalSeparator, VerticalSeparator, ProgressBar, Slider
 from .buttons import Button, ButtonAction, OK, Cancel, Yes, No, Submit, EventButton
