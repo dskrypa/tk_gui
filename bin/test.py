@@ -7,28 +7,19 @@ from cli_command_parser import Command, Action, Counter, Option, main
 
 from tk_gui.__version__ import __author_email__, __version__, __author__, __url__  # noqa
 from tk_gui.elements import Table, Input, Text, ScrollFrame, SizeGrip
-from tk_gui.elements.choices import Radio, RadioGroup, CheckBox, Combo, ListBox
-from tk_gui.elements.bars import HorizontalSeparator, VerticalSeparator, ProgressBar, Slider
-from tk_gui.elements.buttons import Button, ButtonAction
+from tk_gui.elements.choices import CheckBox, Combo, ListBox
+from tk_gui.elements.bars import HorizontalSeparator, VerticalSeparator
+from tk_gui.elements.buttons import Button
 from tk_gui.elements.images import Image, Animation, SpinnerImage, ClockImage
-from tk_gui.elements.menu.menu import Menu, MenuGroup, MenuItem, MenuProperty
+from tk_gui.elements.menu.menu import Menu, MenuGroup, MenuItem
 from tk_gui.elements.menu.items import CopySelection, GoogleSelection, SearchKpopFandom, SearchGenerasia, PasteClipboard
 from tk_gui.elements.menu.items import ToUpperCase, ToTitleCase, ToLowerCase, OpenFileLocation, OpenFile
 from tk_gui.elements.menu.items import CloseWindow
 from tk_gui.elements.text import Multiline, gui_log_handler
-from tk_gui.elements.rating import Rating
-from tk_gui.event_handling import button_handler
 from tk_gui.images.icons import Icons
 from tk_gui.images.utils import ICONS_DIR
-from tk_gui.options import GuiOptions
-from tk_gui.popups import ImagePopup, AnimatedPopup, SpinnerPopup, ClockPopup, BasicPopup, Popup
 from tk_gui.popups.about import AboutPopup
-from tk_gui.popups.basic_prompts import TextPromptPopup, LoginPromptPopup
-from tk_gui.popups.choices import ChooseImagePopup, choose_item
-from tk_gui.popups.common import popup_warning, popup_error, popup_yes_no, popup_no_yes, popup_ok
-from tk_gui.popups.raw import PickFolder, PickColor, PickFile, pick_folder_popup
-from tk_gui.popups.style import StylePopup
-from tk_gui.views.view import View
+from tk_gui.popups.raw import PickColor
 from tk_gui.window import Window
 
 
@@ -47,7 +38,7 @@ class GuiTest(Command):
     verbose = Counter('-v', default=2, help='Increase logging verbosity (can specify multiple times)')
     color = Option('-c', help='The initial color to display when action=pick_color')
 
-    def __init__(self):
+    def _init_command_(self):
         logging.getLogger('PIL.PngImagePlugin').setLevel(50)
         try:
             from ds_tools.logging import init_logging
@@ -59,57 +50,22 @@ class GuiTest(Command):
             init_logging(self.verbose, log_path=None, names=None)
 
     @action
-    def about(self):
-        AboutPopup().run()
-
-    # region Image Tests
-
-    @action
-    def spinner(self):
-        SpinnerPopup(img_size=(400, 400)).run()
-
-    @action
-    def gif(self):
-        gif_path = ICONS_DIR.joinpath('spinners', 'ring_gray_segments.gif')
-        AnimatedPopup(gif_path).run()
-
-    @action
-    def image(self):
-        png_path = ICONS_DIR.joinpath('exclamation-triangle-yellow.png')
-        ImagePopup(png_path).run()
-
-    @action
-    def clock(self):
-        ClockPopup(toggle_slim_on_click=True).run()
-
-    # endregion
-
-    @action
-    def popup(self):
-        # results = BasicPopup('This is a test', title='Test', buttons=('OK',)).run()
-        results = BasicPopup('This is a test', title='Test', buttons=('Cancel', 'OK'), bind_esc=True).run()
-        # results = BasicPopup('This is a test with more words', title='Test', buttons=('Cancel', 'Test', 'OK')).run()
-        print(results)
-
-    @action
     def scroll(self):
-        frame_layout = [[Text(f'test_{i:03d}')] for i in range(100)]
-        png_path = ICONS_DIR.joinpath('exclamation-triangle-yellow.png')
-
+        frame_content = [[Text(f'test_{i:03d}')] for i in range(100)]
         layout = [
-            [ScrollFrame(frame_layout, size=(100, 100), scroll_y=True)],
-            # [ScrollFrame(frame_layout, scroll_y=True)],
-            [Image(png_path, popup=True, size=(150, 150))],
+            [ScrollFrame(frame_content, size=(100, 100), scroll_y=True)],
+            [Image(ICONS_DIR.joinpath('exclamation-triangle-yellow.png'), popup=True, size=(150, 150))],
             [Multiline('\n'.join(map(chr, range(97, 123))), size=(40, 10))],
         ]
+        Window(layout, 'Scroll Test', size=(300, 500), exit_on_esc=True, scroll_y=True).run()
 
-        Window(
-            layout,
-            'Scroll Test',
-            size=(300, 500),
-            exit_on_esc=True,
-            scroll_y=True,
-        ).run()
+    @action
+    def scroll_nested(self):
+        # TODO: If the mouse is over a ScrollableWidget that has no scroll bar for the scroll axis, but is inside a
+        #  scrollable container, then that parent container should scroll instead of the nested widget suppressing
+        #  the scroll.
+        # TODO: Implement with the fix for the TODO in pseudo_elements.scroll.find_scroll_cb()
+        pass
 
     @action
     def max_size(self):
@@ -130,223 +86,6 @@ class GuiTest(Command):
             layout.append(row[:-1])
 
         Window(layout, 'Icon Test', size=(300, 500), exit_on_esc=True, scroll_y=True).run()
-
-    # region Input Tests
-
-    @action
-    def pick_folder(self):
-        path = PickFolder().run()
-        print(f'Picked: {path.as_posix() if path else path}')
-
-    @action
-    def pick_color(self):
-        color = PickColor(self.color).run()
-        print(f'Picked {color=}')
-
-    @action
-    def radio(self):
-        b = RadioGroup('group 2')
-        with RadioGroup('group 1'):
-            layout = [
-                [Radio('A1', default=True), Radio('B1', group=b)],
-                [Radio('A2'), Radio('B2', 'b two', group=b)],
-                [Radio('A3'), Radio('B3', group=b)],
-            ]
-
-        results = Window(layout, 'Radio Test', exit_on_esc=True).run().results
-        print(f'Results: {results}')
-
-    @action
-    def combo(self):
-        layout = [
-            [Combo(['A', 'B', 'C', 'D'], key='A')],
-            [Combo({'A': 1, 'B': 2, 'C': 3}, key='B', default='C')],
-        ]
-        results = Window(layout, 'Combo Test', exit_on_esc=True).run().results
-        print(f'Results: {results}')
-
-    @action
-    def progress(self):
-        bar = ProgressBar(100)
-        window = Window([[Text('Processing...')], [bar]], 'Progress Test', exit_on_esc=True)
-        for _ in bar(range(99)):
-            window._root.after(50, window.interrupt)
-            window.run()
-
-    @action
-    def slider(self):
-        layout = [
-            [Slider(0, 1, interval=0.05, key='A')],
-            [Slider(0, 20, tick_interval=5, key='B')],
-        ]
-        results = Window(layout, 'Slider Test', exit_on_esc=True).run().results
-        print(f'Results: {results}')
-
-    @action
-    def listbox(self):
-        chars = list(map(chr, range(97, 123)))
-        layout = [
-            [ListBox(chars, key='A', size=(40, 10)), ListBox(chars, ['a', 'b'], key='B', size=(40, 10))]
-        ]
-
-        results = Popup(layout, 'ListBox Test', exit_on_esc=True).run()
-        # results = Window(layout, 'ListBox Test', exit_on_esc=True).run().results
-        print(f'Results: {results}')
-
-    @action
-    def rating(self):
-        a, b = Rating(key='a'), Rating(key='b', show_value=True)
-
-        def toggle_cb(event=None):
-            for rating in (a, b):
-                rating.toggle_enabled()
-
-        layout = [[a], [b], [Button('Toggle', cb=toggle_cb)]]
-        results = Window(layout, 'Rating Test', exit_on_esc=True).run().results
-        print(f'Results: {results}')
-
-    # endregion
-
-    # region Test Popups
-
-    @action
-    def style(self):
-        results = StylePopup(show_buttons=True).run()
-        print(f'{results=}')
-
-    @action
-    def popup_multiline(self):
-        filler = 'the quick brown fox jumped over the lazy dog'
-        popup_ok(f'{filler}\n{filler}')
-
-    @action
-    def popup_warning(self):
-        popup_warning('This is a test warning!')
-
-    @action
-    def popup_error(self):
-        popup_error('This is a test error!')
-
-    @action
-    def popup_yes_no(self):
-        result = popup_yes_no('This is a test!')
-        print(f'{result=}')
-
-    @action
-    def popup_no_yes(self):
-        result = popup_no_yes('This is a test!')
-        print(f'{result=}')
-
-    @action
-    def popup_ok(self):
-        popup_ok('This is a test!')
-
-    @action
-    def popup_text(self):
-        result = TextPromptPopup('Enter a string').run()
-        print(f'{result=}')
-
-    @action
-    def popup_text_cancel(self):
-        result = TextPromptPopup('Enter a string', cancel_text='Cancel', bind_esc=True).run()
-        print(f'{result=}')
-
-    @action
-    def popup_login(self):
-        user, pw = LoginPromptPopup('Enter your login info', cancel_text='Cancel').run()
-        print(f'{user=}, {pw=}')
-
-    @action
-    def popup_img_choice(self):
-        icons = Icons(500)
-        items = {name: icons.draw(name) for name in tuple(icons.char_names)[:10]}
-        # items = {name: ICONS_DIR.joinpath(name) for name in ('exclamation-triangle-yellow.png', 'search.png')}
-        result = ChooseImagePopup.with_auto_prompt(items, img_title_fmt='Example image: {title}').run()
-        print(f'{result=}')
-
-    @action
-    def popup_choice(self):
-        items = [f'Letter: {c}' for c in 'abcdefghijklmnopqrstuvwxyz']
-        result = choose_item(items, item_name='Letter')
-        print(f'{result=}')
-
-    # endregion
-
-    @action
-    def menu_handler_methods(self):
-        class MenuBar(Menu):
-            with MenuGroup('File'):
-                MenuItem('Select File')
-                MenuItem('Settings')
-                CloseWindow()
-            with MenuGroup('Help'):
-                MenuItem('About', AboutPopup)
-
-        class TestView(View, title='Test'):
-            menu = MenuProperty(MenuBar)
-
-            @menu['File']['Select File'].callback
-            def select_file_handler(self, event):
-                path = PickFile(title='Pick a File').run()
-                try:
-                    path_str = path.as_posix()
-                except AttributeError:
-                    path_str = ''
-                self.window['test_input'].update(path_str)  # noqa
-
-            @menu['File']['Settings'].callback
-            def settings(self, event):
-                config = self.window.config
-                options = GuiOptions(submit='Save', title=None)
-                with options.next_row() as options:
-                    options.add_bool('remember_pos', 'Remember Last Window Position', config.remember_position)
-                    options.add_bool('remember_size', 'Remember Last Window Size', config.remember_size)
-                with options.next_row() as options:
-                    options.add_popup(
-                        'style', 'Style', StylePopup, default=config.style, popup_kwargs={'show_buttons': True}
-                    )
-                with options.next_row() as options:
-                    options.add_directory('output_dir', 'Output Directory')
-
-                result = options.run_popup()
-                return result
-
-            def get_pre_window_layout(self):
-                yield [self.menu]
-
-            def get_post_window_layout(self):
-                BE = ButtonAction.BIND_EVENT
-                yield [Input(key='test_input', size=(40, 1))]
-                yield [Button('A', key='A', action=BE), Button('B', key='B', action=BE)]
-
-            @button_handler('A', 'B')
-            def handle_button_clicked(self, event, key):
-                popup_ok(f'You clicked the button with {key=}: {event}')
-
-        TestView().run()
-
-    @action
-    def view_chain(self):
-        class TestView(View, title='Test'):
-            window_kwargs = {'exit_on_esc': True, 'right_click_menu': BaseRightClickMenu()}
-
-            def __init__(self, path: Path = None, **kwargs):
-                super().__init__(**kwargs)
-                self.path = path
-
-            def get_post_window_layout(self):
-                path_str = self.path.as_posix() if self.path else 'N/A'
-                yield [Text(f'Current path: {path_str}', size=(40, 1))]
-                yield [Button('Open...', key='open', action=ButtonAction.BIND_EVENT)]
-
-            @button_handler('open')
-            def pick_next_album(self, event, key=None):
-                init_dir = self.path.parent if self.path else None
-                if path := pick_folder_popup(init_dir, 'Pick A Directory', parent=self.window):
-                    return self.set_next_view(path)
-                return None
-
-        TestView.run_all()
 
     @action(default=True)
     def window(self):
