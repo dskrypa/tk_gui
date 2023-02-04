@@ -273,15 +273,19 @@ class UpdateTextMenuItem(SelectionMenuItem, ABC):
         raise NotImplementedError
 
     def _update_widget(self, widget: Union[Entry, Text], kwargs: dict[str, Any]):
-        if selection := kwargs.get(self.keyword):
+        selection = kwargs.get(self.keyword)
+        text = selection or get_text(widget)
+        if (updated := self.update_text(text)) == text:
+            return
+        elif selection:
             first, last = get_selection_pos(widget, raw=True)
-            if (updated := self.update_text(selection)) != selection:
+            if not (first is last is None):
                 replace_selection(widget, updated, first, last)
-        else:
-            text = get_text(widget)
-            if (updated := self.update_text(text)) != text:
-                widget.delete(0, tkc.END)
-                widget.insert(0, updated)
+                return
+
+        # Either there was no selection, or there was no selection position
+        widget.delete(0, tkc.END)
+        widget.insert(0, updated)
 
     def callback(self, event: Event, **kwargs):
         widget: Union[Entry, Text] = event.widget
