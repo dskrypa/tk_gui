@@ -201,6 +201,7 @@ class RowContainer(ABC):
         setdefault = widget_ele_map.setdefault
         for widget, ele, maybe_has_map in self.__iter_widget_eles():
             setdefault(widget, ele)
+            # TODO: This seems to be mapping widget IDs to the frame that contains a given element in many cases
             try:
                 nested_map = maybe_has_map.widget_id_element_map
             except AttributeError:

@@ -106,22 +106,27 @@ class GuiInputTest(Command):
 
     @action(default=True)
     def state_comparison(self):
-        row = []
-        for n, disabled in enumerate((True, False, True, False)):
-            toggleable = n >= 2
-            if n:
-                row.append(VerticalSeparator())
-            elements = list(_prep_input_eles(disabled, not toggleable))
-            if toggleable:
-                row.append(Frame([[_prep_toggle_button(disabled, elements)], *_labeled(elements)]))
-            else:
-                row.append(InteractiveFrame(_labeled(elements), disabled=disabled))
-
-        results = Window([row], 'Input State Comparison', exit_on_esc=True).run().results
+        window = _state_comparison_window()
+        results = window.run().results
         print(f'Results: {results}')
 
 
 # region State Comparison Helpers
+
+
+def _state_comparison_window():
+    row = []
+    for n, disabled in enumerate((True, False, True, False)):
+        toggleable = n >= 2
+        if n:
+            row.append(VerticalSeparator())
+        elements = list(_prep_input_eles(disabled, not toggleable))
+        if toggleable:
+            row.append(Frame([[_prep_toggle_button(disabled, elements)], *_labeled(elements)]))
+        else:
+            row.append(InteractiveFrame(_labeled(elements), disabled=disabled))
+
+    return Window([row], 'Input State Comparison', exit_on_esc=True)
 
 
 def _prep_input_eles(disabled: bool, include_label: bool = True):

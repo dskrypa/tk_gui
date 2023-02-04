@@ -176,8 +176,8 @@ class Slider(DisableableMixin, CallbackCommandMixin, Interactive, base_style_lay
         config: dict[str, Any] = {
             'highlightthickness': 0,
             **self.style.get_map(
-                'slider', self.style_state,
-                bd='border_width', relief='relief', font='font', background='bg', troughcolor='trough_color', fg='fg',
+                'slider', self.style_state, bd='border_width', font='font', fg='fg', bg='bg',
+                relief='relief', troughcolor='trough_color',
             ),
             **self._style_config,
         }
@@ -213,13 +213,7 @@ class Slider(DisableableMixin, CallbackCommandMixin, Interactive, base_style_lay
             kwargs['state'] = 'disabled'
 
         """
-        bigincrement:
-        digits:
-        label:
-        repeatdelay:
-        repeatinterval:
-        sliderlength:
-        sliderrelief:
+        bigincrement:  digits:  label:  repeatdelay:  repeatinterval:  sliderlength:  sliderrelief:
         """
         self.widget = Scale(row.frame, **kwargs)
         self.pack_widget()

@@ -23,6 +23,7 @@ if TYPE_CHECKING:
 __all__ = ['Style', 'StyleSpec', 'STATE_NAMES', 'StyleLayer', 'Layer', 'StyleState', 'Font']
 # log = logging.getLogger(__name__)
 
+_NotSet = object()
 DEFAULT_FONT = ('Helvetica', 10)
 STATE_NAMES = ('default', 'disabled', 'invalid', 'active', 'highlight')
 
@@ -448,6 +449,7 @@ class StyleLayerProperty(StyleProperty[StyleLayer]):
 Layer = Literal[
     'base', 'insert', 'scroll', 'arrows', 'radio', 'checkbox', 'frame', 'combo', 'progress', 'image', 'tooltip', 'text',
     'button', 'listbox', 'link', 'selected', 'input', 'table', 'table_header', 'table_alt', 'slider', 'menu',
+    'checkbox_label',
 ]
 
 
@@ -468,13 +470,14 @@ class Style(ClearableCachedPropertyMixin):
     arrows = StyleLayerProperty()                   # Arrows on forms, such as combo boxes
     button = StyleLayerProperty('base')
     checkbox = StyleLayerProperty('base')
+    checkbox_label = StyleLayerProperty('base')
     combo = StyleLayerProperty('text')              # Combo box (dropdown) input
     frame = StyleLayerProperty('base')
     image = StyleLayerProperty('base')
     input = StyleLayerProperty('text')
     insert = StyleLayerProperty()
     link = StyleLayerProperty('text')               # Hyperlinks
-    listbox = StyleLayerProperty('text')
+    listbox = StyleLayerProperty('input')
     menu = StyleLayerProperty('base')
     progress = StyleLayerProperty('base')           # Progress bars
     radio = StyleLayerProperty('base')
@@ -626,10 +629,29 @@ class Style(ClearableCachedPropertyMixin):
         # log.debug(f'  > {layer=}')
         return {dst: val for dst, src in dst_src_map.items() if (val := getattr(layer, src)[state]) is not None}
 
-    def make_ttk_style(self, name_suffix: str) -> tuple[str, TtkStyle]:
+    # def get_ttk_map_list(self, layer: Layer, attr: StyleAttr) -> list[tuple[str, str]]:
+    #     layer: StyleLayer = getattr(self, layer)
+    #     state_vals: StateValues = getattr(layer, attr)
+    #     state_val_list = [
+    #         # ('!focus', state_vals[StyleState.DEFAULT]),
+    #         ('disabled', state_vals[StyleState.DISABLED]),
+    #         ('invalid', state_vals[StyleState.INVALID]),
+    #         ('active', state_vals[StyleState.ACTIVE]),
+    #         ('selected', state_vals[StyleState.HIGHLIGHT]),
+    #     ]
+    #     return [sv for sv in state_val_list if sv[1] is not None]
+
+    def make_ttk_style(self, name_suffix: str, theme: str | None = _NotSet) -> tuple[str, TtkStyle]:
+        """
+        :param name_suffix: Suffix for the theme name.  Should match the widget's ttk class name.
+        :param theme: The theme that this style should use.  Defaults to this Style's default ttk_theme.  Use ``None``
+          to skip the ``theme_use(...)`` call.
+        :return: The name to use, and a :class:`ttk.Style` object.
+        """
         name = f'{next(self._ttk_count)}__{name_suffix}'
         ttk_style = TtkStyle()
-        ttk_style.theme_use(self.ttk_theme)
+        if theme is not None:
+            ttk_style.theme_use(self.ttk_theme if theme is _NotSet else theme)
         return name, ttk_style
 
     # region Font Methods

@@ -27,6 +27,7 @@ from .mixins import DisableableMixin, CallbackCommandMixin, TraceCallbackMixin
 
 if TYPE_CHECKING:
     from tkinter import Scrollbar, Listbox as TkListbox, Frame as TkFrame
+    from tkinter.ttk import Style as TtkStyle
     from tk_gui.pseudo_elements import Row
 
 __all__ = ['Radio', 'RadioGroup', 'CheckBox', 'Combo', 'ListBox', 'make_checkbox_grid']
@@ -308,16 +309,61 @@ class CheckBox(DisableableMixin, CallbackCommandMixin, TraceCallbackMixin, Inter
     def underline(self) -> Optional[int]:
         return normalize_underline(self._underline, self.label)
 
+    # @cached_property
+    # def _ttk_style(self) -> tuple[str, TtkStyle]:
+    #     name, ttk_style = self.style.make_ttk_style('.TCheckbutton', theme=None)
+    #     indicator = ('Checkbutton.indicator', {'side': 'left', 'sticky': ''})
+    #     label = ('Checkbutton.label', {'sticky': 'nswe'})
+    #     focus = ('Checkbutton.focus', {'side': 'left', 'sticky': 'w', 'children': [label]})
+    #     padding = ('Checkbutton.padding', {'sticky': 'nswe', 'children': [indicator, focus]})
+    #     ttk_style.layout(name, [padding])
+    #     return name, ttk_style
+    #
+    # def _prepare_ttk_style(self) -> str:
+    #     style, state = self.style, self.style_state
+    #     ttk_style_name, ttk_style = self._ttk_style
+    #     style_kwargs = {
+    #         # 'indicatorcolor': '', 'indicatorbackground': '',
+    #         **style.get_map('checkbox_label', state, font='font', foreground='fg', background='bg'),
+    #         **style.get_map('checkbox', state, indicatorcolor='fg', indicatorbackground='bg'),
+    #     }
+    #     ttk_style.configure(ttk_style_name, **style_kwargs)
+    #     ttk_style.map(
+    #         ttk_style_name,
+    #         foreground=style.get_ttk_map_list('checkbox_label', 'fg'),
+    #         background=style.get_ttk_map_list('checkbox_label', 'bg'),
+    #         # indicatorcolor=[(None, ''), ('active', ''), ('alternate', ''), ('disabled', ''), ('pressed', ''), ('selected', ''), ('readonly', '')],
+    #         # indicatorbackground=[(None, ''), ('active', ''), ('alternate', ''), ('disabled', ''), ('pressed', ''), ('selected', ''), ('readonly', '')],
+    #     )
+    #     return ttk_style_name
+    #
+    # def apply_style(self):
+    #     super().apply_style()
+    #     self._prepare_ttk_style()
+
     @property
     def style_config(self) -> dict[str, Any]:
-        style = self.style
+        """
+        Notes for :class:`tkinter.Checkbutton` style:
+            - selectcolor: The actual check box background; matches background when disabled
+            - fg / foreground: Label text
+            - bg / background: Outer frame background
+            - disabledforeground: fg color when disabled
+            - activeforeground: fg color while mouse button is down
+            - activebackground: bg color while mouse button is down
+            - highlightcolor / highlightbackground: Unknown
+            - offrelief: default = raised
+            - overrelief: default = n/a
+            - relief: default = flat
+        """
+        style, state = self.style, self.style_state
         return {
             'highlightthickness': 1,
             **style.get_map(
-                'checkbox', self.style_state, bd='border_width', font='font', highlightcolor='fg', fg='fg',
-                highlightbackground='bg', background='bg', activebackground='bg',
+                'checkbox_label', state, bd='border_width', font='font', fg='fg', bg='bg',
+                activeforeground='fg', activebackground='bg', disabledforeground='fg',
             ),
-            **style.get_map('selected', self.style_state, selectcolor='fg'),
+            **style.get_map('checkbox', state, selectcolor='bg'),
             **self._style_config,
         }
 
@@ -330,6 +376,7 @@ class CheckBox(DisableableMixin, CallbackCommandMixin, TraceCallbackMixin, Inter
             'variable': tk_var,
             'takefocus': int(self.allow_focus),
             'underline': self.underline,
+            # 'style': self._prepare_ttk_style(),
             # 'tristatevalue': 2,  # A different / user-specified value could be used
             # 'tristateimage': '-',  # needs to be an image; may need `image` (+ selectimage) as well to be used
             **self.style_config,
@@ -347,6 +394,8 @@ class CheckBox(DisableableMixin, CallbackCommandMixin, TraceCallbackMixin, Inter
         self._maybe_add_var_trace()
         self.widget = Checkbutton(row.frame, **kwargs)
         self.pack_widget()
+        # from tk_gui.utils import dump_ttk_widget_info
+        # dump_ttk_widget_info(self.widget)
 
 
 def make_checkbox_grid(rows: list[Sequence[CheckBox]]):
@@ -406,57 +455,41 @@ class Combo(
 
     # region Style Methods
 
-    # def __prepare_ttk_style(self) -> str:
-    #     style, state = self.style, self.style_state
-    #     ttk_style_name, ttk_style = style.make_ttk_style('.TCombobox')
-    #     style_kwargs = {
-    #         # **style.get_map('combo', state, foreground='fg', insertcolor='fg', fieldbackground='bg'),
-    #         # **style.get_map('arrows', state, arrowcolor='fg', background='bg'),
-    #
-    #         # **style.get_map(
-    #         #     'combo', state,
-    #         #     # foreground='fg',
-    #         #     # darkcolor='fg',
-    #         #     # insertcolor='fg',
-    #         #     fieldbackground='bg',
-    #         #     lightcolor='bg',
-    #         #     # background='bg',
-    #         #     arrowsize='arrow_width',
-    #         #     arrowcolor='arrow_color',
-    #         # ),
-    #         # **style.get_map('arrows', state, arrowcolor='fg', background='bg'),
-    #
-    #         'foreground': style.get_ttk_map_list('combo', 'fg'),
-    #         'fieldbackground': style.get_ttk_map_list('combo', 'bg'),
-    #
-    #         'arrowsize': style.get_ttk_map_list('combo', 'arrow_width'),
-    #         'arrowcolor': style.get_ttk_map_list('combo', 'arrow_color'),
-    #
-    #         **style.get_map('selected', state, selectforeground='fg', selectbackground='bg'),
-    #     }
-    #     ttk_style.configure(ttk_style_name, **style_kwargs)
-    #
-    #     # btn_style = style.get_map('button', state, fg='fg', bg='bg')
-    #     # ttk_style.map(ttk_style_name, arrowcolor=[('foreground', btn_style['fg']), ('background', btn_style['bg'])])
-    #
-    #     if ro_bg := style.combo.bg[state]:
-    #         ttk_style.map(ttk_style_name, fieldbackground=[('readonly', ro_bg)])
-    #
-    #     return ttk_style_name
+    @cached_property
+    def _ttk_style(self) -> tuple[str, TtkStyle]:
+        return self.style.make_ttk_style('.TCombobox')
 
     def _prepare_ttk_style(self) -> str:
         style, state = self.style, self.style_state
-        ttk_style_name, ttk_style = style.make_ttk_style('.TCombobox')
+        ttk_style_name, ttk_style = self._ttk_style
         style_kwargs = {
             **style.get_map('combo', state, foreground='fg', insertcolor='fg', fieldbackground='bg'),
             **style.get_map('arrows', state, arrowcolor='fg', background='bg'),
-            **style.get_map('selected', state, selectforeground='fg', selectbackground='bg'),
+            # **style.get_map('selected', state, selectforeground='fg', selectbackground='bg'),
         }
         ttk_style.configure(ttk_style_name, **style_kwargs)
         if ro_bg := style.combo.bg[state]:
             ttk_style.map(ttk_style_name, fieldbackground=[('readonly', ro_bg)])
 
         return ttk_style_name
+
+    def _apply_ttk_style(self):
+        # This sets colors for drop-down formatting
+        style, state = self.style, self.style_state
+        fg, bg = style.combo.fg[state], style.combo.bg[state]
+        # sel_fg, sel_bg = style.selected.fg[state], style.selected.bg[state]
+        if fg and bg:
+            widget = self.widget
+            widget.tk.eval(
+                f'[ttk::combobox::PopdownWindow {widget}].f.l configure'
+                f' -foreground {fg} -background {bg} -selectforeground {bg} -selectbackground {fg}'
+                # f' -foreground {fg} -background {bg} -selectforeground {sel_fg} -selectbackground {sel_bg}'
+            )
+
+    def apply_style(self):
+        super().apply_style()
+        self._prepare_ttk_style()
+        self._apply_ttk_style()
 
     @property
     def style_config(self) -> dict[str, Any]:
@@ -480,7 +513,6 @@ class Combo(
 
     def pack_into(self, row: Row):
         self.tk_var = tk_var = StringVar()
-        style, state = self.style, self.style_state
         kwargs = {
             'textvariable': tk_var,
             'style': self._prepare_ttk_style(),
@@ -500,13 +532,7 @@ class Combo(
 
         self._maybe_add_var_trace()
         self.widget = combo_box = Combobox(row.frame, **kwargs)
-        fg, bg = style.combo.fg[state], style.combo.bg[state]
-        if fg and bg:  # This sets colors for drop-down formatting
-            combo_box.tk.eval(
-                f'[ttk::combobox::PopdownWindow {combo_box}].f.l configure'
-                f' -foreground {fg} -background {bg} -selectforeground {bg} -selectbackground {fg}'
-            )
-
+        self._apply_ttk_style()
         self.pack_widget()
         if default := self.default:
             combo_box.set(default)
@@ -518,6 +544,7 @@ class Combo(
             return
         self.widget['state'] = 'readonly' if self.read_only else self._enabled_state
         self.disabled = False
+        self.apply_style()
 
 
 class ListBox(DisableableMixin, Interactive, base_style_layer='listbox'):
@@ -619,11 +646,16 @@ class ListBox(DisableableMixin, Interactive, base_style_layer='listbox'):
     @property
     def style_config(self) -> dict[str, Any]:
         style, state = self.style, self.style_state
+        fg, bg = style.listbox.fg[state], style.listbox.bg[state]
         return {
             'highlightthickness': 0,
-            **style.get_map('listbox', state, font='font', background='bg', fg='fg'),
+            'background': bg,
+            'fg': fg,
+            'selectbackground': fg,  # Intentionally using the inverse of fg/bg
+            'selectforeground': bg,
+            **style.get_map('listbox', state, font='font'),
             **style.get_map('listbox', 'disabled', disabledforeground='fg'),
-            **style.get_map('selected', state, font='font', selectbackground='bg', selectforeground='fg'),
+            # **style.get_map('selected', state, font='font', selectbackground='bg', selectforeground='fg'),
             **self._style_config,
         }
 

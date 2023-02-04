@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Optional, Type, Any, Callable, Collection, Ite
 from .constants import STYLE_CONFIG_KEYS
 
 if TYPE_CHECKING:
+    from tkinter import BaseWidget
     from .typing import HasParent
 
 __all__ = [
@@ -240,3 +241,58 @@ def get_user_temp_dir(*sub_dirs, mode: int = 0o777) -> Path:
     if not path.exists():
         path.mkdir(mode=mode, parents=True, exist_ok=True)
     return path
+
+
+def _iter_ele_names(layout):
+    for name, data in layout:
+        yield name
+        for key, value in data.items():
+            if not isinstance(value, str):
+                yield from _iter_ele_names(value)
+
+
+def dump_ttk_widget_info(widget: BaseWidget):
+    """
+    Print info about the given ttk widget and its style.
+
+    Based on documentation:
+    https://www.tcl.tk/man/tcl/TkCmd/ttk_widget.html
+    https://www.tcl.tk/man/tcl/TkCmd/ttk_style.html
+    https://stackoverflow.com/q/45389166/19070573
+    """
+    from tkinter.ttk import Style
+
+    config = widget.configure()
+    try:
+        style_name = config['style'][-1] or widget.winfo_class()
+    except Exception:  # noqa
+        style_name = widget.winfo_class()
+
+    print(f'Ttk info for {widget=}:')
+    print('  - Config:')
+    for key, val in sorted(config.items()):
+        print(f'     - {key}: {val!r}')
+
+    style = Style()
+    layout = style.layout(style_name)
+    print(f'  - Style {style_name!r} options:')
+    print(f'     - Config: {style.configure(style_name)}')
+    print(f'     - Base Layout: {layout}')
+    _print_style_details(style, style_name, layout)
+
+
+def _print_style_details(style, style_name, layout):
+    for element_name, data in layout:
+        print(f'     - {element_name}:')
+        print(f'        - Layout: {data}')
+        print(f'        - Options:')
+        for option in style.element_options(element_name):
+            values = {
+                state or 'default': style.lookup(style_name, option, [state] if state else None)
+                for state in (None, 'active', 'alternate', 'disabled', 'pressed', 'selected', 'readonly')
+            }
+            print(f'           - {option}: {values}')
+
+        for key, value in data.items():
+            if not isinstance(value, str):
+                _print_style_details(style, style_name, value)
