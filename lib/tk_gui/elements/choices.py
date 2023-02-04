@@ -30,7 +30,7 @@ if TYPE_CHECKING:
     from tkinter.ttk import Style as TtkStyle
     from tk_gui.pseudo_elements import Row
 
-__all__ = ['Radio', 'RadioGroup', 'CheckBox', 'Combo', 'ListBox', 'make_checkbox_grid']
+__all__ = ['Radio', 'RadioGroup', 'CheckBox', 'Combo', 'Dropdown', 'ListBox', 'make_checkbox_grid']
 log = logging.getLogger(__name__)
 
 _NotSet = object()
@@ -451,7 +451,7 @@ class Combo(
         try:
             return self.choices[choice]  # noqa
         except TypeError:
-            return choice
+            return choice if choice else None
 
     # region Style Methods
 
@@ -545,6 +545,9 @@ class Combo(
         self.widget['state'] = 'readonly' if self.read_only else self._enabled_state
         self.disabled = False
         self.apply_style()
+
+
+Dropdown = Combo
 
 
 class ListBox(DisableableMixin, Interactive, base_style_layer='listbox'):
