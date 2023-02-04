@@ -49,6 +49,7 @@ class Button(CustomEventResultsMixin, DisableableMixin, Interactive, base_style_
     separate: bool = False
     bind_enter: bool = False
     callback: BindCallback = None
+    _action: ButtonAction | None = None
 
     def __init__(
         self,
@@ -84,16 +85,10 @@ class Button(CustomEventResultsMixin, DisableableMixin, Interactive, base_style_
         super().__init__(binds=binds, justify_text=justify_text, focus=focus, **kwargs)
         self.text = text
         self.image = image
-        if provided_cb := cb is not None:
+        if cb is not None:
             self.callback = cb
-        if action is None:
-            self.action = ButtonAction.CALLBACK if provided_cb else ButtonAction.SUBMIT
-        else:
-            self.action = action = ButtonAction(action)
-            if provided_cb and action != ButtonAction.CALLBACK:
-                raise ValueError(
-                    f'Invalid {action=} - when a callback is provided, the only valid action is {ButtonAction.CALLBACK}'
-                )
+        if action is not None:
+            self.action = action
         self._last_press = 0
         self._last_release = 0
         self._last_activated = 0
@@ -121,6 +116,34 @@ class Button(CustomEventResultsMixin, DisableableMixin, Interactive, base_style_
     @property
     def value(self) -> bool:
         return bool(self._last_activated)
+
+    @property
+    def action(self) -> ButtonAction:
+        if (action := self._action) is not None:
+            return action
+        elif self.callback is not None:
+            return ButtonAction.CALLBACK
+        else:
+            return ButtonAction.SUBMIT
+
+    @action.setter
+    def action(self, action: ButtonAction | str | None):
+        if action is None:
+            if self._action is not None:  # Avoid creating an instance attr if it wasn't already stored
+                self._action = None
+            return
+
+        action = ButtonAction(action)
+        if self.callback is not None and action != ButtonAction.CALLBACK:
+            raise ValueError(
+                f'Invalid {action=} - when a callback is provided, the only valid action is {ButtonAction.CALLBACK}'
+            )
+        else:
+            self._action = action
+
+    def update(self, text: str):
+        self.widget.configure(text=text)
+        self.text = text
 
     # region Packing
 
