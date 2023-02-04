@@ -15,6 +15,8 @@ __all__ = ['DisableableMixin', 'CallbackCommandMixin', 'TraceCallbackMixin']
 
 
 class DisableableMixin:
+    configure_widget: Callable
+    apply_style: Callable
     widget: Optional[Widget]
     disabled: bool
     _disabled_state: str = 'disabled'
@@ -30,14 +32,16 @@ class DisableableMixin:
     def enable(self):
         if not self.disabled:
             return
-        self.widget['state'] = self._enabled_state
+        self.configure_widget(state=self._enabled_state)
         self.disabled = False
+        self.apply_style()
 
     def disable(self):
         if self.disabled:
             return
-        self.widget['state'] = self._disabled_state
+        self.configure_widget(state=self._disabled_state)
         self.disabled = True
+        self.apply_style()
 
 
 class CallbackCommandMixin:

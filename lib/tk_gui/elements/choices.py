@@ -10,7 +10,7 @@ import logging
 import tkinter.constants as tkc
 from contextvars import ContextVar
 from itertools import count
-from tkinter import Radiobutton, Checkbutton, BooleanVar, IntVar, StringVar, Event, TclError, BaseWidget
+from tkinter import Radiobutton, Checkbutton, BooleanVar, IntVar, StringVar, Event, TclError
 from tkinter.ttk import Combobox
 from typing import TYPE_CHECKING, Optional, Union, Any, MutableMapping, Generic, Collection, TypeVar, Sequence, Iterable
 from weakref import WeakValueDictionary
@@ -26,6 +26,7 @@ from .exceptions import NoActiveGroup, BadGroupCombo
 from .mixins import DisableableMixin, CallbackCommandMixin, TraceCallbackMixin
 
 if TYPE_CHECKING:
+    from tkinter import Scrollbar, Listbox as TkListbox, Frame as TkFrame
     from tk_gui.pseudo_elements import Row
 
 __all__ = ['Radio', 'RadioGroup', 'CheckBox', 'Combo', 'ListBox', 'make_checkbox_grid']
@@ -405,6 +406,44 @@ class Combo(
 
     # region Style Methods
 
+    # def __prepare_ttk_style(self) -> str:
+    #     style, state = self.style, self.style_state
+    #     ttk_style_name, ttk_style = style.make_ttk_style('.TCombobox')
+    #     style_kwargs = {
+    #         # **style.get_map('combo', state, foreground='fg', insertcolor='fg', fieldbackground='bg'),
+    #         # **style.get_map('arrows', state, arrowcolor='fg', background='bg'),
+    #
+    #         # **style.get_map(
+    #         #     'combo', state,
+    #         #     # foreground='fg',
+    #         #     # darkcolor='fg',
+    #         #     # insertcolor='fg',
+    #         #     fieldbackground='bg',
+    #         #     lightcolor='bg',
+    #         #     # background='bg',
+    #         #     arrowsize='arrow_width',
+    #         #     arrowcolor='arrow_color',
+    #         # ),
+    #         # **style.get_map('arrows', state, arrowcolor='fg', background='bg'),
+    #
+    #         'foreground': style.get_ttk_map_list('combo', 'fg'),
+    #         'fieldbackground': style.get_ttk_map_list('combo', 'bg'),
+    #
+    #         'arrowsize': style.get_ttk_map_list('combo', 'arrow_width'),
+    #         'arrowcolor': style.get_ttk_map_list('combo', 'arrow_color'),
+    #
+    #         **style.get_map('selected', state, selectforeground='fg', selectbackground='bg'),
+    #     }
+    #     ttk_style.configure(ttk_style_name, **style_kwargs)
+    #
+    #     # btn_style = style.get_map('button', state, fg='fg', bg='bg')
+    #     # ttk_style.map(ttk_style_name, arrowcolor=[('foreground', btn_style['fg']), ('background', btn_style['bg'])])
+    #
+    #     if ro_bg := style.combo.bg[state]:
+    #         ttk_style.map(ttk_style_name, fieldbackground=[('readonly', ro_bg)])
+    #
+    #     return ttk_style_name
+
     def _prepare_ttk_style(self) -> str:
         style, state = self.style, self.style_state
         ttk_style_name, ttk_style = style.make_ttk_style('.TCombobox')
@@ -416,6 +455,7 @@ class Combo(
         ttk_style.configure(ttk_style_name, **style_kwargs)
         if ro_bg := style.combo.bg[state]:
             ttk_style.map(ttk_style_name, fieldbackground=[('readonly', ro_bg)])
+
         return ttk_style_name
 
     @property
@@ -566,16 +606,6 @@ class ListBox(DisableableMixin, Interactive, base_style_layer='listbox'):
     # endregion
 
     @property
-    def style_config(self) -> dict[str, Any]:
-        style, state = self.style, self.style_state
-        return {
-            'highlightthickness': 0,
-            **style.get_map('listbox', state, font='font', background='bg', fg='fg', ),
-            **style.get_map('selected', state, font='font', selectbackground='bg', selectforeground='fg', ),
-            **self._style_config,
-        }
-
-    @property
     def callback(self) -> BindTarget | None:
         return self._callback
 
@@ -585,6 +615,17 @@ class ListBox(DisableableMixin, Interactive, base_style_layer='listbox'):
             self._callback = self.normalize_callback(callback)
         else:
             self._callback = callback
+
+    @property
+    def style_config(self) -> dict[str, Any]:
+        style, state = self.style, self.style_state
+        return {
+            'highlightthickness': 0,
+            **style.get_map('listbox', state, font='font', background='bg', fg='fg'),
+            **style.get_map('listbox', 'disabled', disabledforeground='fg'),
+            **style.get_map('selected', state, font='font', selectbackground='bg', selectforeground='fg'),
+            **self._style_config,
+        }
 
     def pack_into(self, row: Row):
         kwargs = {
@@ -597,8 +638,6 @@ class ListBox(DisableableMixin, Interactive, base_style_layer='listbox'):
             kwargs['width'], kwargs['height'] = self.size
         except TypeError:
             kwargs['width'] = max_line_len(self.choices) + 1
-        if self.disabled:
-            kwargs['state'] = self._disabled_state
 
         """
         activestyle: Literal["dotbox", "none", "underline"]
@@ -611,22 +650,14 @@ class ListBox(DisableableMixin, Interactive, base_style_layer='listbox'):
             self.reset(default=True)
 
         self.pack_widget()
+        if self.disabled:
+            # Note: This needs to occur after inserting any values, otherwise they do not appear.
+            list_box.configure(state='disabled')
+
         list_box.bind('<<ListboxSelect>>', self._handle_selection_made)
         if (callback := self._callback) is not None:
             self._callback = self.normalize_callback(callback)
 
     @cached_property
-    def widgets(self) -> list[BaseWidget]:
-        return self.widget.widgets
-
-    def enable(self):
-        if not self.disabled:
-            return
-        self.widget.inner_widget['state'] = self._enabled_state
-        self.disabled = False
-
-    def disable(self):
-        if self.disabled:
-            return
-        self.widget.inner_widget['state'] = self._disabled_state
-        self.disabled = True
+    def widgets(self) -> list[ScrollableListbox | TkListbox | TkFrame | Scrollbar]:
+        return self.widget.widgets  # noqa

@@ -8,9 +8,9 @@ from __future__ import annotations
 
 import logging
 import tkinter.constants as tkc
-from abc import ABC, abstractmethod
+from abc import ABC
 from functools import partial
-from tkinter import StringVar, Event, Entry, BaseWidget, Label as TkLabel
+from tkinter import StringVar, Event, Entry, Label as TkLabel, Text as TkText, Frame as TkFrame
 from typing import TYPE_CHECKING, Optional, Union, Any, Callable
 
 from tk_gui.caching import cached_property
@@ -25,6 +25,7 @@ from ..mixins import DisableableMixin, TraceCallbackMixin
 from .links import LinkTarget, _Link
 
 if TYPE_CHECKING:
+    from tkinter.ttk import Scrollbar
     from tk_gui.pseudo_elements import Row
     from tk_gui.typing import Bool, XY, BindTarget, TraceCallback
 
@@ -372,11 +373,7 @@ class InteractiveText(DisableableMixin, Interactive, ABC):
     def _update_state(self, disabled: bool):
         self.widget['state'] = self._disabled_state if disabled else self._enabled_state
         self.disabled = disabled
-        self._refresh_colors()
-
-    @abstractmethod
-    def _refresh_colors(self):
-        raise NotImplementedError
+        self.apply_style()
 
 
 class Input(TextValueMixin, LinkableMixin, InteractiveText, disabled_state='readonly', move_cursor=True):
@@ -454,13 +451,7 @@ class Input(TextValueMixin, LinkableMixin, InteractiveText, disabled_state='read
     def validated(self, valid: bool):
         if self.valid != valid:
             self.valid = valid
-            self._refresh_colors()
-
-    def _refresh_colors(self):
-        bg_key = 'readonlybackground' if self.disabled else 'bg'
-        kwargs = self.style.get_map('input', self.style_state, fg='fg', **{bg_key: 'bg'})
-        log.log(9, f'Refreshing colors for {self} with {self.style_state=}: {kwargs}')
-        self.widget.configure(**kwargs)
+            self.apply_style()
 
     # endregion
 
@@ -495,6 +486,8 @@ class Multiline(InteractiveText, disabled_state='disabled'):
         self._read_only_style = read_only_style
         self._bind_manager = BindManager()
 
+    # region State
+
     @property
     def read_only(self) -> Bool:
         return self._read_only
@@ -528,7 +521,12 @@ class Multiline(InteractiveText, disabled_state='disabled'):
         if old_state != new_state:
             self.widget.inner_widget.configure(state=new_state)  # noqa
         self.disabled = disabled
-        self._refresh_colors()
+        with self:
+            self.apply_style()
+
+    # endregion
+
+    # region Style
 
     @property
     def base_style_layer_and_state(self) -> tuple[StyleLayer, StyleState]:
@@ -559,6 +557,8 @@ class Multiline(InteractiveText, disabled_state='disabled'):
             config.setdefault('relief', 'sunken')
 
         return config
+
+    # endregion
 
     def pack_into(self, row: Row):
         kwargs = self.style_config
@@ -641,21 +641,15 @@ class Multiline(InteractiveText, disabled_state='disabled'):
                 widget.see(tkc.END)
 
     @property
-    def _bind_widget(self) -> BaseWidget | None:
+    def _bind_widget(self) -> TkText | None:
         try:
             return self.widget.inner_widget
         except AttributeError:  # self.widget is still None / hasn't been packed yet
             return None
 
     @cached_property
-    def widgets(self) -> list[BaseWidget]:
-        return self.widget.widgets
-
-    def _refresh_colors(self):
-        with self:
-            kwargs = self.style.get_map('text', self.style_state, fg='fg', bg='bg')
-            log.log(9, f'Refreshing colors for {self} with {self.style_state=}: {kwargs}')
-            self.widget.configure(**kwargs)
+    def widgets(self) -> list[ScrollableText | TkText | TkFrame | Scrollbar]:
+        return self.widget.widgets  # noqa
 
 
 def _clear_selection(widget: Union[Entry, Text], event: Event = None):
