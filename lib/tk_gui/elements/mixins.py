@@ -4,12 +4,12 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional, Callable, ParamSpec, TypeVar
+from typing import TYPE_CHECKING, Callable, ParamSpec, TypeVar
 
 if TYPE_CHECKING:
-    from tkinter import Widget, Button, Checkbutton, Menu, Radiobutton, Scale, Scrollbar, Text, OptionMenu, Spinbox
+    from tkinter import Button, Checkbutton, Menu, Radiobutton, Scale, Scrollbar, Text, OptionMenu, Spinbox
     from tkinter import Variable
-    from tk_gui.elements import Element
+    from tk_gui.elements.element import Element, Interactive
     from tk_gui.typing import BindTarget, BindCallback, TraceCallback
     from tk_gui.window import Window
 
@@ -20,9 +20,6 @@ T = TypeVar('T')
 
 
 class DisableableMixin:
-    configure_widget: Callable
-    apply_style: Callable
-    widget: Optional[Widget]
     disabled: bool
     _disabled_state: str = 'disabled'
     _enabled_state: str = 'normal'
@@ -34,19 +31,27 @@ class DisableableMixin:
         if enabled_state:
             cls._enabled_state = enabled_state
 
-    def enable(self):
+    def enable(self: DisableableMixin | Interactive):
         if not self.disabled:
             return
-        self.configure_widget(state=self._enabled_state)
-        self.disabled = False
-        self.apply_style()
+        try:
+            self.configure_widget(state=self._enabled_state)
+        except AttributeError:  # Assume the widget has not been initialized yet
+            self.disabled = False
+        else:
+            self.disabled = False
+            self.apply_style()
 
-    def disable(self):
+    def disable(self: DisableableMixin | Interactive):
         if self.disabled:
             return
-        self.configure_widget(state=self._disabled_state)
-        self.disabled = True
-        self.apply_style()
+        try:
+            self.configure_widget(state=self._disabled_state)
+        except AttributeError:  # Assume the widget has not been initialized yet
+            self.disabled = True
+        else:
+            self.disabled = True
+            self.apply_style()
 
 
 class CallbackCommandMixin:

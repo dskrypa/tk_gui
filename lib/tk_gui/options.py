@@ -21,7 +21,7 @@ from .popups import PickFolder
 
 if TYPE_CHECKING:
     from tkinter import Event
-    from .typing import Key, TraceCallback, Layout
+    from .typing import Key, TraceCallback, Layout, E
 
 __all__ = [
     'GuiOptions',
@@ -422,10 +422,10 @@ class GuiOptions:
         for name, opt in self.options.items():
             yield from opt.prepare_layout(disable_all, change_cb)
 
-    def _pack(self, layout: list[list[Element]], columns: list[Layout]) -> Layout:
+    def _pack(self, layout: list[list[E]], columns: list[Layout]) -> list[list[E]]:
         if self.align_text or self.align_checkboxes:
             if columns:
-                row_sets = [layout + columns[0], columns[1:]] if len(columns) > 1 else [layout + columns[0]]
+                row_sets = [layout + columns[0], columns[1:]] if len(columns) > 1 else [layout + columns[0]] # noqa
             else:
                 row_sets = [layout]
 
