@@ -7,16 +7,18 @@ Misc GUI elements
 from __future__ import annotations
 
 import tkinter.constants as tkc
+from tkinter import Frame
 from tkinter.ttk import Sizegrip
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, Union, Any
 
 from .element import ElementBase
 
 if TYPE_CHECKING:
     from ..enums import Side
     from ..pseudo_elements import Row
+    from ..typing import XY
 
-__all__ = ['SizeGrip']
+__all__ = ['SizeGrip', 'Spacer']
 
 
 class SizeGrip(ElementBase):
@@ -32,3 +34,20 @@ class SizeGrip(ElementBase):
         ttk_style.configure(name, background=style.base.bg.default)
         self.widget = Sizegrip(row.frame, style=name, takefocus=int(self.allow_focus))
         self.pack_widget(fill=tkc.X, expand=True, anchor=tkc.SE)
+
+
+class Spacer(ElementBase):
+    widget: Frame
+
+    def __init__(self, size: XY, pad: XY = (0, 0), **kwargs):
+        super().__init__(pad=pad, **kwargs)
+        self.size = size
+
+    @property
+    def style_config(self) -> dict[str, Any]:
+        return {'bg': self.style.base.bg.default, **self._style_config}
+
+    def pack_into(self, row: Row):
+        width, height = self.size
+        self.widget = Frame(row.frame, width=width, height=height, **self.style_config)
+        self.pack_widget()

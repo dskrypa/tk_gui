@@ -9,6 +9,6 @@ from .buttons import Button, ButtonAction, OK, Cancel, Yes, No, Submit, EventBut
 from .choices import Radio, RadioGroup, Combo, Dropdown, CheckBox, ListBox
 from .images import Image, Animation, SpinnerImage, ClockImage
 from .menu import Menu, MenuGroup, MenuItem, MenuProperty
-from .misc import SizeGrip
+from .misc import SizeGrip, Spacer
 from .table import TableColumn, Table
 from .text import Text, Link, Input, Multiline, Label
