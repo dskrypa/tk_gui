@@ -10,16 +10,16 @@ import logging
 import tkinter.constants as tkc
 from abc import ABC, abstractmethod
 from tkinter import Frame, LabelFrame, BaseWidget
-from typing import TYPE_CHECKING, Optional, Union, Iterable, Sequence
+from typing import TYPE_CHECKING, Optional, Union, Iterable, Sequence, Generic
 
 from tk_gui.caching import cached_property
 from tk_gui.enums import Anchor, Justify, Side
 from tk_gui.styles import Style, StyleSpec
 from tk_gui.utils import Inheritable
+from tk_gui.typing import Bool, XY, TkFill, E
 
 if TYPE_CHECKING:
     from tk_gui.elements.element import Element, ElementBase  # noqa
-    from tk_gui.typing import Bool, XY, TkFill
     from tk_gui.window import Window
     from .row_container import RowContainer
 
@@ -30,11 +30,9 @@ _NotSet = object()
 _CENTER_ANCHORS = {tkc.CENTER, None}
 _HORIZONTAL_CENTER_ANCHORS = {tkc.CENTER, tkc.N, tkc.S, None}
 _VERTICAL_CENTER_ANCHORS = {tkc.CENTER, tkc.W, tkc.E, None}
-AnyEle = Union['ElementBase', 'Element']
-Elements = Iterable[AnyEle]
 
 
-class RowBase(ABC):
+class RowBase(Generic[E], ABC):
     parent: Optional[Union[RowBase, RowContainer]]
     anchor_elements: Anchor = Inheritable(type=Anchor, attr_name='parent_rc')
     text_justification: Justify = Inheritable(type=Justify, attr_name='parent_rc')
@@ -58,7 +56,7 @@ class RowBase(ABC):
 
     @property
     @abstractmethod
-    def elements(self) -> Sequence[AnyEle]:
+    def elements(self) -> Sequence[E]:
         """
         Intended to be overridden by subclasses to provide a standardized way of defining custom element members for
         compound elements.
@@ -74,10 +72,10 @@ class RowBase(ABC):
 
     @cached_property
     def widgets(self) -> list[BaseWidget]:
-        return [self.frame, *(w for element in self.elements for w in element.widgets)]
+        return [self.frame, *(w for element in self.elements for w in element.widgets)]  # noqa
 
     @cached_property
-    def widget_id_element_map(self) -> dict[str, Union[RowBase, AnyEle]]:
+    def widget_id_element_map(self) -> dict[str, Union[RowBase, E]]:
         """Used to populate this row's parent's :attr:`RowContainer.widget_id_element_map`."""
         widget_ele_map = {self.frame._w: self}  # noqa
         setdefault = widget_ele_map.setdefault
@@ -85,7 +83,7 @@ class RowBase(ABC):
             try:
                 nested_map = ele.widget_id_element_map  # noqa
             except AttributeError:
-                for widget in ele.widgets:
+                for widget in ele.widgets:  # noqa
                     setdefault(widget._w, ele)  # noqa
             else:
                 widget_ele_map.update(nested_map)
@@ -94,7 +92,7 @@ class RowBase(ABC):
         return widget_ele_map
 
     @cached_property
-    def id_ele_map(self) -> dict[str, AnyEle]:
+    def id_ele_map(self) -> dict[str, E]:
         return {ele.id: ele for ele in self.elements}
 
     @property
@@ -116,15 +114,15 @@ class RowBase(ABC):
                 ele.pack_into_row(self)
 
 
-class Row(RowBase):
+class Row(RowBase[E]):
     _anchor: Optional[Anchor] = None
     ignore_grab: bool = False
     frame: Optional[Frame] = None       # This satisfies the abstract property req while letting it be assigned in pack
     expand: Optional[bool] = None       # Set to True only for Column elements
     fill: Optional[bool] = None         # Changes for Column, Separator, StatusBar
-    elements: tuple[AnyEle, ...] = ()   # This satisfies the abstract property req while letting it be assigned in init
+    elements: tuple[E, ...] = ()        # This satisfies the abstract property req while letting it be assigned in init
 
-    def __init__(self, parent: RowContainer, elements: Elements):
+    def __init__(self, parent: RowContainer, elements: Iterable[E]):
         self.parent = parent
         self.elements = tuple(elements)
 
@@ -138,7 +136,7 @@ class Row(RowBase):
     def custom(
         cls,
         parent: RowContainer,
-        elements: Elements,
+        elements: Iterable[E],
         *,
         anchor: Union[str, Anchor] = _NotSet,
         expand: bool = None,

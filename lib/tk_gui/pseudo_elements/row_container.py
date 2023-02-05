@@ -10,17 +10,17 @@ import logging
 from abc import ABC, abstractmethod
 from itertools import count
 from tkinter import Toplevel, Frame, BaseWidget
-from typing import TYPE_CHECKING, Optional, Union, Any, Iterator, Type, overload
+from typing import TYPE_CHECKING, Optional, Union, Any, Iterator, Type, Generic, overload
 
 from tk_gui.caching import cached_property
 from ..enums import Anchor, Justify, Side
 from ..styles import Style, StyleSpec
 from ..utils import call_with_popped
+from ..typing import XY, Layout, Bool, TkContainer, E
 from .row import Row, RowBase
 
 if TYPE_CHECKING:
     from ..elements.element import ElementBase
-    from ..typing import XY, Layout, Bool, TkContainer
     from ..window import Window
     from .scroll import ScrollableContainer, ScrollableToplevel
 
@@ -32,10 +32,10 @@ CONTAINER_PARAMS = {
     'scroll_y', 'scroll_x', 'scroll_y_div', 'scroll_x_div',
 }
 
-ElementLike = Union[RowBase, 'ElementBase', 'RowContainer']
+ElementLike = Union[RowBase, E, 'RowContainer']
 
 
-class RowContainer(ABC):
+class RowContainer(Generic[E], ABC):
     _counter = count()
     ignore_grab: bool = False
     scroll_y: Bool = False
@@ -47,14 +47,14 @@ class RowContainer(ABC):
     element_side: Side
     element_padding: Optional[XY]
     element_size: Optional[XY]
-    rows: list[Row]
+    rows: list[Row[E]]
 
     # region Init Overload
 
     @overload
     def __init__(
         self,
-        layout: Layout = None,
+        layout: Layout[E] = None,
         *,
         style: StyleSpec = None,
         anchor_elements: Union[str, Anchor] = None,
@@ -71,7 +71,7 @@ class RowContainer(ABC):
 
     # endregion
 
-    def __init__(self, layout: Layout = None, *, style: StyleSpec = None, **kwargs):
+    def __init__(self, layout: Layout[E] = None, *, style: StyleSpec = None, **kwargs):
         self._id = next(self._counter)
         self.style = Style.get_style(style)
         self.init_container(layout, **kwargs)
@@ -81,7 +81,7 @@ class RowContainer(ABC):
 
     def init_container(
         self,
-        layout: Layout = None,
+        layout: Layout[E] = None,
         anchor_elements: Union[str, Anchor] = None,
         text_justification: Union[str, Justify] = None,
         element_side: Union[str, Side] = None,
@@ -106,7 +106,7 @@ class RowContainer(ABC):
     def __repr__(self) -> str:
         return f'<{self.__class__.__name__}[{self._id}]>'
 
-    def _normalize_rows(self, layout: Layout, row_cls: Type[Row] = Row) -> Iterator[Row]:
+    def _normalize_rows(self, layout: Layout[E], row_cls: Type[Row] = Row) -> Iterator[Row[E]]:
         for raw_row in layout:
             if isinstance(raw_row, row_cls):
                 log.debug(f'Found pre-built row={raw_row!r}', extra={'color': 11})
@@ -114,7 +114,7 @@ class RowContainer(ABC):
             else:
                 yield row_cls(self, raw_row)
 
-    def add_rows(self, layout: Layout, pack: Bool = False, debug: Bool = False, update: Bool = False):
+    def add_rows(self, layout: Layout[E], pack: Bool = False, debug: Bool = False, update: Bool = False):
         if not pack:
             self.rows.extend(self._normalize_rows(layout))
         elif debug:
@@ -135,7 +135,7 @@ class RowContainer(ABC):
             for row in added:
                 row.pack()
 
-    def _add_rows(self, layout: Layout):
+    def _add_rows(self, layout: Layout[E]):
         rows = self.rows
         for row in self._normalize_rows(layout):
             rows.append(row)
@@ -212,7 +212,7 @@ class RowContainer(ABC):
         return widget_ele_map
 
     @cached_property
-    def id_ele_map(self) -> dict[str, ElementBase]:
+    def id_ele_map(self) -> dict[str, E]:
         id_ele_map = {}
         for ele in self.widget_id_element_map.values():
             try:
@@ -221,12 +221,12 @@ class RowContainer(ABC):
                 pass
         return id_ele_map
 
-    def all_elements(self) -> Iterator[Union[ElementBase, Row]]:
+    def all_elements(self) -> Iterator[Union[E, Row[E]]]:
         from ..elements.element import ElementBase
 
         yield from (e for e in self.widget_id_element_map.values() if isinstance(e, (ElementBase, Row)))
 
-    def __getitem__(self, item: Union[str, BaseWidget]) -> ElementBase:
+    def __getitem__(self, item: Union[str, BaseWidget]) -> E:
         """
         :param item: A widget, widget ID (assigned by tk/tkinter), or element ID (assigned in
           :meth:`ElementBase.__init__`).

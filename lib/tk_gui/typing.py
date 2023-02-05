@@ -4,16 +4,18 @@ Type annotations for the Tkinter GUI package.
 :author: Doug Skrypa
 """
 
+from __future__ import annotations
+
 from abc import abstractmethod
 from typing import TYPE_CHECKING, Protocol, TypeVar, Any, Union, Callable, Iterable, Optional, runtime_checkable
-from typing import Literal, _ProtocolMeta  # noqa
+from typing import Iterator, Literal, _ProtocolMeta  # noqa
 
 if TYPE_CHECKING:
-    from pathlib import Path
-    from tkinter import Event, Toplevel, Frame, LabelFrame
-    from PIL.Image import Image as PILImage
-    from .elements import Element
-    from .enums import BindTargets, BindEvent
+    from pathlib import Path  # noqa
+    from tkinter import Event, Toplevel, Frame, LabelFrame  # noqa
+    from PIL.Image import Image as PILImage  # noqa
+    from .elements.element import Element, ElementBase  # noqa
+    from .enums import BindTargets, BindEvent  # noqa
     from .pseudo_elements import Row
 
 # fmt: off
@@ -35,9 +37,11 @@ TraceCallback = Callable[[str, str, str], Any]
 Bindable = Union['BindEvent', str]
 BindTarget = Union[BindCallback, EventCallback, ButtonEventCB, 'BindTargets', str, None]
 
+AnyEle = Union['ElementBase', 'Element']
+E = TypeVar('E', bound=AnyEle)
+
 Bool = Union[bool, Any]
 XY = tuple[int, int]
-Layout = Iterable[Iterable['Element'] | 'Row']
 Axis = Literal['x', 'y']
 Orientation = Literal['horizontal', 'vertical']
 PathLike = Union['Path', str]
@@ -99,4 +103,12 @@ class ProvidesEventCallback(Protocol):
 
     @abstractmethod
     def as_callback(self) -> EventCallback:
+        pass
+
+
+class Layout(Protocol[E]):
+    __slots__ = ()
+
+    @abstractmethod
+    def __iter__(self) -> Iterator[Iterable[E] | Row[E]]:
         pass
