@@ -91,14 +91,26 @@ class FrameMixin:
         else:
             frame_cls = TkFrame
         try:
-            kwargs['width'], kwargs['height'] = self.size
+            width, height = self.size
         except TypeError:
-            pass
+            width = height = None
+        else:
+            kwargs['width'], kwargs['height'] = width, height
 
         self.widget = frame = frame_cls(row.frame, takefocus=int(self.allow_focus), **kwargs)
         self.pack_rows()
         self.pack_widget()
         if (pack_propagate := self.pack_propagate) is not None:
+            # Setting pack_propagate=False results in the frame retaining its configured size instead of shrinking
+            # to fit the elements it contains, but it may cause undesirable results if the window size changes, etc.
+            # More info: https://stackoverflow.com/a/566840/19070573
+            if not pack_propagate:
+                frame.update_idletasks()  # Required for the required height/width to be correct
+                if width is None:
+                    width = frame.winfo_reqwidth()
+                if height is None:
+                    height = frame.winfo_reqheight()
+                frame.configure(width=width, height=height)
             frame.pack_propagate(pack_propagate)
 
 
