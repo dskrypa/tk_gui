@@ -482,11 +482,9 @@ class GuiOptions:
         disable_all: bool = None,
         submit_row: int = None,
         change_cb: TraceCallback = None,
-        # **kwargs,
+        **kwargs,
     ) -> Frame:
-        frame = Frame(self.layout(submit_key, disable_all, submit_row, change_cb), title=self.title)
-        # return Column([[frame]], key='col::frame_options', justification='center', **kwargs)
-        return frame
+        return Frame(self.layout(submit_key, disable_all, submit_row, change_cb), title=self.title, **kwargs)
 
     # endregion
 
