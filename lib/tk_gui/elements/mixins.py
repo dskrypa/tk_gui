@@ -4,14 +4,19 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional, Callable
+from typing import TYPE_CHECKING, Optional, Callable, ParamSpec, TypeVar
 
 if TYPE_CHECKING:
     from tkinter import Widget, Button, Checkbutton, Menu, Radiobutton, Scale, Scrollbar, Text, OptionMenu, Spinbox
     from tkinter import Variable
+    from tk_gui.elements import Element
     from tk_gui.typing import BindTarget, BindCallback, TraceCallback
+    from tk_gui.window import Window
 
 __all__ = ['DisableableMixin', 'CallbackCommandMixin', 'TraceCallbackMixin']
+
+P = ParamSpec('P')
+T = TypeVar('T')
 
 
 class DisableableMixin:
@@ -63,6 +68,7 @@ class CallbackCommandMixin:
 class TraceCallbackMixin:
     __change_cb_name: str | None = None
     __var_change_cb: TraceCallback | None = None
+    window: Window
     tk_var: Variable | None
 
     @property
@@ -84,9 +90,18 @@ class TraceCallbackMixin:
 
     def _maybe_add_var_trace(self):
         if (var_change_cb := self.__var_change_cb) and (tk_var := self.tk_var):
-            self.__change_cb_name = tk_var.trace_add('write', var_change_cb)
+            self.__change_cb_name = tk_var.trace_add('write', self.__var_change_cb_wrapper(var_change_cb))
 
     def _maybe_remove_var_trace(self):
         if (cb_name := self.__change_cb_name) and (tk_var := self.tk_var):
             tk_var.trace_remove('write', cb_name)
             self.__change_cb_name = None
+
+    def __var_change_cb_wrapper(
+        self: TraceCallbackMixin | Element, var_change_cb: TraceCallback[P, T]
+    ) -> TraceCallback[P, None]:
+        def var_change_cb_wrapper(*args: P.args, **kwargs: P.kwargs):
+            result = var_change_cb(*args, **kwargs)
+            self.window._handle_callback_action(result, None, self)
+
+        return var_change_cb_wrapper
