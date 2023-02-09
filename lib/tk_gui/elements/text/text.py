@@ -194,6 +194,12 @@ class LinkableMixin:
             return
         link.open(event)
 
+    def update(self, value: Any = None, link: _Link = None):
+        if value is not None:
+            self.value = value
+        if link is not None:
+            self.update_link(link)
+
 
 class Label(TextValueMixin, LinkableMixin, Element, base_style_layer='text'):
     """A text element in which the text is NOT selectable."""
@@ -257,12 +263,6 @@ class Label(TextValueMixin, LinkableMixin, Element, base_style_layer='text'):
 
         self.pack_widget()
         self.maybe_enable_link()
-
-    def update(self, value: Any = None, link: _Link = None):
-        if value is not None:
-            self.value = value
-        if link is not None:
-            self.update_link(link)
 
 
 class Text(TextValueMixin, LinkableMixin, Element):
@@ -342,12 +342,6 @@ class Text(TextValueMixin, LinkableMixin, Element):
         self.widget = Entry(row.frame, **kwargs)
         self.pack_widget()
         self.maybe_enable_link()
-
-    def update(self, value: Any = None, link: _Link = None):
-        if value is not None:
-            self.value = value
-        if link is not None:
-            self.update_link(link)
 
 
 class Link(Text):
@@ -438,13 +432,10 @@ class Input(TextValueMixin, LinkableMixin, InteractiveText, disabled_state='read
     def update(self, value: Any = None, disabled: Bool = None, password_char: str = None, link: _Link = None):
         if disabled is not None:
             self._update_state(disabled)
-        if value is not None:
-            self.value = value
         if password_char is not None:
             self.widget.configure(show=password_char)
             self.password_char = password_char
-        if link is not None:
-            self.update_link(link)
+        super().update(value, link)
 
     # region Update State
 

@@ -191,6 +191,7 @@ class RadioGroup(TraceCallbackMixin):
         return Radio(text, value, group=self, **kwargs)
 
     def select(self, choice: Radio):
+        # TODO: Add way to select by value or ID/key?
         self.selection_var.set(choice.choice_id)
 
     def reset(self, default: Bool = True):
@@ -244,6 +245,7 @@ class CheckBox(DisableableMixin, CallbackCommandMixin, TraceCallbackMixin, Inter
     widget: Checkbutton
     tk_var: Optional[BooleanVar] = None
     _values: Optional[tuple[B, A]] = None
+    # TODO: Helper for initializing custom checkbox with a locked/unlocked padlock icon?
 
     def __init__(
         self,
@@ -447,7 +449,11 @@ class Combo(
 
     @property
     def value(self) -> Any:
+        # TODO: Automatically mark invalid when an invalid value is manually typed?
+        # TODO: Auto-filter to prefixed values on starting to type?
+        # TODO: Prevent typing / force selection from choices?
         choice = self.tk_var.get()
+        # TODO: Add way to programmatically reset / change / update choices + selection
         try:
             return self.choices[choice]  # noqa
         except TypeError:
