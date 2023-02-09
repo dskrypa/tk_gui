@@ -311,11 +311,11 @@ class Element(BindMixin, ElementBase, ABC):
             **kwargs,
         }
         if anchor := self.anchor.value:
-            try:
-                widget.configure(anchor=anchor)  # noqa
-            except TclError:  # Not all widgets support anchor in configure
-                # TODO: Avoid the extra call for widgets it's known to not work with?
-                pack_kwargs['anchor'] = anchor
+            # TODO: *Should* anchor ever be provided via .configure instead of .pack?
+            # try:
+            #     widget.configure(anchor=anchor)  # noqa
+            # except TclError:  # Not all widgets support anchor in configure
+            pack_kwargs['anchor'] = anchor
 
         widget.pack(**pack_kwargs)
         if not self._visible:
@@ -344,6 +344,15 @@ class Element(BindMixin, ElementBase, ABC):
     def show(self):
         if (settings := self._pack_settings) is None:
             settings = {}
+        if self.side == Side.RIGHT and 'after' not in settings and 'before' not in settings:
+            row_elements = self.parent.elements
+            index = row_elements.index(self)
+            key, index = ('after', index - 1) if index else ('before', index + 1)
+            try:
+                settings[key] = row_elements[index].widget
+            except IndexError:
+                pass
+
         # log.debug(f'Showing {self} with {settings=}')
         self.widget.pack(**settings)
         self._visible = True
