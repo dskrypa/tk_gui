@@ -724,28 +724,32 @@ class ListBox(DisableableMixin, Interactive, base_style_layer='listbox'):
     def update_choices(
         self, choices: Collection[str], replace: Bool = False, select: Bool = False, resize: Bool = True
     ):
-        values = choices if replace else (*self.choices, *choices)
-        self._set_choices(values, len(choices), select, resize)
+        if replace and self.was_packed:
+            list_box = self.widget.inner_widget
+            list_box.delete(0, len(self.choices))
+        self._set_choices(choices if replace else (*self.choices, *choices), select, resize)
 
-    def _set_choices(self, values: Collection[str], new_val_count: int, select: Bool = False, resize: Bool = True):
+    def _set_choices(
+        self, values: Collection[str], new_values: Collection[str], select: Bool = False, resize: Bool = True
+    ):
         self.choices = tuple(values)
         try:
             list_box = self.widget.inner_widget
         except AttributeError:  # Widget has not been initialized/packed yet
             return
-        list_box.insert(tkc.END, *values)
+        list_box.insert(tkc.END, *new_values)
         num_choices = len(self.choices)
         if select:
-            for i in range(num_choices - new_val_count, num_choices):
+            for i in range(num_choices - len(new_values), num_choices):
                 list_box.selection_set(i)
         if resize and num_choices != list_box.cget('height'):
             list_box.configure(height=num_choices)
 
     def append_choices(self, values: Collection[str], select: Bool = False, resize: Bool = True):
-        self._set_choices((*self.choices, *values), len(values), select, resize)
+        self._set_choices((*self.choices, *values), values, select, resize)
 
     def append_choice(self, value: str, select: Bool = False, resize: Bool = True):
-        self._set_choices((*self.choices, value), 1, select, resize)
+        self._set_choices((*self.choices, value), (value,), select, resize)
 
     def reset(self, default: Bool = True):
         try:
