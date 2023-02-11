@@ -47,7 +47,7 @@ class MenuMode(Enum):
             return cls.NEVER
         try:
             return cls[value.upper().replace(' ', '_')]
-        except KeyError:
+        except (KeyError, AttributeError, TypeError):
             return None  # This is what the default implementation does to signal an exception should be raised
 
     @classmethod
