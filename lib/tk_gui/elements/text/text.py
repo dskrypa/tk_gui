@@ -27,7 +27,7 @@ from .links import LinkTarget, _Link
 if TYPE_CHECKING:
     from tkinter.ttk import Scrollbar
     from tk_gui.pseudo_elements import Row
-    from tk_gui.typing import Bool, XY, BindTarget, TraceCallback
+    from tk_gui.typing import Bool, XY, BindTarget, TraceCallback, TkFill
 
 __all__ = ['Text', 'Link', 'Input', 'Multiline', 'Label']
 log = logging.getLogger(__name__)
@@ -37,6 +37,8 @@ class TextValueMixin(TraceCallbackMixin):
     string_var: Optional[StringVar] = None
     widget: Union[TkLabel, Entry]
     size: XY
+    fill: TkFill
+    expand: bool
     _value: str
     _move_cursor: bool = False
     _auto_size: bool = True
@@ -100,7 +102,7 @@ class TextValueMixin(TraceCallbackMixin):
         lines = self._value.splitlines()
         width = max(map(len, lines))
         height = len(lines)
-        if font and 'bold' in font:
+        if (font and 'bold' in font) or not (self.expand and self.fill in ('x', 'both', True)):
             width += 1
         return width, height
 
