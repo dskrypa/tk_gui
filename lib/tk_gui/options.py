@@ -117,7 +117,7 @@ class CheckboxOption(Option, opt_type='checkbox'):
 class InputOption(Option, opt_type='input'):
     def prepare_layout(self, disable_all: bool, change_cb: TraceCallback = None) -> OptionTuples:
         col_num, row_num, val = self.col, self.row, self.value
-        yield col_num, row_num, Text(self.label, key=f'lbl::{self.name}')
+        yield col_num, row_num, Text(self.label)
         yield col_num, row_num, Input('' if val is _NotSet else val, **self.common_kwargs(disable_all, change_cb))
 
     def validate(self, value):
@@ -135,10 +135,8 @@ class InputOption(Option, opt_type='input'):
 class DropdownOption(Option, opt_type='dropdown'):
     def prepare_layout(self, disable_all: bool, change_cb: TraceCallback = None) -> OptionTuples:
         col_num, row_num, val = self.col, self.row, self.value
-        yield col_num, row_num, Text(self.label, key=f'lbl::{self.name}')
-        yield col_num, row_num, Combo(
-            self.kwargs['choices'], default_value=val, **self.common_kwargs(disable_all, change_cb)
-        )
+        yield col_num, row_num, Text(self.label)
+        yield col_num, row_num, Combo(self.kwargs['choices'], default=val, **self.common_kwargs(disable_all, change_cb))
 
 
 class ListboxOption(Option, opt_type='listbox'):
@@ -176,7 +174,7 @@ class ListboxOption(Option, opt_type='listbox'):
 
     def prepare_layout(self, disable_all: bool, change_cb: TraceCallback = None) -> OptionTuples:
         col_num, row_num, val = self.col, self.row, self.value
-        yield col_num, row_num, Text(self.label, key=f'lbl::{self.name}')
+        yield col_num, row_num, Text(self.label)
         kwargs = self.kwargs
         choices = kwargs['choices']
         yield col_num, row_num, ListBox(
@@ -212,7 +210,7 @@ class PopupOption(Option, opt_type='popup'):
         if val is _NotSet:
             val = None
 
-        yield col_num, row_num, Text(self.label, key=f'lbl::{self.name}')
+        yield col_num, row_num, Text(self.label)
 
         input_ele = Input('' if val is None else val, **self.common_kwargs(disable_all, change_cb))
         yield col_num, row_num, input_ele
@@ -440,10 +438,7 @@ class GuiOptions:
         if not layout and len(columns) == 1:
             layout = columns[0]
         else:
-            column_objects = [
-                Frame(column, key=f'col::options::{i}', pad=(0, 0), expand_x=True) for i, column in enumerate(columns)
-            ]
-            layout.append(column_objects)
+            layout.append([Frame(column, pad=(0, 0), expand_x=True) for i, column in enumerate(columns)])
 
         return layout
 
