@@ -140,12 +140,7 @@ class Rating(InteractiveRowFrame):
     def _handle_star_clicked(self, event: Event):
         self._button_down = True
         self.rating = round(int(100 * event.x / self.star_element.widget.winfo_width()) / 10)
-        if rating_input := self.rating_input:
-            rating_input.update(self.rating)
-            rating_input.validated(True)
-            # The rating input value change will trigger _handle_value_changed to update the star element
-        else:
-            self.star_element.image = self._combined_stars()
+        self._update()
 
     def _handle_value_changed(self, tk_var_name: str, index, operation: str):
         rating_input = self.rating_input
@@ -196,6 +191,14 @@ class Rating(InteractiveRowFrame):
             if not (0 <= rating <= 10):
                 raise ValueError(f'Invalid {rating=} - value must be between 0 and 10, inclusive')
             self._rating = rating
+            self._update()
+
+    def _update(self):
+        if rating_input := self.rating_input:
+            rating_input.update(self.rating)
+            rating_input.validated(True)
+            # The rating input value change will trigger _handle_value_changed to update the star element
+        else:
             self.star_element.image = self._combined_stars()
 
     @cached_property
