@@ -645,6 +645,7 @@ class ComboMap(Generic[T], Combo):
 
 class ListBox(DisableableMixin, Interactive, base_style_layer='listbox'):
     widget: ScrollableListbox
+    defaults: set[str]
 
     def __init__(
         self,
@@ -720,18 +721,31 @@ class ListBox(DisableableMixin, Interactive, base_style_layer='listbox'):
         else:
             self.set_selection_indices(value)
 
-    def append_choice(self, value: str, select: Bool = False, resize: Bool = True):
-        self.choices = (*self.choices, value)
+    def update_choices(
+        self, choices: Collection[str], replace: Bool = False, select: Bool = False, resize: Bool = True
+    ):
+        values = choices if replace else (*self.choices, *choices)
+        self._set_choices(values, select, resize)
+
+    def _set_choices(self, values: Collection[str], select: Bool = False, resize: Bool = True):
+        self.choices = tuple(values)
         try:
             list_box = self.widget.inner_widget
         except AttributeError:  # Widget has not been initialized/packed yet
             return
-        list_box.insert(tkc.END, value)
+        list_box.insert(tkc.END, *values)
         num_choices = len(self.choices)
         if select:
-            list_box.selection_set(num_choices - 1)
+            for i in range(num_choices - len(values), num_choices):
+                list_box.selection_set(i)
         if resize and num_choices != list_box.cget('height'):
             list_box.configure(height=num_choices)
+
+    def append_choices(self, values: Collection[str], select: Bool = False, resize: Bool = True):
+        self._set_choices((*self.choices, *values), select, resize)
+
+    def append_choice(self, value: str, select: Bool = False, resize: Bool = True):
+        self._set_choices((*self.choices, value), select, resize)
 
     def reset(self, default: Bool = True):
         try:
