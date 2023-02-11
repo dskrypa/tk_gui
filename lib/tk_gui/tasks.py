@@ -12,8 +12,8 @@ from queue import Empty
 from threading import Thread
 from typing import TYPE_CHECKING, Callable, TypeVar, ParamSpec
 
-from .elements.images import Spinner
 from .popups.base import POPUP_QUEUE
+from .popups.image import SpinnerPopup
 
 if TYPE_CHECKING:
     from .typing import XY
@@ -28,24 +28,22 @@ T = TypeVar('T')
 def run_task_with_spinner(
     func: Callable[P, T], args: P.args = (), kwargs: P.kwargs = None, spinner_size: XY = (200, 200), **spin_kwargs
 ) -> T:
-    with Spinner(spinner_size, **spin_kwargs) as spinner:
-        func_future, thread = _as_future(func, args, kwargs)
-        thread.join(0.05)
-        while thread.is_alive():
-            try:
-                future, func, args, kwargs = POPUP_QUEUE.get(timeout=0.05)
-            except Empty:
-                pass
-            else:
-                if future.set_running_or_notify_cancel():
-                    try:
-                        result = func(*args, **kwargs)
-                    except Exception as e:
-                        future.set_exception(e)
-                    else:
-                        future.set_result(result)
-
-            spinner.update()
+    spinner = SpinnerPopup(size=spinner_size, **spin_kwargs)
+    func_future, thread = _as_future(func, args, kwargs, cb=lambda: spinner.window.interrupt())
+    thread.join(0.05)
+    while thread.is_alive():
+        try:
+            future, func, args, kwargs = POPUP_QUEUE.get(timeout=0.05)
+        except Empty:
+            pass
+        else:
+            if future.set_running_or_notify_cancel():
+                try:
+                    result = func(*args, **kwargs)
+                except Exception as e:
+                    future.set_exception(e)
+                else:
+                    future.set_result(result)
 
     return func_future.result()
 
