@@ -20,7 +20,7 @@ from tk_gui.caching import cached_property
 from tk_gui.enums import ListBoxSelectMode, Anchor
 from tk_gui.pseudo_elements.scroll import ScrollableListbox
 from tk_gui.typing import Bool, T, BindTarget, BindCallback, TraceCallback
-from tk_gui.utils import max_line_len
+from tk_gui.utils import max_line_len, extract_kwargs
 from ._utils import normalize_underline
 from .element import Interactive
 from .exceptions import NoActiveGroup, BadGroupCombo
@@ -522,6 +522,21 @@ class Combo(
 
         self.widget['values'] = self.choices
 
+    def update(
+        self,
+        selection: str | int | None = _NotSet,
+        *,
+        choices: Collection[str] = None,
+        replace: Bool = False,
+        disabled: Bool = None,
+    ):
+        if choices:
+            self.update_choices(choices, replace)
+        if selection is not _NotSet:
+            self.select(selection)
+        if disabled is not None:
+            self.toggle_enabled(disabled)
+
     def reset(self, default: Bool = True):
         if default:
             self.select(self.default)  # if the default is None, this will clear the selection
@@ -731,8 +746,7 @@ class ListBox(DisableableMixin, Interactive, base_style_layer='listbox'):
         self, choices: Collection[str], replace: Bool = False, select: Bool = False, resize: Bool = True
     ):
         if replace and self.was_packed:
-            list_box = self.widget.inner_widget
-            list_box.delete(0, len(self.choices))
+            self.widget.inner_widget.delete(0, len(self.choices))
         self._set_choices(choices if replace else (*self.choices, *choices), choices, select, resize)
 
     def _set_choices(
@@ -768,6 +782,21 @@ class ListBox(DisableableMixin, Interactive, base_style_layer='listbox'):
                     list_box.selection_set(i)
         else:
             list_box.selection_clear(0, len(self.choices))
+
+    def update(
+        self,
+        selection: str | int | None = _NotSet,
+        *,
+        choices: Collection[str] = None,
+        disabled: Bool = None,
+        **kwargs,
+    ):
+        if choices:
+            self.update_choices(choices, **extract_kwargs(kwargs, {'replace', 'select', 'resize'}))
+        if selection is not _NotSet:
+            self.select(selection)
+        if disabled is not None:
+            self.toggle_enabled(disabled)
 
     # endregion
 
