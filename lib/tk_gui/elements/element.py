@@ -456,11 +456,13 @@ class InteractiveMixin:
     def disable(self):
         raise NotImplementedError
 
-    def toggle_enabled(self):
-        if self.disabled:
-            self.enable()
-        else:
+    def toggle_enabled(self, disable: Bool = None):
+        if disable is None:
+            disable = not self.disabled
+        if disable:
             self.disable()
+        else:
+            self.enable()
 
 
 class Interactive(InteractiveMixin, Element, ABC):

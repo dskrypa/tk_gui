@@ -304,6 +304,12 @@ class CheckBox(DisableableMixin, CallbackCommandMixin, TraceCallbackMixin, Inter
         else:
             self.tk_var.set(value)
 
+    def update(self, value: Union[bool, A, B] = _NotSet, disabled: Bool = None):
+        if value is not _NotSet:
+            self.value = value
+        if disabled is not None:
+            self.toggle_enabled(disabled)
+
     def toggle(self) -> bool:
         """
         Toggle the value, and return the new value.

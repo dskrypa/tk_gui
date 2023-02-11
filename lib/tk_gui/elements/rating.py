@@ -183,10 +183,7 @@ class Rating(InteractiveRowFrame):
 
     def update(self, rating: int = None, disabled: Bool = None):
         if disabled is not None:
-            if disabled:
-                self.disable()
-            else:
-                self.enable()
+            self.toggle_enabled(disabled)
         if rating is not None:
             if not (0 <= rating <= 10):
                 raise ValueError(f'Invalid {rating=} - value must be between 0 and 10, inclusive')
