@@ -196,8 +196,17 @@ class RadioGroup(TraceCallbackMixin):
     def add_choice(self, text: str, value: Any = _NotSet, **kwargs) -> Radio:
         return Radio(text, value, group=self, **kwargs)
 
-    def select(self, choice: Radio):
-        # TODO: Add way to select by value or ID/key?
+    def select(self, choice: Radio | int | str):
+        if isinstance(choice, int):
+            choice = self.choices[choice]
+        elif isinstance(choice, str):
+            if (from_key := next((c for c in self.choices.values() if c.key == choice), None)) is not None:
+                choice = from_key
+            elif (from_label := next((c for c in self.choices.values() if c.label == choice), None)) is not None:
+                choice = from_label
+            else:
+                raise ValueError(f'Invalid {choice=} - expected a valid Radio key, label, or index')
+
         self.selection_var.set(choice.choice_id)
 
     def reset(self, default: Bool = True):
@@ -207,7 +216,7 @@ class RadioGroup(TraceCallbackMixin):
         return self.choices.get(self.selection_var.get())
 
     @property
-    def value(self) -> Any:
+    def value(self) -> tuple[str, T | str] | T | str | None:
         if choice := self.get_choice():
             return (choice.label, choice.value) if self.include_label else choice.value
         return None
