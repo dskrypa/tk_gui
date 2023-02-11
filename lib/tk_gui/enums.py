@@ -85,6 +85,8 @@ class Side(MissingMixin, Enum, aliases={'l': 'LEFT', 'r': 'RIGHT', 't': 'TOP', '
     BOTTOM = tkc.BOTTOM
 
     def as_sticky(self) -> str:
+        # TODO: It appears that sticky can use `ew` for horizontally centered, `ns` for vertically, `nsew` for both
+        #  -> may correlate better with anchor?
         return SIDE_STICKY_MAP.get(self.value)
 
 

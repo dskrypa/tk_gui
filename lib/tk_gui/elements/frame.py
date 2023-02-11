@@ -44,23 +44,32 @@ class FrameMixin:
     allow_focus: bool
     pack_rows: Callable
     pack_widget: Callable
+    grid_rows: Callable
     # Mixin-specific attributes
     border: Bool
     title: Optional[str]
     anchor_title: Anchor
     pack_propagate: Bool = None
+    grid: Bool = False
 
     def init_frame(
-        self, title: str = None, anchor_title: _Anchor = None, border: Bool = False, pack_propagate: Bool = None
+        self,
+        title: str = None,
+        anchor_title: _Anchor = None,
+        border: Bool = False,
+        pack_propagate: Bool = None,
+        grid: Bool = False,
     ):
         self.title = title
         self.anchor_title = Anchor(anchor_title)
         self.border = border
         if pack_propagate is not None:
             self.pack_propagate = pack_propagate
+        if grid:
+            self.grid = grid
 
     def init_frame_from_kwargs(self, kwargs: dict[str, Any]):
-        call_with_popped(self.init_frame, ('title', 'anchor_title', 'border', 'pack_propagate'), kwargs)
+        call_with_popped(self.init_frame, ('title', 'anchor_title', 'border', 'pack_propagate', 'grid'), kwargs)
 
     @property
     def tk_container(self) -> Union[TkFrame, LabelFrame]:
@@ -101,7 +110,10 @@ class FrameMixin:
 
     def pack_into(self, row: Row):
         self._init_widget(row.frame)
-        self.pack_rows()
+        if self.grid:
+            self.grid_rows()
+        else:
+            self.pack_rows()
         self.pack_widget()
         if (pack_propagate := self.pack_propagate) is not None:
             frame = self.widget
@@ -153,6 +165,13 @@ class RowFrame(FrameMixin, RowBase, Element, ABC, base_style_layer='frame'):
 
     def pack_rows(self, debug: Bool = False):
         self.pack_elements(debug)
+
+    def grid_rows(self):
+        for c, ele in enumerate(self.elements):
+            ele.grid_into_frame(self, 0, c)
+
+        self.frame.grid_rowconfigure(1, weight=1)
+        self.frame.grid_columnconfigure(1, weight=1)
 
 
 class BasicRowFrame(RowFrame):
@@ -237,6 +256,11 @@ class Frame(FrameMixin, Element, RowContainer, base_style_layer='frame'):
             self.add_rows(layout)
         super().pack_rows(debug)
 
+    def grid_rows(self):
+        if layout := self.get_custom_layout():
+            self.add_rows(layout)
+        super().grid_rows()
+
 
 class InteractiveFrameMixin(InteractiveMixin):
     rows: list[Row]
@@ -283,6 +307,7 @@ class ScrollFrame(Element, RowContainer, base_style_layer='frame'):
     widget: Union[ScrollableLabelFrame, ScrollableFrame]
     inner_frame: Union[TkFrame, LabelFrame]
     inner_style: Optional[Style] = None
+    grid: Bool = False
 
     def __init__(
         self,
@@ -294,6 +319,7 @@ class ScrollFrame(Element, RowContainer, base_style_layer='frame'):
         title_mode: FrameMode = 'outer',
         border_mode: FrameMode = 'outer',
         inner_style: StyleSpec = None,
+        grid: Bool = False,
         **kwargs,
     ):
         self.init_container_from_kwargs(layout, kwargs=kwargs)
@@ -305,6 +331,8 @@ class ScrollFrame(Element, RowContainer, base_style_layer='frame'):
         self.border_mode = border_mode
         if inner_style:
             self.inner_style = Style.get_style(inner_style)
+        if grid:
+            self.grid = grid
 
     def __repr__(self) -> str:
         key, size, visible, rows = self._key, self.size, self._visible, len(self.rows)
@@ -363,7 +391,10 @@ class ScrollFrame(Element, RowContainer, base_style_layer='frame'):
     def pack_into(self, row: Row):
         self._init_widget(row.frame)
         outer_frame = self.widget
-        self.pack_rows()
+        if self.grid:
+            self.grid_rows()
+        else:
+            self.pack_rows()
         self._update_scroll_region(outer_frame, outer_frame.inner_widget, self.size)
         self.pack_widget()
 

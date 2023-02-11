@@ -150,13 +150,17 @@ class RowContainer(Generic[E], ABC):
 
     @property
     @abstractmethod
-    def tk_container(self) -> Union[Frame, Toplevel]:
+    def tk_container(self) -> TkContainer:
         raise NotImplementedError
 
     @property
     @abstractmethod
     def window(self) -> Window:
         raise NotImplementedError
+
+    @property
+    def frame(self) -> TkContainer:
+        return self.tk_container
 
     # endregion
 
@@ -285,3 +289,11 @@ class RowContainer(Generic[E], ABC):
         else:
             for row in self.rows:
                 row.pack()
+
+    def grid_rows(self):
+        for r, row in enumerate(self.rows):
+            for c, ele in enumerate(row.elements):
+                ele.grid_into_frame(self, r, c)
+
+        self.frame.grid_rowconfigure(1, weight=1)
+        self.frame.grid_columnconfigure(1, weight=1)

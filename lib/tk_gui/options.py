@@ -438,7 +438,7 @@ class GuiOptions:
         if not layout and len(columns) == 1:
             layout = columns[0]
         else:
-            layout.append([Frame(column, pad=(0, 0), expand_x=True) for i, column in enumerate(columns)])
+            layout.append([Frame(column, pad=(0, 0)) for i, column in enumerate(columns)])
 
         return layout
 
