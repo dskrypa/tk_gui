@@ -1,3 +1,3 @@
-from .utils import MenuMode, CallbackMetadata
-from .menu import Mode, MenuItem, MenuGroup, Menu, MenuProperty
+from .utils import MenuMode, CallbackMetadata, Mode, MenuModeCallback
+from .menu import MenuItem, MenuGroup, Menu, MenuProperty
 from .items import *  # noqa

@@ -16,16 +16,16 @@ from ...event_handling import CustomEventResultsMixin
 from ..element import ElementBase
 from ..exceptions import CallbackError, CallbackAlreadyRegistered, NoCallbackRegistered
 from .._utils import normalize_underline
-from .utils import MenuMode, ContainerMixin, MenuMeta, get_current_menu_group, wrap_menu_cb, find_member, copy_menu_obj
+from .utils import MenuMode, MenuModeCallback, Mode, ContainerMixin, MenuMeta
+from .utils import get_current_menu_group, wrap_menu_cb, find_member, copy_menu_obj
 
 if TYPE_CHECKING:
     from tk_gui.pseudo_elements import Row
     from tk_gui.typing import Bool, XY, EventCallback, ProvidesEventCallback
 
-__all__ = ['Mode', 'MenuEntry', 'MenuItem', 'MenuGroup', 'Menu', 'CustomMenuItem', 'MenuProperty']
+__all__ = ['MenuEntry', 'MenuItem', 'MenuGroup', 'Menu', 'CustomMenuItem', 'MenuProperty']
 log = logging.getLogger(__name__)
 
-Mode = Union['MenuMode', str, bool, None]
 M = TypeVar('M', bound='Menu')
 T = TypeVar('T')
 
@@ -33,13 +33,17 @@ T = TypeVar('T')
 class MenuEntry(ABC):
     """An entry in a cascading menu tree, which may be a button/choice, or it may have other entries nested under it."""
 
-    __slots__ = ('parent', 'label', '_underline', 'enabled', 'show', 'keyword', '_format_label')
+    __slots__ = (
+        'parent', 'label', '_underline', 'enabled', 'show', 'keyword', '_format_label', '_enabled_cb', '_show_cb'
+    )
 
     parent: MenuGroup | Menu | None
     label: str | None
     enabled: MenuMode
     show: MenuMode
     keyword: str | None
+    _enabled_cb: MenuModeCallback | None
+    _show_cb: MenuModeCallback | None
 
     def __init__(
         self,
@@ -64,8 +68,8 @@ class MenuEntry(ABC):
         """
         self.label = label
         self._underline = underline
-        self.enabled = MenuMode(enabled)
-        self.show = MenuMode(show)
+        self.enabled, self._enabled_cb = MenuMode.normalize(enabled)
+        self.show, self._show_cb = MenuMode.normalize(show)
         self.keyword = keyword
         self._format_label = format_label
         if group := get_current_menu_group(True):
@@ -103,10 +107,10 @@ class MenuEntry(ABC):
         return self.label
 
     def enabled_for(self, event: Event = None, kwargs: dict[str, Any] = None) -> bool:
-        return self.enabled.enabled(kwargs, self.keyword)
+        return self.enabled.enabled(self, kwargs, self.keyword, self._enabled_cb)
 
     def show_for(self, event: Event = None, kwargs: dict[str, Any] = None) -> bool:
-        return self.show.show(kwargs, self.keyword)
+        return self.show.show(self, kwargs, self.keyword, self._show_cb)
 
     @abstractmethod
     def maybe_add(

@@ -107,6 +107,8 @@ class TextValueMixin(TraceCallbackMixin):
         width = max(map(len, lines))
         height = len(lines)
         if (font and 'bold' in font) or not (self.expand and self.fill in ('x', 'both', True)):
+            # TODO: The expand/fill condition seems to only be necessary when the value contains a thin char like
+            #  lower-case L
             width += 1
         return width, height
 

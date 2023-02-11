@@ -12,7 +12,7 @@ from contextvars import ContextVar
 from copy import copy
 from enum import Enum
 from tkinter import Event, Entry, Text, BaseWidget, TclError, StringVar
-from typing import TYPE_CHECKING, Optional, Union, Any, Mapping, Iterator, Sequence, TypeVar
+from typing import TYPE_CHECKING, Optional, Union, Any, Mapping, Iterator, Sequence, TypeVar, Callable
 
 from .._utils import get_top_level
 from ..exceptions import NoActiveGroup
@@ -21,11 +21,14 @@ if TYPE_CHECKING:
     from tk_gui.typing import Bool, EventCallback
     from .menu import MenuItem, MenuGroup, MenuEntry
 
-__all__ = ['MenuMode', 'CallbackMetadata']
+__all__ = ['MenuMode', 'CallbackMetadata', 'MenuModeCallback', 'Mode']
 log = logging.getLogger(__name__)
 
 _NotSet = object()
 _menu_group_stack = ContextVar('tk_gui.elements.menu.stack', default=[])
+
+MenuModeCallback = Callable[['MenuEntry'], bool | Any]
+Mode = Union['MenuMode', MenuModeCallback, str, bool, None]
 T = TypeVar('T')
 
 
@@ -34,6 +37,7 @@ class MenuMode(Enum):
     NEVER = 'never'         #
     KEYWORD = 'keyword'     # Enable when the specified keyword is present
     TRUTHY = 'truthy'       # Enable when the specified keyword's value is truthy
+    CALLBACK = 'callback'   # Enable when the registered callback returns a truthy value
 
     @classmethod
     def _missing_(cls, value: Union[str, bool]):
@@ -46,12 +50,28 @@ class MenuMode(Enum):
         except KeyError:
             return None  # This is what the default implementation does to signal an exception should be raised
 
-    def enabled(self, kwargs: Mapping[str, Any] = None, keyword: str = None) -> bool:
+    @classmethod
+    def normalize(cls, mode: Mode) -> tuple[MenuMode, MenuModeCallback | None]:
+        try:
+            return cls(mode), None
+        except ValueError:
+            if callable(mode):
+                return cls.CALLBACK, mode
+            raise
+
+    def enabled(
+        self, menu_entry: MenuEntry, kwargs: Mapping[str, Any] = None, keyword: str = None, cb: MenuModeCallback = None
+    ) -> bool:
         try:
             return _MODE_TRUTH_MAP[self]
         except KeyError:
             pass
-        if not kwargs or not keyword:
+        if self == self.CALLBACK:
+            if cb is None:
+                log.warning(f'No show/enabled callback was registered for {menu_entry=}')
+                return False
+            return cb(menu_entry)
+        elif not kwargs or not keyword:
             return False
         try:
             value = kwargs[keyword]
