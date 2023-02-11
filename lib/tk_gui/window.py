@@ -997,6 +997,13 @@ class Window(BindMixin, RowContainer):
 
     @_tk_event_handler(BindEvent.RIGHT_CLICK)
     def handle_right_click(self, event: Event):
+        try:
+            if self.widget_id_element_map[event.widget._w].right_click_menu:
+                # If the element that was clicked has its own right-click menu, it should override the window's
+                return
+        except (AttributeError, KeyError, TypeError):
+            pass
+
         if menu := self._right_click_menu:
             menu.parent = self  # Needed for style inheritance
             menu.show(event, self.root)
