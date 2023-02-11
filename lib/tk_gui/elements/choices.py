@@ -707,6 +707,19 @@ class ListBox(DisableableMixin, Interactive, base_style_layer='listbox'):
         for i in index_or_indices:
             list_box.selection_set(i)
 
+    def select(self, value: str | int | Iterable[int] | None):
+        if value is None:
+            self.reset(False)
+        elif isinstance(value, str):
+            try:
+                index = self.choices.index(value)
+            except ValueError as e:
+                raise ValueError(f'Invalid selection={value!r} - pick from choices={self.choices}') from e
+            else:
+                self.set_selection_indices(index)
+        else:
+            self.set_selection_indices(value)
+
     def append_choice(self, value: str, select: Bool = False, resize: Bool = True):
         self.choices = (*self.choices, value)
         try:
