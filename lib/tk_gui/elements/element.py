@@ -31,7 +31,7 @@ __all__ = ['ElementBase', 'Element', 'Interactive', 'InteractiveMixin']
 log = logging.getLogger(__name__)
 
 _DIRECT_ATTRS = {'key', 'right_click_menu', 'left_click_cb', 'binds', 'data'}
-_INHERITABLES = {'size', 'auto_size_text', 'justify_text'}
+_INHERITABLES = {'size', 'auto_size_text'}
 _BASIC = frozenset({'anchor', 'style', 'pad', 'side', 'fill', 'expand', 'allow_focus', 'ignore_grab'})
 _basic_keys = _BASIC.intersection
 
@@ -207,7 +207,6 @@ class Element(BindMixin, ElementBase, ABC):
 
     size: XY = Inheritable('element_size', default=None)
     auto_size_text: bool = Inheritable()
-    justify_text: Justify = Inheritable('text_justification', type=Justify)
 
     @overload
     def __init__(
@@ -220,7 +219,6 @@ class Element(BindMixin, ElementBase, ABC):
         auto_size_text: Bool = None,
         anchor: _Anchor = None,
         side: _Side = Side.LEFT,
-        justify_text: _Justify = None,
         expand: Bool = None,
         fill: TkFill = None,
         allow_focus: bool = False,
@@ -480,7 +478,6 @@ class Interactive(InteractiveMixin, Element, ABC):
         auto_size_text: Bool = None,
         anchor: _Anchor = None,
         side: _Side = Side.LEFT,
-        justify_text: _Justify = None,
         expand: Bool = None,
         fill: TkFill = None,
         allow_focus: bool = False,

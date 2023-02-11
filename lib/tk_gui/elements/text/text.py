@@ -19,7 +19,7 @@ from tk_gui.enums import Justify, Anchor
 from tk_gui.event_handling import BindManager
 from tk_gui.pseudo_elements.scroll import ScrollableText
 from tk_gui.styles import Style, Font, StyleState, StyleLayer
-from tk_gui.utils import max_line_len, call_with_popped
+from tk_gui.utils import Inheritable, max_line_len, call_with_popped
 from ..element import Element, Interactive
 from ..mixins import DisableableMixin, TraceCallbackMixin
 from .links import LinkTarget, _Link
@@ -32,10 +32,14 @@ if TYPE_CHECKING:
 __all__ = ['Text', 'Link', 'Input', 'Multiline', 'Label']
 log = logging.getLogger(__name__)
 
+_Anchor = Union[str, Anchor]
+_Justify = Union[str, Justify]
+
 
 class TextValueMixin(TraceCallbackMixin):
     string_var: Optional[StringVar] = None
     widget: Union[TkLabel, Entry]
+    justify: Justify = Inheritable('text_justification', type=Justify)
     size: XY
     fill: TkFill
     expand: bool
@@ -213,8 +217,8 @@ class Label(TextValueMixin, LinkableMixin, Element, base_style_layer='text'):
         value: Any = '',
         link: _Link | LinkTarget = None,
         *,
-        justify: Union[str, Justify] = None,
-        anchor_info: Union[str, Anchor] = None,
+        justify: _Justify = None,
+        anchor_info: _Anchor = None,
         link_bind: str = None,
         auto_size: Bool = True,
         change_cb: TraceCallback = None,
@@ -225,7 +229,8 @@ class Label(TextValueMixin, LinkableMixin, Element, base_style_layer='text'):
         if justify is anchor_info is None:
             justify = Justify.LEFT
             anchor_info = justify.as_anchor()
-        super().__init__(justify_text=justify, **kwargs)
+        super().__init__(**kwargs)
+        self.justify = justify
         if change_cb:
             self.var_change_cb = change_cb
         if anchor_info:
@@ -252,7 +257,7 @@ class Label(TextValueMixin, LinkableMixin, Element, base_style_layer='text'):
         kwargs = {
             'textvariable': self.string_var,
             'anchor': self.anchor_info.value,
-            'justify': self.justify_text.value,
+            'justify': self.justify.value,
             'wraplength': 0,
             'takefocus': int(self.allow_focus),
             **self.style_config,
@@ -279,8 +284,7 @@ class Text(TextValueMixin, LinkableMixin, Element):
         value: Any = '',
         link: _Link | LinkTarget = None,
         *,
-        justify: Union[str, Justify] = None,
-        anchor: Union[str, Anchor] = None,
+        justify: _Justify = None,
         link_bind: str = None,
         auto_size: Bool = True,
         use_input_style: Bool = False,
@@ -289,21 +293,12 @@ class Text(TextValueMixin, LinkableMixin, Element):
     ):
         self.value = value
         self.init_linkable(link, link_bind, kwargs.pop('tooltip', None))
-        if justify is anchor is None:
-            justify = Justify.LEFT
-        super().__init__(justify_text=justify, anchor=anchor, **kwargs)
+        super().__init__(**kwargs)
+        self.justify = justify
         if change_cb:
             self.var_change_cb = change_cb
         self._auto_size = auto_size
         self._use_input_style = use_input_style
-
-    @property
-    def pad_kw(self) -> dict[str, int]:
-        try:
-            x, y = self.pad
-        except TypeError:
-            x, y = 5, 3
-        return {'padx': x, 'pady': y}
 
     @property
     def style_config(self) -> dict[str, Any]:
@@ -336,7 +331,7 @@ class Text(TextValueMixin, LinkableMixin, Element):
         kwargs = {
             'highlightthickness': 0,
             'textvariable': self.string_var,
-            'justify': self.justify_text.value,
+            'justify': self.justify.value,
             'state': 'readonly',
             'takefocus': int(self.allow_focus),
             **self.style_config,
@@ -387,14 +382,15 @@ class Input(TextValueMixin, LinkableMixin, InteractiveText, disabled_state='read
         link: _Link | LinkTarget = None,
         link_bind: str = None,
         password_char: str = None,
-        justify_text: Union[str, Justify, None] = Justify.LEFT,
+        justify: Union[_Justify, None] = Justify.LEFT,
         callback: BindTarget = None,                                # Key press callback
         change_cb: TraceCallback = None,                            # Value change callback
         **kwargs,
     ):
         self.value = value
         self.init_linkable(link, link_bind, kwargs.pop('tooltip', None))
-        super().__init__(justify_text=justify_text, **kwargs)
+        super().__init__(**kwargs)
+        self.justify = justify
         self._callback = callback
         if password_char:
             self.password_char = password_char
@@ -417,7 +413,7 @@ class Input(TextValueMixin, LinkableMixin, InteractiveText, disabled_state='read
         kwargs = {
             'textvariable': self.string_var,
             'show': self.password_char,
-            'justify': self.justify_text.value,
+            'justify': self.justify.value,
             'takefocus': int(self.allow_focus),
             **self.style_config,
         }
@@ -456,6 +452,7 @@ class Input(TextValueMixin, LinkableMixin, InteractiveText, disabled_state='read
 class Multiline(InteractiveText, disabled_state='disabled'):
     widget: ScrollableText
     _read_only: Bool = False
+    justify: Justify = Inheritable('text_justification', type=Justify)
 
     def __init__(
         self,
@@ -465,13 +462,14 @@ class Multiline(InteractiveText, disabled_state='disabled'):
         scroll_x: bool = False,
         auto_scroll: bool = False,
         rstrip: bool = False,
-        justify_text: Union[str, Justify, None] = Justify.LEFT,
+        justify: Union[_Justify, None] = Justify.LEFT,
         input_cb: BindTarget = None,
         read_only: Bool = False,
         read_only_style: Bool = False,
         **kwargs,
     ):
-        super().__init__(justify_text=justify_text, **kwargs)
+        super().__init__(**kwargs)
+        self.justify = justify
         self.__entered = False
         self._value = str(value)
         self.scroll_y = scroll_y
@@ -579,7 +577,7 @@ class Multiline(InteractiveText, disabled_state='disabled'):
         text = scroll_text.inner_widget
         if value:
             text.insert(1.0, value)
-        if (justify := self.justify_text) != Justify.NONE:
+        if (justify := self.justify) != Justify.NONE:
             text.tag_add(justify.value, 1.0, 'end')  # noqa
         for pos in ('center', 'left', 'right'):
             text.tag_configure(pos, justify=pos)  # noqa

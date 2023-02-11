@@ -16,9 +16,10 @@ from typing import TYPE_CHECKING, Union, Optional, Any
 
 from PIL.ImageTk import PhotoImage
 
-from ..enums import Justify, Anchor
-from ..event_handling import BindMap, BindMapping, CustomEventResultsMixin
-from ..images import as_image, scale_image
+from tk_gui.enums import Justify, Anchor
+from tk_gui.event_handling import BindMap, BindMapping, CustomEventResultsMixin
+from tk_gui.images import as_image, scale_image
+from tk_gui.utils import Inheritable
 from .element import Interactive
 from .mixins import DisableableMixin
 
@@ -46,6 +47,7 @@ class ButtonAction(Enum):
 
 class Button(CustomEventResultsMixin, DisableableMixin, Interactive, base_style_layer='button'):
     widget: _Button
+    justify: Justify = Inheritable('text_justification', type=Justify)
     separate: bool = False
     anchor_info: Anchor = Anchor.NONE
     bind_enter: bool = False
@@ -59,7 +61,7 @@ class Button(CustomEventResultsMixin, DisableableMixin, Interactive, base_style_
         *,
         shortcut: str = None,
         anchor_info: Union[str, Anchor] = None,
-        justify_text: Union[str, Justify, None] = Justify.CENTER,
+        justify: Union[str, Justify, None] = Justify.CENTER,
         action: Union[ButtonAction, str] = None,
         binds: BindMapping = None,
         bind_enter: Bool = False,
@@ -84,9 +86,10 @@ class Button(CustomEventResultsMixin, DisableableMixin, Interactive, base_style_
             binds.add('<Return>', self.handle_activated)
         if focus is None:
             focus = bind_enter
-        super().__init__(binds=binds, justify_text=justify_text, focus=focus, **kwargs)
+        super().__init__(binds=binds, focus=focus, **kwargs)
         self.text = text
         self.image = image
+        self.justify = justify
         if cb is not None:
             self.callback = cb
         if action is not None:
@@ -218,7 +221,7 @@ class Button(CustomEventResultsMixin, DisableableMixin, Interactive, base_style_
             'width': width,
             'height': height,
             'anchor': self.anchor_info.value,
-            'justify': self.justify_text.value,
+            'justify': self.justify.value,
             'takefocus': int(self.allow_focus),
             **self.style_config,
         }
