@@ -17,13 +17,14 @@ if TYPE_CHECKING:
     from .elements.element import Element, ElementBase  # noqa
     from .enums import BindTargets, BindEvent  # noqa
     from .pseudo_elements import Row
+    from .window import Window  # noqa
 
 # fmt: off
 __all__ = [
     'Bool', 'XY', 'Key', 'HasParent', 'HasValue', 'Layout', 'Axis', 'Orientation', 'PathLike', 'OptInt',
     'BindCallback', 'EventCallback', 'TraceCallback', 'BindTarget', 'Bindable', 'ProvidesEventCallback',
     'TkFill', 'TkSide', 'TkJustify',
-    'TkContainer',
+    'TkContainer', 'HasFrame', 'FrameLike',
 ]
 # fmt: on
 
@@ -52,6 +53,7 @@ TkSide = Literal['left', 'right', 'top', 'bottom']
 TkJustify = Literal['left', 'center', 'right']
 
 TkContainer = Union['Toplevel', 'Frame', 'LabelFrame']
+FrameLike = TypeVar('FrameLike', bound=TkContainer)
 
 RGB = HSL = tuple[int, int, int]
 RGBA = tuple[int, int, int, int]
@@ -111,4 +113,19 @@ class Layout(Protocol[E]):
 
     @abstractmethod
     def __iter__(self) -> Iterator[Iterable[E] | Row[E]]:
+        pass
+
+
+@runtime_checkable
+class HasFrame(Protocol[FrameLike]):
+    __slots__ = ()
+
+    @property
+    @abstractmethod
+    def frame(self) -> FrameLike:
+        pass
+
+    @property
+    @abstractmethod
+    def window(self) -> Window:
         pass

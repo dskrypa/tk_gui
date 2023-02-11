@@ -18,7 +18,7 @@ from .mixins import DisableableMixin, CallbackCommandMixin
 
 if TYPE_CHECKING:
     from ..pseudo_elements import Row
-    from ..typing import Bool, Orientation, T, BindTarget
+    from ..typing import Bool, Orientation, T, BindTarget, TkContainer
 
 __all__ = ['Separator', 'HorizontalSeparator', 'VerticalSeparator', 'ProgressBar', 'Slider']
 log = logging.getLogger(__name__)
@@ -33,11 +33,14 @@ class Separator(ElementBase, base_style_layer='separator'):
         super().__init__(**kwargs)
         self.orientation = orientation
 
-    def pack_into(self, row: Row):
+    def _init_widget(self, tk_container: TkContainer):
         style = self.style
         name, ttk_style = style.make_ttk_style('.Line.TSeparator')
         ttk_style.configure(name, background=style.separator.bg.default)
-        self.widget = TtkSeparator(row.frame, orient=self.orientation, style=name, takefocus=int(self.allow_focus))
+        self.widget = TtkSeparator(tk_container, orient=self.orientation, style=name, takefocus=int(self.allow_focus))
+
+    def pack_into(self, row: Row):
+        self._init_widget(row.frame)
         fill, expand = (tkc.X, True) if self.orientation == tkc.HORIZONTAL else (tkc.Y, False)
         self.pack_widget(fill=fill, expand=expand)
 
@@ -94,7 +97,7 @@ class ProgressBar(Element, base_style_layer='progress'):
         ttk_style.configure(name, **kwargs)
         return name
 
-    def pack_into(self, row: Row):
+    def _init_widget(self, tk_container: TkContainer):
         horizontal = self.orientation == tkc.HORIZONTAL
         kwargs = {
             'style': self._prepare_ttk_style(),
@@ -110,8 +113,7 @@ class ProgressBar(Element, base_style_layer='progress'):
         else:
             kwargs['length'] = width if horizontal else height
 
-        self.widget = Progressbar(row.frame, mode='determinate', **kwargs)
-        self.pack_widget()
+        self.widget = Progressbar(tk_container, mode='determinate', **kwargs)
 
     def update(self, value: int, increment: Bool = True, max_value: int = None):
         bar = self.widget
@@ -184,7 +186,7 @@ class Slider(DisableableMixin, CallbackCommandMixin, Interactive, base_style_lay
         config.setdefault('relief', tkc.FLAT)
         return config
 
-    def pack_into(self, row: Row):
+    def _init_widget(self, tk_container: TkContainer):
         min_val, max_val, interval, default = self.min_value, self.max_value, self.interval, self.default
         if _is_int(min_val) and _is_int(max_val) and _is_int(interval):
             self.tk_var = tk_var = IntVar(value=int(default) if default is not None else default)
@@ -215,8 +217,7 @@ class Slider(DisableableMixin, CallbackCommandMixin, Interactive, base_style_lay
         """
         bigincrement:  digits:  label:  repeatdelay:  repeatinterval:  sliderlength:  sliderrelief:
         """
-        self.widget = Scale(row.frame, **kwargs)
-        self.pack_widget()
+        self.widget = Scale(tk_container, **kwargs)
 
 
 def _is_int(value: float) -> bool:

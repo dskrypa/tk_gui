@@ -29,7 +29,7 @@ from .element import Element
 
 if TYPE_CHECKING:
     from ..pseudo_elements import Row
-    from ..typing import XY, BindTarget, ImageType, Bool, OptInt
+    from ..typing import XY, BindTarget, ImageType, Bool, OptInt, TkContainer, HasFrame
 
 __all__ = ['Image', 'Animation', 'SpinnerImage', 'ClockImage', 'get_size']
 log = logging.getLogger(__name__)
@@ -92,6 +92,12 @@ class Image(Element, base_style_layer='image'):
         self._image = _GuiImage(data)
         if self.widget is not None:
             self.refresh()
+
+    def _init_widget(self, tk_container: TkContainer):
+        pass
+
+    def grid_into(self, parent: HasFrame, row: int, column: int, **kwargs):
+        raise RuntimeError('Grid is not currently supported for images')
 
     def pack_into(self, row: Row):
         try:

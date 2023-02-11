@@ -21,7 +21,7 @@ from .utils import get_current_menu_group, wrap_menu_cb, find_member, copy_menu_
 
 if TYPE_CHECKING:
     from tk_gui.pseudo_elements import Row
-    from tk_gui.typing import Bool, XY, EventCallback, ProvidesEventCallback
+    from tk_gui.typing import Bool, XY, EventCallback, ProvidesEventCallback, TkContainer, HasFrame
 
 __all__ = ['MenuEntry', 'MenuItem', 'MenuGroup', 'Menu', 'CustomMenuItem', 'MenuProperty']
 log = logging.getLogger(__name__)
@@ -375,10 +375,15 @@ class Menu(CustomEventResultsMixin, ContainerMixin, ElementBase, metaclass=MenuM
 
         return menu
 
+    def _init_widget(self, tk_container: TkContainer):
+        self.widget = menu = self.prepare(tk_container)
+        tk_container.configure(menu=menu)
+
     def pack_into(self, row: Row):
-        root = row.window._root
-        self.widget = menu = self.prepare(root)
-        root.configure(menu=menu)
+        self._init_widget(row.window._root)
+
+    def grid_into(self, parent: HasFrame, row: int, column: int, **kwargs):
+        self._init_widget(parent.window._root)
 
     def show(self, event: Event, parent: BaseWidget = None, **kwargs):
         return self.popup((event.x_root, event.y_root), parent, event, **kwargs)

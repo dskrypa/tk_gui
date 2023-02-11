@@ -25,8 +25,7 @@ from .mixins import DisableableMixin
 
 if TYPE_CHECKING:
     from PIL.Image import Image as PILImage
-    from ..pseudo_elements import Row
-    from ..typing import XY, BindCallback, Bool, ImageType, Key
+    from ..typing import XY, BindCallback, Bool, ImageType, Key, TkContainer
 
 __all__ = ['Button', 'OK', 'Cancel', 'Yes', 'No', 'Submit', 'EventButton']
 log = logging.getLogger(__name__)
@@ -213,7 +212,7 @@ class Button(CustomEventResultsMixin, DisableableMixin, Interactive, base_style_
 
         return config
 
-    def pack_into(self, row: Row):
+    def _init_widget(self, tk_container: TkContainer):
         # self.string_var = StringVar()
         # self.string_var.set(self._value)
         width, height = self._pack_size()
@@ -240,11 +239,9 @@ class Button(CustomEventResultsMixin, DisableableMixin, Interactive, base_style_
         if self.disabled:
             kwargs['state'] = self._disabled_state
 
-        self.widget = button = _Button(row.frame, **kwargs)
+        self.widget = button = _Button(tk_container, **kwargs)
         if image:
             button.image = image
-
-        self.pack_widget()
 
     # endregion
 

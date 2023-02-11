@@ -23,7 +23,7 @@ from ._utils import find_descendants
 if TYPE_CHECKING:
     from tkinter import Widget, Event, BaseWidget
     from ..pseudo_elements.row import RowBase, Row
-    from ..typing import XY, Bool, BindCallback, Key, TkFill, BindTarget
+    from ..typing import XY, Bool, BindCallback, Key, TkFill, BindTarget, HasFrame, TkContainer
     from ..window import Window
     from .menu import Menu
 
@@ -44,7 +44,7 @@ class ElementBase(ClearableCachedPropertyMixin, ABC):
     _style_config: dict[str, Any]
     _base_style_layer: str = None
     id: str
-    parent: Optional[RowBase] = None
+    parent: Optional[RowBase | HasFrame] = None
     widget: Optional[Widget] = None
     fill: TkFill = None
     expand: bool = None
@@ -135,8 +135,12 @@ class ElementBase(ClearableCachedPropertyMixin, ABC):
         self.pack_into(row)
 
     @abstractmethod
-    def pack_into(self, row: RowBase):
+    def _init_widget(self, tk_container: TkContainer):
         raise NotImplementedError
+
+    def pack_into(self, row: Row):
+        self._init_widget(row.frame)
+        self.pack_widget()
 
     def pack_widget(self, *, expand: bool = None, fill: TkFill = None, **kwargs):
         if expand is None:
@@ -152,6 +156,26 @@ class ElementBase(ClearableCachedPropertyMixin, ABC):
             **kwargs,
         }
         self.widget.pack(**pack_kwargs)
+
+    # endregion
+
+    # region Grid Methods
+
+    def grid_into_frame(self, parent: HasFrame, row: int, column: int, **kwargs):
+        self.parent = parent
+        self.grid_into(parent, row, column, **kwargs)
+
+    def grid_into(self, parent: HasFrame, row: int, column: int, **kwargs):
+        self._init_widget(parent.frame)
+        self.grid_widget(row, column, **kwargs)
+
+    def grid_widget(self, row: int, column: int, *, row_span: int = None, col_span: int = None, **kwargs):
+        grid_kwargs = {
+            'sticky': self.side.as_sticky(),
+            **self.pad_kw,
+            **kwargs,
+        }
+        self.widget.grid(row=row, column=column, rowspan=row_span, columnspan=col_span, **grid_kwargs)
 
     # endregion
 
@@ -326,6 +350,15 @@ class Element(BindMixin, ElementBase, ABC):
         if self._tooltip:
             del self._tooltip
         self._tooltip = ToolTip(self, text, delay=delay, style=style, wrap_len_px=wrap_len_px)
+
+    def grid_into_frame(self, parent: HasFrame, row: int, column: int, **kwargs):
+        self.parent = parent
+        if key := self._key:
+            parent.window.register_element(key, self)
+        self.grid_into(parent, row, column, **kwargs)
+        self.apply_binds()
+        if tooltip := self.tooltip_text:
+            self.add_tooltip(tooltip)
 
     # endregion
 

@@ -84,7 +84,7 @@ class Side(MissingMixin, Enum, aliases={'l': 'LEFT', 'r': 'RIGHT', 't': 'TOP', '
     TOP = tkc.TOP
     BOTTOM = tkc.BOTTOM
 
-    def as_sticky(self):
+    def as_sticky(self) -> str:
         return SIDE_STICKY_MAP.get(self.value)
 
 

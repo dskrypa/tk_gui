@@ -16,7 +16,7 @@ from .element import ElementBase
 if TYPE_CHECKING:
     from ..enums import Side
     from ..pseudo_elements import Row
-    from ..typing import XY
+    from ..typing import XY, TkContainer
 
 __all__ = ['SizeGrip', 'Spacer']
 
@@ -28,11 +28,14 @@ class SizeGrip(ElementBase):
     def __init__(self, side: Union[str, Side] = tkc.BOTTOM, **kwargs):
         super().__init__(side=side, **kwargs)
 
-    def pack_into(self, row: Row):
+    def _init_widget(self, tk_container: TkContainer):
         style = self.style
         name, ttk_style = style.make_ttk_style('.Sizegrip.TSizegrip')
         ttk_style.configure(name, background=style.base.bg.default)
-        self.widget = Sizegrip(row.frame, style=name, takefocus=int(self.allow_focus))
+        self.widget = Sizegrip(tk_container, style=name, takefocus=int(self.allow_focus))
+
+    def pack_into(self, row: Row):
+        self._init_widget(row.frame)
         self.pack_widget(fill=tkc.X, expand=True, anchor=tkc.SE)
 
 
@@ -47,7 +50,6 @@ class Spacer(ElementBase):
     def style_config(self) -> dict[str, Any]:
         return {'bg': self.style.base.bg.default, **self._style_config}
 
-    def pack_into(self, row: Row):
+    def _init_widget(self, tk_container: TkContainer):
         width, height = self.size
-        self.widget = Frame(row.frame, width=width, height=height, **self.style_config)
-        self.pack_widget()
+        self.widget = Frame(tk_container, width=width, height=height, **self.style_config)

@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from tkinter import BaseWidget
     from ..pseudo_elements import Row
     from ..styles import Font, Layer
+    from ..typing import TkContainer
 
 __all__ = ['TableColumn', 'Table']
 log = logging.getLogger(__name__)
@@ -154,7 +155,7 @@ class Table(Element, base_style_layer='table'):
         ttk_style.configure(name, **config)
         return config
 
-    def pack_into(self, row: Row):
+    def _init_widget(self, tk_container: TkContainer):
         columns, style = self.columns, self.style
         kwargs = {
             'columns': [col.key for col in columns.values()],
@@ -166,10 +167,10 @@ class Table(Element, base_style_layer='table'):
             **self.style_config,
         }
         if self.scroll_y or self.scroll_x:
-            self.widget = outer = ScrollableTreeview(row.frame, self.scroll_y, self.scroll_x, style, **kwargs)
+            self.widget = outer = ScrollableTreeview(tk_container, self.scroll_y, self.scroll_x, style, **kwargs)
             tree_view = outer.inner_widget
         else:
-            self.widget = tree_view = Treeview(row.frame, **kwargs)
+            self.widget = tree_view = Treeview(tk_container, **kwargs)
 
         char_width = style.char_width('table')
         for column in columns.values():
@@ -190,6 +191,9 @@ class Table(Element, base_style_layer='table'):
 
         tree_view.configure(style=self._ttk_style()[0])
         # tree_view.bind('<<TreeviewSelect>>', self._treeview_selected)
+
+    def pack_into(self, row: Row):
+        self._init_widget(row.frame)
         self.pack_widget(expand=True)
 
     @cached_property

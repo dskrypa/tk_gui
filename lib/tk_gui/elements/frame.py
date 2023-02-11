@@ -20,7 +20,7 @@ from ..utils import call_with_popped
 from .element import Element, InteractiveMixin
 
 if TYPE_CHECKING:
-    from ..typing import Layout, Bool, XY
+    from ..typing import Layout, Bool, XY, TkContainer
     from ..pseudo_elements.row import Row
 
 __all__ = [
@@ -81,7 +81,7 @@ class FrameMixin:
 
         return config
 
-    def pack_into(self, row: Row):
+    def _init_widget(self, tk_container: TkContainer):
         kwargs = self.style_config
         if title := self.title:
             kwargs['text'] = title
@@ -93,14 +93,22 @@ class FrameMixin:
         try:
             width, height = self.size
         except TypeError:
-            width = height = None
+            pass
         else:
             kwargs['width'], kwargs['height'] = width, height
 
-        self.widget = frame = frame_cls(row.frame, takefocus=int(self.allow_focus), **kwargs)
+        self.widget = frame_cls(tk_container, takefocus=int(self.allow_focus), **kwargs)
+
+    def pack_into(self, row: Row):
+        self._init_widget(row.frame)
         self.pack_rows()
         self.pack_widget()
         if (pack_propagate := self.pack_propagate) is not None:
+            frame = self.widget
+            try:
+                width, height = self.size
+            except TypeError:
+                width = height = None
             # Setting pack_propagate=False results in the frame retaining its configured size instead of shrinking
             # to fit the elements it contains, but it may cause undesirable results if the window size changes, etc.
             # More info: https://stackoverflow.com/a/566840/19070573
@@ -345,14 +353,18 @@ class ScrollFrame(Element, RowContainer, base_style_layer='frame'):
         outer_kw['inner_kwargs'] = inner_kw
         return outer_kw
 
-    def pack_into(self, row: Row):
+    def _init_widget(self, tk_container: TkContainer):
         kwargs = self._prepare_pack_kwargs()
         labeled = self.title_mode in {'outer', 'both'}
         outer_cls = ScrollableLabelFrame if labeled else ScrollableFrame
         self.widget = outer_frame = outer_cls(self.parent.frame, self.scroll_y, self.scroll_x, **kwargs)
-        self.inner_frame = inner_frame = outer_frame.inner_widget
+        self.inner_frame = outer_frame.inner_widget
+
+    def pack_into(self, row: Row):
+        self._init_widget(row.frame)
+        outer_frame = self.widget
         self.pack_rows()
-        self._update_scroll_region(outer_frame, inner_frame, self.size)
+        self._update_scroll_region(outer_frame, outer_frame.inner_widget, self.size)
         self.pack_widget()
 
     def update_scroll_region(self, size: Optional[XY] = None):

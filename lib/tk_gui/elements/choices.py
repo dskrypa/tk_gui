@@ -19,7 +19,7 @@ from weakref import WeakValueDictionary
 from tk_gui.caching import cached_property
 from tk_gui.enums import ListBoxSelectMode, Anchor
 from tk_gui.pseudo_elements.scroll import ScrollableListbox
-from tk_gui.typing import Bool, T, BindTarget, BindCallback, TraceCallback
+from tk_gui.typing import Bool, T, BindTarget, BindCallback, TraceCallback, TkContainer, HasFrame
 from tk_gui.utils import max_line_len, extract_kwargs
 from ._utils import normalize_underline
 from .element import Interactive
@@ -112,7 +112,7 @@ class Radio(DisableableMixin, CallbackCommandMixin, Interactive, Generic[T], bas
             **self._style_config,
         }
 
-    def pack_into(self, row: Row):
+    def _init_widget(self, tk_container: TkContainer):
         kwargs = {
             'text': self.label,
             'value': self.choice_id,
@@ -130,8 +130,17 @@ class Radio(DisableableMixin, CallbackCommandMixin, Interactive, Generic[T], bas
         if self.disabled:
             kwargs['state'] = self._disabled_state
 
-        self.widget = Radiobutton(row.frame, **kwargs)
+        self.widget = Radiobutton(tk_container, **kwargs)
+
+    def pack_into(self, row: Row):
+        self._init_widget(row.frame)
         self.pack_widget()
+        if self.default:
+            self.select()
+
+    def grid_into(self, parent: HasFrame, row: int, column: int, **kwargs):
+        self._init_widget(parent.frame)
+        self.grid_widget(row, column, **kwargs)
         if self.default:
             self.select()
 
@@ -396,7 +405,7 @@ class CheckBox(DisableableMixin, CallbackCommandMixin, TraceCallbackMixin, Inter
 
     # endregion
 
-    def pack_into(self, row: Row):
+    def _init_widget(self, tk_container: TkContainer):
         self.tk_var = tk_var = BooleanVar(value=self.default)
         kwargs = {
             'text': self.label,
@@ -420,8 +429,7 @@ class CheckBox(DisableableMixin, CallbackCommandMixin, TraceCallbackMixin, Inter
             kwargs['command'] = self.normalize_callback(callback)
 
         self._maybe_add_var_trace()
-        self.widget = Checkbutton(row.frame, **kwargs)
-        self.pack_widget()
+        self.widget = Checkbutton(tk_container, **kwargs)
         # from tk_gui.utils import dump_ttk_widget_info
         # dump_ttk_widget_info(self.widget)
 
@@ -603,7 +611,7 @@ class Combo(
         if widget := self.widget:
             widget.bind('<<ComboboxSelected>>', self.normalize_callback(callback))
 
-    def pack_into(self, row: Row):
+    def _init_widget(self, tk_container: TkContainer):
         self.tk_var = tk_var = StringVar()
         kwargs = {
             'textvariable': tk_var,
@@ -623,13 +631,22 @@ class Combo(
             kwargs['state'] = 'readonly'
 
         self._maybe_add_var_trace()
-        self.widget = combo_box = Combobox(row.frame, **kwargs)
+        self.widget = combo_box = Combobox(tk_container, **kwargs)
         self._apply_ttk_style()
-        self.pack_widget()
-        if default := self.default:
-            combo_box.set(default)
         if (callback := self._callback) is not None:
             combo_box.bind('<<ComboboxSelected>>', self.normalize_callback(callback))
+
+    def pack_into(self, row: Row):
+        self._init_widget(row.frame)
+        self.pack_widget()
+        if default := self.default:
+            self.widget.set(default)
+
+    def grid_into(self, parent: HasFrame, row: int, column: int, **kwargs):
+        self._init_widget(parent.frame)
+        self.grid_widget(row, column, **kwargs)
+        if default := self.default:
+            self.widget.set(default)
 
     def enable(self):
         if not self.disabled:
@@ -827,7 +844,7 @@ class ListBox(DisableableMixin, Interactive, base_style_layer='listbox'):
             **self._style_config,
         }
 
-    def pack_into(self, row: Row):
+    def _init_widget(self, tk_container: TkContainer):
         kwargs = {
             'exportselection': False,  # Prevent selections in this box from affecting others / the primary selection
             'selectmode': self.select_mode.value,
@@ -843,20 +860,29 @@ class ListBox(DisableableMixin, Interactive, base_style_layer='listbox'):
         activestyle: Literal["dotbox", "none", "underline"]
         setgrid: bool
         """
-        self.widget = outer = ScrollableListbox(row.frame, self.scroll_y, self.scroll_x, self.style, **kwargs)
+        self.widget = outer = ScrollableListbox(tk_container, self.scroll_y, self.scroll_x, self.style, **kwargs)
         list_box = outer.inner_widget
         if choices := self.choices:
             list_box.insert(tkc.END, *choices)
             self.reset(default=True)
 
-        self.pack_widget()
-        if self.disabled:
-            # Note: This needs to occur after inserting any values, otherwise they do not appear.
-            list_box.configure(state='disabled')
-
         list_box.bind('<<ListboxSelect>>', self._handle_selection_made)
         if (callback := self._callback) is not None:
             self._callback = self.normalize_callback(callback)
+
+    def pack_into(self, row: Row):
+        self._init_widget(row.frame)
+        self.pack_widget()
+        if self.disabled:
+            # Note: This needs to occur after inserting any values, otherwise they do not appear.
+            self.widget.inner_widget.configure(state='disabled')
+
+    def grid_into(self, parent: HasFrame, row: int, column: int, **kwargs):
+        self._init_widget(parent.frame)
+        self.grid_widget(row, column, **kwargs)
+        if self.disabled:
+            # Note: This needs to occur after inserting any values, otherwise they do not appear.
+            self.widget.inner_widget.configure(state='disabled')
 
     @cached_property
     def widgets(self) -> list[ScrollableListbox | TkListbox | TkFrame | Scrollbar]:

@@ -27,7 +27,7 @@ from .links import LinkTarget, _Link
 if TYPE_CHECKING:
     from tkinter.ttk import Scrollbar
     from tk_gui.pseudo_elements import Row
-    from tk_gui.typing import Bool, XY, BindTarget, TraceCallback, TkFill
+    from tk_gui.typing import Bool, XY, BindTarget, TraceCallback, TkFill, HasFrame, TkContainer
 
 __all__ = ['Text', 'Link', 'Input', 'Multiline', 'Label']
 log = logging.getLogger(__name__)
@@ -118,6 +118,8 @@ class LinkableMixin:
     __bound_id: str | None = None
     _tooltip_text: str | None
     add_tooltip: Callable
+    pack_widget: Callable
+    grid_widget: Callable
     widget: Union[TkLabel, Entry]
     style: Style
     base_style_layer_and_state: tuple[StyleLayer, StyleState]
@@ -208,6 +210,19 @@ class LinkableMixin:
         if link is not None:
             self.update_link(link)
 
+    def _init_widget(self, tk_container: TkContainer):
+        raise NotImplementedError
+
+    def pack_into(self, row: Row):
+        self._init_widget(row.frame)
+        self.pack_widget()
+        self.maybe_enable_link()
+
+    def grid_into(self, parent: HasFrame, row: int, column: int, **kwargs):
+        self._init_widget(parent.frame)
+        self.grid_widget(row, column, **kwargs)
+        self.maybe_enable_link()
+
 
 class Label(TextValueMixin, LinkableMixin, Element, base_style_layer='text'):
     """A text element in which the text is NOT selectable."""
@@ -254,7 +269,7 @@ class Label(TextValueMixin, LinkableMixin, Element, base_style_layer='text'):
             **self._style_config,
         }
 
-    def pack_into(self, row: Row):
+    def _init_widget(self, tk_container: TkContainer):
         self.init_string_var()
         kwargs = {
             'textvariable': self.string_var,
@@ -269,13 +284,10 @@ class Label(TextValueMixin, LinkableMixin, Element, base_style_layer='text'):
         except TypeError:
             pass
 
-        self.widget = label = TkLabel(row.frame, **kwargs)
+        self.widget = label = TkLabel(tk_container, **kwargs)
         if kwargs.get('height', 1) != 1:
             wrap_len = label.winfo_reqwidth()  # width in pixels
             label.configure(wraplength=wrap_len)
-
-        self.pack_widget()
-        self.maybe_enable_link()
 
 
 class Text(TextValueMixin, LinkableMixin, Element):
@@ -328,7 +340,7 @@ class Text(TextValueMixin, LinkableMixin, Element):
         else:
             return self.style.text, StyleState.DEFAULT
 
-    def pack_into(self, row: Row):
+    def _init_widget(self, tk_container: TkContainer):
         self.init_string_var()
         kwargs = {
             'highlightthickness': 0,
@@ -342,9 +354,7 @@ class Text(TextValueMixin, LinkableMixin, Element):
             kwargs['width'] = self._init_size(kwargs.get('font'))[0]
         except TypeError:
             pass
-        self.widget = Entry(row.frame, **kwargs)
-        self.pack_widget()
-        self.maybe_enable_link()
+        self.widget = Entry(tk_container, **kwargs)
 
 
 class Link(Text):
@@ -410,7 +420,7 @@ class Input(TextValueMixin, LinkableMixin, InteractiveText, disabled_state='read
             **self._style_config,
         }
 
-    def pack_into(self, row: Row):
+    def _init_widget(self, tk_container: TkContainer):
         self.init_string_var()
         kwargs = {
             'textvariable': self.string_var,
@@ -426,9 +436,7 @@ class Input(TextValueMixin, LinkableMixin, InteractiveText, disabled_state='read
         if self.disabled:
             kwargs['state'] = self._disabled_state
 
-        self.widget = entry = Entry(row.frame, **kwargs)
-        self.pack_widget()
-        self.maybe_enable_link()
+        self.widget = entry = Entry(tk_container, **kwargs)
         entry.bind('<FocusOut>', partial(_clear_selection, entry), add=True)  # Prevents ghost selections
         if (callback := self._callback) is not None:
             entry.bind('<Key>', self.normalize_callback(callback), add=True)
@@ -557,7 +565,7 @@ class Multiline(InteractiveText, disabled_state='disabled'):
 
     # endregion
 
-    def pack_into(self, row: Row):
+    def _init_widget(self, tk_container: TkContainer):
         kwargs = self.style_config
         kwargs['takefocus'] = int(self.allow_focus)
         try:
@@ -575,7 +583,7 @@ class Multiline(InteractiveText, disabled_state='disabled'):
             kwargs['width'] = max_line_len(value.splitlines())
 
         # Other keys:  maxundo:  spacing1:  spacing2:  spacing3:  tabs:  undo:  wrap:
-        self.widget = scroll_text = ScrollableText(row.frame, self.scroll_y, self.scroll_x, self.style, **kwargs)
+        self.widget = scroll_text = ScrollableText(tk_container, self.scroll_y, self.scroll_x, self.style, **kwargs)
         text = scroll_text.inner_widget
         if value:
             text.insert(1.0, value)
@@ -584,15 +592,24 @@ class Multiline(InteractiveText, disabled_state='disabled'):
         for pos in ('center', 'left', 'right'):
             text.tag_configure(pos, justify=pos)  # noqa
 
-        self.pack_widget()
-        if self.disabled:
-            # Note: This needs to occur after setting any text value, otherwise the text does not appear.
-            text.configure(state='disabled')
-
         if self._read_only:
             self._bind_manager.bind('<Key>', _block_text_entry, text)
         elif (callback := self._input_cb) is not None:
             self._bind_manager.bind('<Key>', callback, text)
+
+    def pack_into(self, row: Row):
+        self._init_widget(row.frame)
+        self.pack_widget()
+        if self.disabled:
+            # Note: This needs to occur after setting any text value, otherwise the text does not appear.
+            self.widget.inner_widget.configure(state='disabled')
+
+    def grid_into(self, parent: HasFrame, row: int, column: int, **kwargs):
+        self._init_widget(parent.frame)
+        self.grid_widget(row, column, **kwargs)
+        if self.disabled:
+            # Note: This needs to occur after setting any text value, otherwise the text does not appear.
+            self.widget.inner_widget.configure(state='disabled')
 
     def __enter__(self) -> Multiline:
         if self.__entered:
