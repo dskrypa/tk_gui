@@ -11,8 +11,6 @@ from tkinter import Frame
 from tkinter.ttk import Sizegrip
 from typing import TYPE_CHECKING, Union, Any
 
-from ..enums import Anchor
-from ..utils import Inheritable
 from .element import ElementBase
 
 if TYPE_CHECKING:
@@ -40,12 +38,10 @@ class SizeGrip(ElementBase):
 
 class Spacer(ElementBase):
     widget: Frame
-    anchor: Anchor = Inheritable('anchor_elements', type=Anchor)
 
-    def __init__(self, size: XY, pad: XY = (0, 0), anchor: Union[str, Anchor] = None, **kwargs):
+    def __init__(self, size: XY, pad: XY = (0, 0), **kwargs):
         super().__init__(pad=pad, **kwargs)
         self.size = size
-        self.anchor = anchor
 
     @property
     def style_config(self) -> dict[str, Any]:
@@ -54,7 +50,4 @@ class Spacer(ElementBase):
     def pack_into(self, row: Row):
         width, height = self.size
         self.widget = Frame(row.frame, width=width, height=height, **self.style_config)
-        if anchor := self.anchor.value:
-            self.pack_widget(anchor=anchor)
-        else:
-            self.pack_widget()
+        self.pack_widget()

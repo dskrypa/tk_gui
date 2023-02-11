@@ -10,7 +10,6 @@ import logging
 import tkinter.constants as tkc
 from abc import ABC, abstractmethod
 from itertools import count
-from tkinter import TclError
 from typing import TYPE_CHECKING, Optional, Callable, Union, Any, overload
 
 from tk_gui.caching import ClearableCachedPropertyMixin, cached_property
@@ -32,9 +31,12 @@ __all__ = ['ElementBase', 'Element', 'Interactive', 'InteractiveMixin']
 log = logging.getLogger(__name__)
 
 _DIRECT_ATTRS = {'key', 'right_click_menu', 'left_click_cb', 'binds', 'data'}
-_INHERITABLES = {'size', 'auto_size_text', 'anchor', 'justify_text'}
-_BASIC = frozenset({'style', 'pad', 'side', 'fill', 'expand', 'allow_focus', 'ignore_grab'})
+_INHERITABLES = {'size', 'auto_size_text', 'justify_text'}
+_BASIC = frozenset({'anchor', 'style', 'pad', 'side', 'fill', 'expand', 'allow_focus', 'ignore_grab'})
 _basic_keys = _BASIC.intersection
+
+_Anchor = Union[str, Anchor]
+_Justify = Union[str, Justify]
 _Side = Union[str, Side]
 
 
@@ -48,6 +50,7 @@ class ElementBase(ClearableCachedPropertyMixin, ABC):
     expand: bool = None
     allow_focus: bool = False
     ignore_grab: bool = False
+    anchor: Anchor = Inheritable('anchor_elements', type=Anchor)
     pad: XY = Inheritable('element_padding')
     side: Side = Inheritable('element_side', type=Side)
     style: Style = Inheritable(type=Style.get_style)
@@ -67,10 +70,12 @@ class ElementBase(ClearableCachedPropertyMixin, ABC):
         expand: bool = None,
         ignore_grab: Bool = False,
         allow_focus: Bool = None,
+        anchor: _Anchor = None,
         _style_config: dict[str, Any] = None,
         **kwargs,
     ):
         self.id = f'{self.__class__.__name__}#{next(self.__counter)}'
+        self.anchor = anchor
         self.pad = pad
         self.side = side
         if _style_config:
@@ -139,6 +144,7 @@ class ElementBase(ClearableCachedPropertyMixin, ABC):
         if fill is None:
             fill = self.fill
         pack_kwargs = {  # Note: using pack_kwargs to allow things like padding overrides
+            'anchor': self.anchor.value,
             'side': self.side.value,
             'expand': False if expand is None else expand,
             'fill': tkc.NONE if not fill else tkc.BOTH if fill is True else fill,
@@ -201,7 +207,6 @@ class Element(BindMixin, ElementBase, ABC):
 
     size: XY = Inheritable('element_size', default=None)
     auto_size_text: bool = Inheritable()
-    anchor: Anchor = Inheritable('anchor_elements', type=Anchor)
     justify_text: Justify = Inheritable('text_justification', type=Justify)
 
     @overload
@@ -213,9 +218,9 @@ class Element(BindMixin, ElementBase, ABC):
         pad: XY = None,
         style: StyleSpec = None,
         auto_size_text: Bool = None,
-        anchor: Union[str, Anchor] = None,
-        side: Union[str, Side] = Side.LEFT,
-        justify_text: Union[str, Justify] = None,
+        anchor: _Anchor = None,
+        side: _Side = Side.LEFT,
+        justify_text: _Justify = None,
         expand: Bool = None,
         fill: TkFill = None,
         allow_focus: bool = False,
@@ -304,19 +309,13 @@ class Element(BindMixin, ElementBase, ABC):
             fill = self.fill
 
         pack_kwargs = {  # Note: using pack_kwargs to allow things like padding overrides
+            'anchor': self.anchor.value,
             'side': self.side.value,
             'expand': False if expand is None else expand,
             'fill': tkc.NONE if not fill else tkc.BOTH if fill is True else fill,
             **self.pad_kw,
             **kwargs,
         }
-        if anchor := self.anchor.value:
-            # TODO: *Should* anchor ever be provided via .configure instead of .pack?
-            # try:
-            #     widget.configure(anchor=anchor)  # noqa
-            # except TclError:  # Not all widgets support anchor in configure
-            pack_kwargs['anchor'] = anchor
-
         widget.pack(**pack_kwargs)
         if not self._visible:
             self._pack_settings = widget.pack_info()
@@ -465,6 +464,34 @@ class InteractiveMixin:
 
 
 class Interactive(InteractiveMixin, Element, ABC):
+    @overload
+    def __init__(
+        self,
+        disabled: Bool = False,
+        focus: Bool = False,
+        valid: Bool = True,
+        *,
+        key: Key = None,
+        size: XY = None,
+        pad: XY = None,
+        style: StyleSpec = None,
+        auto_size_text: Bool = None,
+        anchor: _Anchor = None,
+        side: _Side = Side.LEFT,
+        justify_text: _Justify = None,
+        expand: Bool = None,
+        fill: TkFill = None,
+        allow_focus: bool = False,
+        visible: Bool = True,
+        tooltip: str = None,
+        right_click_menu: Menu = None,
+        left_click_cb: Callable = None,
+        binds: BindMapping = None,
+        bind_clicks: Bool = None,
+        data: Any = None,
+    ):
+        ...
+
     def __init__(self, disabled: Bool = False, focus: Bool = False, valid: Bool = True, **kwargs):
         super().__init__(**kwargs)
         self.init_interactive(disabled, focus, valid)
