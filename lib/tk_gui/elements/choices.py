@@ -530,7 +530,7 @@ class Combo(
         replace: Bool = False,
         disabled: Bool = None,
     ):
-        if choices:
+        if choices is not None:
             self.update_choices(choices, replace)
         if selection is not _NotSet:
             self.select(selection)
@@ -791,7 +791,7 @@ class ListBox(DisableableMixin, Interactive, base_style_layer='listbox'):
         disabled: Bool = None,
         **kwargs,
     ):
-        if choices:
+        if choices is not None:
             self.update_choices(choices, **extract_kwargs(kwargs, {'replace', 'select', 'resize'}))
         if selection is not _NotSet:
             self.select(selection)
