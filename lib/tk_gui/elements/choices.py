@@ -727,7 +727,7 @@ class ListBox(DisableableMixin, Interactive, base_style_layer='listbox'):
         if replace and self.was_packed:
             list_box = self.widget.inner_widget
             list_box.delete(0, len(self.choices))
-        self._set_choices(choices if replace else (*self.choices, *choices), select, resize)
+        self._set_choices(choices if replace else (*self.choices, *choices), choices, select, resize)
 
     def _set_choices(
         self, values: Collection[str], new_values: Collection[str], select: Bool = False, resize: Bool = True
