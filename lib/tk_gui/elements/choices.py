@@ -12,7 +12,8 @@ from contextvars import ContextVar
 from itertools import count
 from tkinter import Radiobutton, Checkbutton, BooleanVar, IntVar, StringVar, Event, TclError
 from tkinter.ttk import Combobox
-from typing import TYPE_CHECKING, Optional, Union, Any, MutableMapping, Generic, Collection, TypeVar, Sequence, Iterable
+from typing import TYPE_CHECKING, Optional, Union, Any, Generic, Collection, TypeVar, Sequence, Iterable
+from typing import Mapping, MutableMapping
 from weakref import WeakValueDictionary
 
 from tk_gui.caching import cached_property
@@ -30,7 +31,7 @@ if TYPE_CHECKING:
     from tkinter.ttk import Style as TtkStyle
     from tk_gui.pseudo_elements import Row
 
-__all__ = ['Radio', 'RadioGroup', 'CheckBox', 'Combo', 'Dropdown', 'ListBox', 'make_checkbox_grid']
+__all__ = ['Radio', 'RadioGroup', 'CheckBox', 'Combo', 'ComboMap', 'Dropdown', 'ListBox', 'make_checkbox_grid']
 log = logging.getLogger(__name__)
 
 _NotSet = object()
@@ -438,6 +439,7 @@ class Combo(
     """A form element that provides a drop down list of items to select.  Only 1 item may be selected."""
     widget: Combobox
     tk_var: Optional[StringVar] = None
+    allow_any: Bool
 
     def __init__(
         self,
@@ -447,27 +449,71 @@ class Combo(
         read_only: Bool = False,
         callback: BindTarget = None,
         change_cb: TraceCallback = None,
+        allow_any: Bool = False,
         **kwargs,
     ):
         super().__init__(**kwargs)
-        self.choices = choices
+        self.choices = tuple(choices)
         self.default = default
         self.read_only = read_only
+        self.allow_any = allow_any
         self._callback = callback
         if change_cb:
             self.var_change_cb = change_cb
 
+    # region Selection Methods
+
     @property
-    def value(self) -> Any:
+    def value(self) -> str | None:
         # TODO: Automatically mark invalid when an invalid value is manually typed?
         # TODO: Auto-filter to prefixed values on starting to type?
-        # TODO: Prevent typing / force selection from choices?
         choice = self.tk_var.get()
-        # TODO: Add way to programmatically reset / change / update choices + selection
-        try:
-            return self.choices[choice]  # noqa
-        except TypeError:
-            return choice if choice else None
+        if choice and (self.allow_any or choice in self.choices):
+            return choice
+        return None
+
+    def select(self, value: str | int | None):
+        if isinstance(value, int):
+            try:
+                choice = self.choices[value]
+            except IndexError:
+                raise ValueError(f'Invalid selection index={value} - pick from choices={self.choices}')
+            else:
+                self.widget.set(choice)
+        elif not value:
+            self.widget.set('')
+        elif not self.allow_any and value not in self.choices:
+            raise ValueError(f'Invalid selection {value=} - pick from choices={self.choices}')
+        else:
+            self.widget.set(value)
+
+    def update_choices(self, choices: Collection[str], replace: Bool = False):
+        if not self.was_packed:
+            if replace:
+                self.choices = tuple(choices)
+                if (default := self.default) and default not in choices:
+                    self.default = None
+            else:
+                self.choices = tuple(*self.choices, *choices)
+            return
+
+        if replace:
+            selected = self.value
+            self.choices = tuple(choices)
+            if selected and selected not in choices:
+                self.widget.set('')
+        else:
+            self.choices = tuple(*self.choices, *choices)
+
+        self.widget['values'] = self.choices
+
+    def reset(self, default: Bool = True):
+        if default:
+            self.select(self.default)  # if the default is None, this will clear the selection
+        else:
+            self.widget.set('')
+
+    # endregion
 
     # region Style Methods
 
@@ -532,7 +578,7 @@ class Combo(
         kwargs = {
             'textvariable': tk_var,
             'style': self._prepare_ttk_style(),
-            'values': list(self.choices),
+            'values': self.choices,
             'takefocus': int(self.allow_focus),
             **self.style_config,
         }
@@ -564,6 +610,28 @@ class Combo(
 
 
 Dropdown = Combo
+
+
+class ComboMap(Generic[T], Combo):
+    def __init__(self, choices: Mapping[str, T], default: str = None, **kwargs):
+        if kwargs.get('allow_any', False):
+            raise TypeError(
+                f'Unable to initialize {self.__class__.__name__} with allow_any=True - selections must match choices'
+            )
+        super().__init__(choices, default, **kwargs)
+        self._choice_map = choices
+
+    @property
+    def value(self) -> T | None:
+        choice = self.tk_var.get()
+        try:
+            return self._choice_map[choice]
+        except (TypeError, KeyError):
+            return None
+
+    def update_choices(self, choices: Mapping[str, T], replace: Bool = False):
+        self._choice_map = choice_map = choices if replace else {**self._choice_map, **choices}
+        super().update_choices(choice_map, replace)
 
 
 class ListBox(DisableableMixin, Interactive, base_style_layer='listbox'):
@@ -631,9 +699,12 @@ class ListBox(DisableableMixin, Interactive, base_style_layer='listbox'):
             list_box.selection_set(i)
 
     def append_choice(self, value: str, select: Bool = False, resize: Bool = True):
-        list_box = self.widget.inner_widget
-        list_box.insert(tkc.END, value)
         self.choices = (*self.choices, value)
+        try:
+            list_box = self.widget.inner_widget
+        except AttributeError:  # Widget has not been initialized/packed yet
+            return
+        list_box.insert(tkc.END, value)
         num_choices = len(self.choices)
         if select:
             list_box.selection_set(num_choices - 1)
@@ -641,7 +712,10 @@ class ListBox(DisableableMixin, Interactive, base_style_layer='listbox'):
             list_box.configure(height=num_choices)
 
     def reset(self, default: Bool = True):
-        list_box = self.widget.inner_widget
+        try:
+            list_box = self.widget.inner_widget
+        except AttributeError:  # Widget has not been initialized/packed yet
+            return
         if default and (defaults := self.defaults):
             for i, choice in enumerate(self.choices):
                 if choice in defaults:
