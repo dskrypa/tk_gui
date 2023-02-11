@@ -18,6 +18,7 @@ from PIL.Image import Image as PILImage, Resampling, open as open_image
 from PIL.ImageSequence import Iterator as FrameIterator
 from PIL.ImageTk import PhotoImage
 
+from ..enums import Anchor
 from ..images import SevenSegmentDisplay, calculate_resize, as_image
 from ..images.cycle import FrameCycle, PhotoImageCycle
 from ..images.spinner import Spinner
@@ -44,6 +45,7 @@ class Image(Element, base_style_layer='image'):
     widget: Label = None
     animated: bool = False
     popup_title: str = None
+    anchor_image: Anchor = Anchor.NONE
 
     def __init_subclass__(cls, animated: bool = None, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -57,6 +59,7 @@ class Image(Element, base_style_layer='image'):
         callback: BindTarget = None,
         popup: Bool = None,
         popup_title: str = None,
+        anchor_image: Union[str, Anchor] = None,
         **kwargs,
     ):
         """
@@ -77,6 +80,8 @@ class Image(Element, base_style_layer='image'):
             self.popup_title = popup_title
         elif cb_provided:
             self._callback = callback
+        if anchor_image:
+            self.anchor_image = Anchor(anchor_image)
 
     @property
     def image(self) -> Optional[_GuiImage]:
@@ -107,7 +112,13 @@ class Image(Element, base_style_layer='image'):
 
     def _pack_into(self, row: Row, image: _Image, width: int, height: int):
         # log.debug(f'Packing {image=} into row with {width=}, {height=}')
-        kwargs = {'width': width, 'height': height, 'takefocus': int(self.allow_focus), **self.style_config}
+        kwargs = {
+            'width': width,
+            'height': height,
+            'anchor': self.anchor_image.value,
+            'takefocus': int(self.allow_focus),
+            **self.style_config,
+        }
         if image:
             kwargs['image'] = image
 
@@ -122,7 +133,7 @@ class Image(Element, base_style_layer='image'):
         # log.debug(f'_re_pack: {width=}, {height=}, {self}')
         self.size = (width, height)
         widget = self.widget
-        widget.configure(image=image, width=width, height=height)
+        widget.configure(image=image, width=width, height=height, anchor=self.anchor_image.value)
 
         widget.image = image
         widget.pack(**self.pad_kw)

@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Union, Optional, Any
 
 from PIL.ImageTk import PhotoImage
 
-from ..enums import Justify
+from ..enums import Justify, Anchor
 from ..event_handling import BindMap, BindMapping, CustomEventResultsMixin
 from ..images import as_image, scale_image
 from .element import Interactive
@@ -47,6 +47,7 @@ class ButtonAction(Enum):
 class Button(CustomEventResultsMixin, DisableableMixin, Interactive, base_style_layer='button'):
     widget: _Button
     separate: bool = False
+    anchor_info: Anchor = Anchor.NONE
     bind_enter: bool = False
     callback: BindCallback = None
     _action: ButtonAction | None = None
@@ -57,6 +58,7 @@ class Button(CustomEventResultsMixin, DisableableMixin, Interactive, base_style_
         image: ImageType = None,
         *,
         shortcut: str = None,
+        anchor_info: Union[str, Anchor] = None,
         justify_text: Union[str, Justify, None] = Justify.CENTER,
         action: Union[ButtonAction, str] = None,
         binds: BindMapping = None,
@@ -89,6 +91,8 @@ class Button(CustomEventResultsMixin, DisableableMixin, Interactive, base_style_
             self.callback = cb
         if action is not None:
             self.action = action
+        if anchor_info:
+            self.anchor_info = Anchor(anchor_info)
         self._last_press = 0
         self._last_release = 0
         self._last_activated = 0
@@ -213,6 +217,7 @@ class Button(CustomEventResultsMixin, DisableableMixin, Interactive, base_style_
         kwargs = {
             'width': width,
             'height': height,
+            'anchor': self.anchor_info.value,
             'justify': self.justify_text.value,
             'takefocus': int(self.allow_focus),
             **self.style_config,

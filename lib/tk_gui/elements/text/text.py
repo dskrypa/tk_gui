@@ -204,6 +204,7 @@ class LinkableMixin:
 class Label(TextValueMixin, LinkableMixin, Element, base_style_layer='text'):
     """A text element in which the text is NOT selectable."""
     widget: TkLabel
+    anchor_info: Anchor = Anchor.NONE
 
     def __init__(
         self,
@@ -211,7 +212,7 @@ class Label(TextValueMixin, LinkableMixin, Element, base_style_layer='text'):
         link: _Link | LinkTarget = None,
         *,
         justify: Union[str, Justify] = None,
-        anchor: Union[str, Anchor] = None,
+        anchor_info: Union[str, Anchor] = None,
         link_bind: str = None,
         auto_size: Bool = True,
         change_cb: TraceCallback = None,
@@ -219,12 +220,14 @@ class Label(TextValueMixin, LinkableMixin, Element, base_style_layer='text'):
     ):
         self.value = value
         self.init_linkable(link, link_bind, kwargs.pop('tooltip', None))
-        if justify is anchor is None:
+        if justify is anchor_info is None:
             justify = Justify.LEFT
-            anchor = Justify.LEFT.as_anchor()
-        super().__init__(justify_text=justify, anchor=anchor, **kwargs)
+            anchor_info = justify.as_anchor()
+        super().__init__(justify_text=justify, **kwargs)
         if change_cb:
             self.var_change_cb = change_cb
+        if anchor_info:
+            self.anchor_info = Anchor(anchor_info)
         self._auto_size = auto_size
 
     @property
@@ -246,6 +249,7 @@ class Label(TextValueMixin, LinkableMixin, Element, base_style_layer='text'):
         self.init_string_var()
         kwargs = {
             'textvariable': self.string_var,
+            'anchor': self.anchor_info.value,
             'justify': self.justify_text.value,
             'wraplength': 0,
             'takefocus': int(self.allow_focus),

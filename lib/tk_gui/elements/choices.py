@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Optional, Union, Any, MutableMapping, Generic,
 from weakref import WeakValueDictionary
 
 from tk_gui.caching import cached_property
-from tk_gui.enums import ListBoxSelectMode
+from tk_gui.enums import ListBoxSelectMode, Anchor
 from tk_gui.pseudo_elements.scroll import ScrollableListbox
 from tk_gui.typing import Bool, T, BindTarget, BindCallback, TraceCallback
 from tk_gui.utils import max_line_len
@@ -37,13 +37,14 @@ _NotSet = object()
 _radio_group_stack = ContextVar('tk_gui.elements.choices.radio.stack', default=[])
 A = TypeVar('A')
 B = TypeVar('B')
-
+_Anchor = Union[str, Anchor]
 
 # region Radio
 
 
 class Radio(DisableableMixin, CallbackCommandMixin, Interactive, Generic[T], base_style_layer='radio'):
     widget: Radiobutton
+    anchor_info: Anchor = Anchor.NONE
 
     def __init__(
         self,
@@ -51,6 +52,7 @@ class Radio(DisableableMixin, CallbackCommandMixin, Interactive, Generic[T], bas
         value: T = _NotSet,
         default: Bool = False,
         *,
+        anchor_info: _Anchor = None,
         group: Union[RadioGroup, int] = None,
         callback: BindTarget = None,
         **kwargs,
@@ -63,6 +65,8 @@ class Radio(DisableableMixin, CallbackCommandMixin, Interactive, Generic[T], bas
         self.choice_id = self.group.register(self)
         kwargs.setdefault('anchor', 'nw')
         super().__init__(**kwargs)
+        if anchor_info:
+            self.anchor_info = Anchor(anchor_info)
 
     def __repr__(self) -> str:
         val_str = f', value={self._value!r}' if self._value is not _NotSet else ''
@@ -111,6 +115,7 @@ class Radio(DisableableMixin, CallbackCommandMixin, Interactive, Generic[T], bas
         kwargs = {
             'text': self.label,
             'value': self.choice_id,
+            'anchor': self.anchor_info.value,
             'variable': self.group.get_selection_var(),
             'takefocus': int(self.allow_focus),
             **self.style_config,
@@ -245,6 +250,7 @@ class CheckBox(DisableableMixin, CallbackCommandMixin, TraceCallbackMixin, Inter
     widget: Checkbutton
     tk_var: Optional[BooleanVar] = None
     _values: Optional[tuple[B, A]] = None
+    anchor_info: Anchor = Anchor.NONE
     # TODO: Helper for initializing custom checkbox with a locked/unlocked padlock icon?
 
     def __init__(
@@ -254,6 +260,7 @@ class CheckBox(DisableableMixin, CallbackCommandMixin, TraceCallbackMixin, Inter
         *,
         true_value: A = None,
         false_value: B = None,
+        anchor_info: _Anchor = None,
         underline: Union[str, int] = None,
         callback: BindTarget = None,
         change_cb: TraceCallback = None,
@@ -268,6 +275,8 @@ class CheckBox(DisableableMixin, CallbackCommandMixin, TraceCallbackMixin, Inter
             self.var_change_cb = change_cb
         if not (true_value is false_value is None):
             self._values = (false_value, true_value)
+        if anchor_info:
+            self.anchor_info = Anchor(anchor_info)
 
     # region Value-related Methods
 
@@ -376,6 +385,7 @@ class CheckBox(DisableableMixin, CallbackCommandMixin, TraceCallbackMixin, Inter
         kwargs = {
             'text': self.label,
             'variable': tk_var,
+            'anchor': self.anchor_info.value,
             'takefocus': int(self.allow_focus),
             'underline': self.underline,
             # 'style': self._prepare_ttk_style(),
