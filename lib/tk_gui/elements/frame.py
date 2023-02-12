@@ -228,17 +228,7 @@ class BasicInteractiveRowFrame(InteractiveRowFrame):
 # endregion
 
 
-class Frame(FrameMixin, Element, RowContainer, base_style_layer='frame'):
-    def __init__(self, layout: Layout = None, **kwargs):
-        self.init_frame_from_kwargs(kwargs)
-        self.init_container_from_kwargs(layout, kwargs=kwargs)
-        Element.__init__(self, **kwargs)
-
-    def __repr__(self) -> str:
-        key, size, visible, rows = self._key, self.size, self._visible, len(self.rows)
-        key_str = f'{key=}, ' if key else ''
-        return f'<{self.__class__.__name__}[id={self.id}, {key_str}{size=}, {visible=}, {rows=}]>'
-
+class CustomLayoutRowContainer(RowContainer, ABC):
     def get_custom_layout(self) -> Layout:  # noqa
         """
         Intended to be overridden by subclasses to provide a standardized way of defining additional rows / a custom
@@ -260,6 +250,18 @@ class Frame(FrameMixin, Element, RowContainer, base_style_layer='frame'):
         if layout := self.get_custom_layout():
             self.add_rows(layout)
         super().grid_rows()
+
+
+class Frame(FrameMixin, Element, CustomLayoutRowContainer, base_style_layer='frame'):
+    def __init__(self, layout: Layout = None, **kwargs):
+        self.init_frame_from_kwargs(kwargs)
+        self.init_container_from_kwargs(layout, kwargs=kwargs)
+        Element.__init__(self, **kwargs)
+
+    def __repr__(self) -> str:
+        key, size, visible, rows = self._key, self.size, self._visible, len(self.rows)
+        key_str = f'{key=}, ' if key else ''
+        return f'<{self.__class__.__name__}[id={self.id}, {key_str}{size=}, {visible=}, {rows=}]>'
 
 
 class InteractiveFrameMixin(InteractiveMixin):
@@ -303,7 +305,7 @@ class InteractiveFrame(InteractiveFrameMixin, Frame, ABC):
         return f'<{self.__class__.__name__}[id={self.id}, {key_str}{size=}, {visible=}, {rows=}, {disabled=}]>'
 
 
-class ScrollFrame(Element, RowContainer, base_style_layer='frame'):
+class ScrollFrame(Element, CustomLayoutRowContainer, base_style_layer='frame'):
     widget: Union[ScrollableLabelFrame, ScrollableFrame]
     inner_frame: Union[TkFrame, LabelFrame]
     inner_style: Optional[Style] = None
