@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     'Opt', 'Option', 'BoolOption',
-    'CheckboxOption', 'InputOption', 'DropdownOption', 'ListboxOption', 'PopupOption', 'PathOption',
+    'CheckboxOption', 'InputOption', 'DropdownOption', 'ListboxOption', 'PopupOption', 'PathOption', 'SubmitOption',
 ]
 log = logging.getLogger(__name__)
 
@@ -324,6 +324,23 @@ class PathOption(PopupOption, opt_type='path'):
                 self.value_key, self, f'Invalid {path=} for option={self.name!r} (not a file)', path
             )
         return path.as_posix()
+
+
+class SubmitOption(Option, opt_type='button'):
+    """Submit button that should be included when using GuiOptions as a popup"""
+    element_count = 1
+
+    def __init__(self, name: str = '__submit__', label: str = 'Submit', bind_enter: bool = False, **kwargs):
+        super().__init__(name, label, **kwargs)
+        self.bind_enter = bind_enter
+
+    def common_kwargs(self, disable_all: bool, change_cb: TraceCallback = None) -> dict[str, Any]:
+        kwargs = super().common_kwargs(disable_all, change_cb)
+        kwargs['cb'] = kwargs.pop('change_cb')  # Button doesn't support change_cb
+        return kwargs
+
+    def as_elements(self, disable_all: bool, change_cb: TraceCallback = None) -> Iterator[Button]:
+        yield Button(self.label, bind_enter=self.bind_enter, **self.common_kwargs(disable_all, change_cb))
 
 
 Opt = TypeVar('Opt', bound=Option)

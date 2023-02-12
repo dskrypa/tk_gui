@@ -141,8 +141,8 @@ class GuiOptions(GuiOptionsBase):
     ):
         super().__init__(title, disable_on_parsed)
         self.layout = OptionLayout(options)
-        for option in self.layout.options():
-            self.options[option.name] = option
+        self.options = {option.name: option for option in self.layout.options()}
+        self.options.pop('__submit__', None)
 
     # region Render Methods
 

@@ -30,16 +30,17 @@ class OptionContainer(ABC):
 
 
 class OptionColumn(OptionContainer):
-    __slots__ = ('_options',)
+    __slots__ = ('_options', 'frame_kwargs')
     _options: list[OptionComponent]
 
-    def __init__(self, options: Iterable[OptionComponent]):
+    def __init__(self, options: Iterable[OptionComponent], **kwargs):
         self._options = list(options)
+        self.frame_kwargs = kwargs
 
-    def as_element(self, disable_all: bool, change_cb: TraceCallback = None, **kwargs) -> InteractiveFrame:
+    def as_element(self, disable_all: bool, change_cb: TraceCallback = None) -> InteractiveFrame:
         layout = ([opt.as_element(disable_all, change_cb)] for opt in self._options)
-        kwargs.setdefault('pad', (0, 0))
-        return InteractiveFrame(layout, **kwargs)
+        self.frame_kwargs.setdefault('pad', (0, 0))
+        return InteractiveFrame(layout, **self.frame_kwargs)
 
     def options(self) -> Iterator[Opt]:
         for opt in self._options:
@@ -63,15 +64,16 @@ class OptionRows(OptionContainer):
 
 
 class OptionGrid(OptionRows):
-    __slots__ = ()
+    __slots__ = ('frame_kwargs',)
 
-    def __init__(self, option_layout: Iterable[Iterable[OptionComponent]]):
+    def __init__(self, option_layout: Iterable[Iterable[OptionComponent]], **kwargs):
         self.rows = [[opt for opt in row] for row in option_layout]
+        self.frame_kwargs = kwargs
 
-    def as_element(self, disable_all: bool, change_cb: TraceCallback = None, **kwargs) -> InteractiveFrame:
+    def as_element(self, disable_all: bool, change_cb: TraceCallback = None) -> InteractiveFrame:
         layout = ((opt.as_element(disable_all, change_cb) for opt in row) for row in self.rows)
-        kwargs.setdefault('pad', (0, 0))
-        return InteractiveFrame(layout, grid=True, **kwargs)
+        self.frame_kwargs.setdefault('pad', (0, 0))
+        return InteractiveFrame(layout, grid=True, **self.frame_kwargs)
 
 
 class OptionLayout(OptionRows):
