@@ -15,7 +15,9 @@ from PIL.ImageColor import getrgb
 if TYPE_CHECKING:
     from tk_gui.typing import RGB, HSL, RGBA, Color
 
-__all__ = ['color_to_rgb', 'get_hue', 'get_lightness', 'get_saturation', 'pick_fg', 'find_unused_color']
+__all__ = [
+    'color_to_rgb', 'get_hue', 'get_lightness', 'get_saturation', 'pick_fg', 'find_unused_color', 'color_to_rgb_str'
+]
 
 
 def color_to_rgb(color: Color) -> Union[RGB, RGBA]:
@@ -27,6 +29,13 @@ def color_to_rgb(color: Color) -> Union[RGB, RGBA]:
         if isinstance(color, str) and len(color) in (3, 4, 6, 8):
             return getrgb(f'#{color}')
         raise
+
+
+def color_to_rgb_str(color: Color) -> str:
+    if isinstance(color, str) and color.startswith('#') and len(color) == 7:
+        return color
+    r, g, b, *a = color_to_rgb(color)
+    return f'#{r:2x}{g:2x}{b:2x}'
 
 
 def pick_fg(bg: Optional[Color]) -> Optional[str]:

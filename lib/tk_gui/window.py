@@ -144,7 +144,7 @@ class Window(BindMixin, RowContainer):
     resizable: bool = True
     can_minimize: bool = True
     transparent_color: str = None
-    alpha_channel: int = None
+    alpha_channel: float = None
     no_title_bar: bool = False
     modal: bool = False
     scaling: float = None
@@ -171,7 +171,7 @@ class Window(BindMixin, RowContainer):
         keep_on_top: Bool = False,
         can_minimize: Bool = True,
         transparent_color: str = None,
-        alpha_channel: int = None,
+        alpha_channel: float = None,
         icon: bytes = None,
         modal: Bool = False,
         no_title_bar: Bool = False,
@@ -603,7 +603,7 @@ class Window(BindMixin, RowContainer):
 
     # region Config / Update Methods
 
-    def set_alpha(self, alpha: int):
+    def set_alpha(self, alpha: float):
         try:
             self._root.attributes('-alpha', alpha)
         except (TclError, RuntimeError):

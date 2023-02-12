@@ -29,9 +29,11 @@ def run_task_with_spinner(
     func: Callable[P, T], args: P.args = (), kwargs: P.kwargs = None, spinner_size: XY = (200, 200), **spin_kwargs
 ) -> T:
     spinner = SpinnerPopup(size=spinner_size, **spin_kwargs)
-    func_future, thread = _as_future(func, args, kwargs, cb=lambda: spinner.window.interrupt())
-    thread.join(0.05)
-    while thread.is_alive():
+    spin_future, spin_thread = _as_future(spinner.run)
+    func_future, func_thread = _as_future(func, args, kwargs, cb=lambda *a: spinner.window.interrupt())
+    spin_thread.join(0.05)
+    func_thread.join(0.05)
+    while func_thread.is_alive():
         try:
             future, func, args, kwargs = POPUP_QUEUE.get(timeout=0.05)
         except Empty:

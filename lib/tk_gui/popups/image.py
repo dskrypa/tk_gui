@@ -11,10 +11,10 @@ from typing import TYPE_CHECKING, Optional, Union
 
 from PIL.Image import MIME
 
-from ..elements.images import AnimatedType, Image, Animation, ClockImage, SpinnerImage, get_size
-from ..event_handling import event_handler
-from ..positioning import positioner
-from ..images import as_image
+from tk_gui.elements.images import AnimatedType, Image, Animation, ClockImage, SpinnerImage, get_size
+from tk_gui.event_handling import event_handler
+from tk_gui.positioning import positioner
+from tk_gui.images import as_image
 from .base import Popup
 
 if TYPE_CHECKING:
@@ -114,8 +114,15 @@ class AnimatedPopup(ImagePopup):
 
 
 class SpinnerPopup(AnimatedPopup):
+    gui_image: SpinnerImage
+
     def __init__(self, *args, img_size: XY = None, **kwargs):
         self._img_size = img_size
+        kwargs.setdefault('bind_esc', False)
+        kwargs.setdefault('keep_on_top', True)
+        kwargs.setdefault('can_minimize', False)
+        kwargs.setdefault('no_title_bar', True)
+        # kwargs.setdefault('alpha_channel', 0.8)  # This would make it semi-transparent; transparent_color didn't work
         super().__init__(None, *args, **kwargs)
 
     def _set_image(self, image: None):

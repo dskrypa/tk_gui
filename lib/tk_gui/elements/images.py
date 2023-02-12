@@ -268,7 +268,7 @@ class SpinnerImage(Animation):
     def __init__(self, **kwargs):
         spinner_kwargs = _extract_kwargs(kwargs, self._spinner_keys, self.DEFAULT_KWARGS)
         size = spinner_kwargs.setdefault('size', self.DEFAULT_SIZE)
-        spinner = Spinner(**spinner_kwargs)
+        self.spinner = spinner = Spinner(**spinner_kwargs)
         super().__init__(spinner, size=size, **kwargs)
 
     def target_size(self, width: int, height: int) -> XY:
