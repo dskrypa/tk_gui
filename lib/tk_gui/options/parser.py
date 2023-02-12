@@ -65,7 +65,7 @@ class GuiOptionsBase(ABC):
                 raise KeyError(f'No value or default has been provided for option={name!r}') from None
             return default
 
-    def update(self, options: Optional[Mapping[str, Any]]):
+    def update(self, options: Mapping[str, Any] | GuiOptionsBase | None):
         """Update the selected options based on previous input"""
         if options is None:
             return

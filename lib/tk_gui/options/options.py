@@ -22,7 +22,8 @@ if TYPE_CHECKING:
 
 __all__ = [
     'Opt', 'Option', 'BoolOption',
-    'CheckboxOption', 'InputOption', 'DropdownOption', 'ListboxOption', 'PopupOption', 'PathOption', 'SubmitOption',
+    'CheckboxOption', 'InputOption', 'DropdownOption', 'ListboxOption', 'SubmitOption',
+    'PopupOption', 'PathOption', 'DirectoryOption',
 ]
 log = logging.getLogger(__name__)
 
@@ -324,6 +325,21 @@ class PathOption(PopupOption, opt_type='path'):
                 self.value_key, self, f'Invalid {path=} for option={self.name!r} (not a file)', path
             )
         return path.as_posix()
+
+
+class DirectoryOption(PathOption, opt_type='directory'):
+    def __init__(
+        self,
+        name: str,
+        label: str,
+        popup_cls: Type[BasePopup] = PickFolder,
+        button: str = 'Browse',
+        default: Any = _NotSet,
+        disabled: bool = False,
+        must_exist: bool = False,
+        **kwargs,
+    ):
+        super().__init__(name, label, popup_cls, button, default, disabled, must_exist, **kwargs)
 
 
 class SubmitOption(Option, opt_type='button'):
