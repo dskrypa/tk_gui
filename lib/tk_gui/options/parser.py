@@ -126,7 +126,7 @@ class GuiOptionsBase(ABC):
     def get_layout(self, disable_all: bool = None, change_cb: TraceCallback = None) -> Layout:
         raise NotImplementedError
 
-    def run_popup(self, **kwargs):
+    def run_popup(self, **kwargs) -> dict[str, Any]:
         from tk_gui.views.options import GuiOptionsView
 
         return GuiOptionsView(self, **kwargs).run()

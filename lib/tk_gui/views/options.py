@@ -4,7 +4,7 @@ View generated to manage gui options
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from .view import View
 
@@ -24,6 +24,6 @@ class GuiOptionsView(View, title='Options'):
     def get_pre_window_layout(self):
         return self.gui_options.get_layout()
 
-    def run(self):
+    def run(self) -> dict[str, Any]:
         data = super().run()
         return self.gui_options.parse(data)  # noqa

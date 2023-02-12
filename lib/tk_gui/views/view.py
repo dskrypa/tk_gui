@@ -36,9 +36,11 @@ class View(HandlesEvents):
         if title:
             cls.title = title
 
-    def __init__(self, parent: Union[View, Window] = None):
+    def __init__(self, parent: Union[View, Window] = None, *, title: str = None):
         if parent is not None:
             self.parent = parent
+        if title is not None:
+            self.title = title
 
     def __repr__(self) -> str:
         return f'<{self.__class__.__name__}[{self.title}][handlers: {len(self._event_handlers_)}]>'
