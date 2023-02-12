@@ -18,7 +18,7 @@ from .exceptions import SingleParsingError
 
 if TYPE_CHECKING:
     from tkinter import Event
-    from tk_gui.typing import TraceCallback, AnyEle
+    from tk_gui.typing import TraceCallback, AnyEle, XY
 
 __all__ = [
     'Opt', 'Option', 'BoolOption',
@@ -55,6 +55,8 @@ class Option(ABC):
         *,
         disabled: bool = False,
         required: bool = False,
+        label_size: XY = None,
+        label_kw: dict[str, Any] = None,
         row: int = _NotSet,
         col: Optional[int] = _NotSet,
         **kwargs
@@ -64,6 +66,8 @@ class Option(ABC):
         self.default = default
         self.disabled = disabled
         self.required = required
+        self.label_size = label_size
+        self.label_kw = label_kw
         self.row = row
         self.col = col
         self.kwargs = kwargs
@@ -107,6 +111,12 @@ class Option(ABC):
         for ele in self.as_elements(disable_all, change_cb):
             yield col_num, row_num, ele
 
+    def _label_element(self) -> Text:
+        if label_kwargs := self.label_kw:
+            return Text(self.label, size=self.label_size, **label_kwargs)
+        else:
+            return Text(self.label, size=self.label_size)
+
     @abstractmethod
     def as_elements(self, disable_all: bool, change_cb: TraceCallback = None) -> Iterable[AnyEle]:
         raise NotImplementedError
@@ -126,14 +136,7 @@ class CheckboxOption(Option, opt_type='checkbox'):
     element_count = 1
 
     def __init__(
-        self,
-        name: str,
-        label: str,
-        default: bool = False,
-        *,
-        disabled: bool = False,
-        required: bool = False,
-        **kwargs
+        self, name: str, label: str, default: bool = False, *, disabled: bool = False, required: bool = False, **kwargs
     ):
         super().__init__(name, label, default, disabled=disabled, required=required, **kwargs)
 
@@ -159,7 +162,7 @@ class InputOption(Option, opt_type='input'):
 
     def as_elements(self, disable_all: bool, change_cb: TraceCallback = None) -> Iterator[Text | Input]:
         val = self.value
-        yield Text(self.label)
+        yield self._label_element()
         yield Input('' if val is _NotSet else val, **self.common_kwargs(disable_all, change_cb))
 
     def validate(self, value):
@@ -178,20 +181,13 @@ class DropdownOption(Option, opt_type='dropdown'):
     element_count = 2
 
     def __init__(
-        self,
-        name: str,
-        label: str,
-        default: Any = None,
-        *,
-        disabled: bool = False,
-        required: bool = False,
-        **kwargs
+        self, name: str, label: str, default: Any = None, *, disabled: bool = False, required: bool = False, **kwargs
     ):
         super().__init__(name, label, default, disabled=disabled, required=required, **kwargs)
 
     def as_elements(self, disable_all: bool, change_cb: TraceCallback = None) -> Iterator[Text | Combo]:
         val = self.value
-        yield Text(self.label)
+        yield self._label_element()
         yield Combo(self.kwargs['choices'], default=val, **self.common_kwargs(disable_all, change_cb))
 
 
@@ -234,7 +230,7 @@ class ListboxOption(Option, opt_type='listbox'):
 
     def as_elements(self, disable_all: bool, change_cb: TraceCallback = None) -> Iterator[Text | ListBox | Button]:
         val = self.value
-        yield Text(self.label)
+        yield self._label_element()
         kwargs = self.kwargs
         choices = kwargs['choices']
         yield ListBox(
@@ -279,7 +275,7 @@ class PopupOption(Option, opt_type='popup'):
             if (result := popup.run()) is not None:
                 input_ele.update(result)
 
-        yield Text(self.label)
+        yield self._label_element()
         yield input_ele
         # log.debug(f'Preparing popup button with text={self.button_text!r}')
         yield Button(self.button_text, cb=update_value)
