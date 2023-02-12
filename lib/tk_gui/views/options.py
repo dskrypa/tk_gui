@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any
 from .view import View
 
 if TYPE_CHECKING:
-    from tk_gui.options.parser import GuiOptionsBase
+    from tk_gui.options.parser import GuiOptions
 
 __all__ = ['GuiOptionsView']
 
@@ -17,7 +17,7 @@ __all__ = ['GuiOptionsView']
 class GuiOptionsView(View, title='Options'):
     window_kwargs = {'exit_on_esc': True}
 
-    def __init__(self, gui_options: GuiOptionsBase, **kwargs):
+    def __init__(self, gui_options: GuiOptions, **kwargs):
         super().__init__(**kwargs)
         self.gui_options = gui_options
 

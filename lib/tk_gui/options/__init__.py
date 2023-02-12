@@ -4,4 +4,4 @@ from .options import (
     PopupOption, PathOption, DirectoryOption,
 )
 from .layout import OptionGrid, OptionColumn, OptionLayout, OptionComponent
-from .parser import GuiOptions, OldGuiOptions
+from .parser import GuiOptions

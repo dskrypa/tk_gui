@@ -40,8 +40,6 @@ class Option(ABC):
     label: str
     disabled: bool
     required: bool
-    row: int
-    col: int
 
     def __init_subclass__(cls, opt_type: str, **kwargs):  # noqa
         super().__init_subclass__(**kwargs)
@@ -58,8 +56,6 @@ class Option(ABC):
         required: bool = False,
         label_size: XY = None,
         label_kw: dict[str, Any] = None,
-        row: int = _NotSet,
-        col: Optional[int] = _NotSet,
         **kwargs
     ):
         self.name = name
@@ -69,17 +65,11 @@ class Option(ABC):
         self.required = required
         self.label_size = label_size
         self.label_kw = label_kw
-        self.row = row
-        self.col = col
         self.kwargs = kwargs
 
     @classmethod
     def for_type(cls, opt_type: str):
         return cls._type_cls_map[opt_type]
-
-    @property
-    def row_and_col(self) -> tuple[int, int]:
-        return self.row, self.col
 
     @property
     def value(self):
@@ -106,11 +96,6 @@ class Option(ABC):
                 except KeyError:
                     pass
         return common
-
-    def prepare_layout(self, disable_all: bool, change_cb: TraceCallback = None) -> OptionTuples:
-        col_num, row_num = self.col, self.row
-        for ele in self.as_elements(disable_all, change_cb):
-            yield col_num, row_num, ele
 
     def _label_element(self) -> Text:
         if label_kwargs := self.label_kw:
@@ -174,7 +159,7 @@ class InputOption(Option, opt_type='input'):
                 return type_func(value)
             except Exception as e:
                 raise SingleParsingError(
-                    self.value_key, self, f'Error parsing {value=!r} for option={self.name!r}: {e}', value
+                    self.value_key, self, f'Error parsing {value=} for option={self.name!r}: {e}', value
                 )
 
 
@@ -242,6 +227,7 @@ class ListboxOption(Option, opt_type='listbox'):
             **self.common_kwargs(disable_all, change_cb),
         )
         if kwargs['extendable']:
+            # TODO: This button needs to be handled here...
             yield Button('Add...', key=f'btn::{self.name}', disabled=disable_all or self.disabled)
 
 

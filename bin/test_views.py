@@ -13,7 +13,7 @@ from tk_gui.elements.menu.items import CopySelection, PasteClipboard
 from tk_gui.elements.menu.items import ToUpperCase, ToTitleCase, ToLowerCase
 from tk_gui.elements.menu.items import CloseWindow
 from tk_gui.event_handling import button_handler
-from tk_gui.options import GuiOptions
+from tk_gui.options import GuiOptions, BoolOption, PopupOption, DirectoryOption, SubmitOption
 from tk_gui.popups.about import AboutPopup
 from tk_gui.popups.common import popup_ok
 from tk_gui.popups.raw import PickFile, pick_folder_popup
@@ -80,19 +80,21 @@ class MiscTestView(View, title='Misc Test View'):
     @menu['File']['Settings'].callback
     def settings(self, event):
         config = self.window.config
-        options = GuiOptions(submit='Save', title=None)
-        with options.next_row() as options:
-            options.add_bool('remember_pos', 'Remember Last Window Position', config.remember_position)
-            options.add_bool('remember_size', 'Remember Last Window Size', config.remember_size)
-        with options.next_row() as options:
-            options.add_popup(
-                'style', 'Style', StylePopup, default=config.style, popup_kwargs={'show_buttons': True}
-            )
-        with options.next_row() as options:
-            options.add_directory('output_dir', 'Output Directory')
-
-        result = options.run_popup()
-        return result
+        kwargs = {'label_size': (16, 1), 'size': (30, None)}
+        style_kwargs = {'popup_kwargs': {'show_buttons': True}} | kwargs
+        layout = [
+            [
+                BoolOption('remember_pos', 'Remember Last Window Position', config.remember_position),
+                BoolOption('remember_size', 'Remember Last Window Size', config.remember_size),
+            ],
+            [PopupOption('style', 'Style', StylePopup, default=config.style, **style_kwargs)],
+            [DirectoryOption('output_dir', 'Output Directory', **kwargs)],
+            [SubmitOption(label='Save')],
+        ]
+        results = GuiOptions(layout).run_popup()
+        if results.pop('save', False):
+            config.update(results, ignore_none=True, ignore_empty=True)
+        return results
 
     def get_pre_window_layout(self):
         yield [self.menu]
