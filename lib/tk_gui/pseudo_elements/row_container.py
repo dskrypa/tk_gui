@@ -109,7 +109,7 @@ class RowContainer(Generic[E], ABC):
     def _normalize_rows(self, layout: Layout[E], row_cls: Type[Row] = Row) -> Iterator[Row[E]]:
         for raw_row in layout:
             if isinstance(raw_row, row_cls):
-                log.debug(f'Found pre-built row={raw_row!r}', extra={'color': 11})
+                log.debug(f'Found pre-built row={raw_row!s}', extra={'color': 11})
                 yield raw_row
             else:
                 yield row_cls(self, raw_row)

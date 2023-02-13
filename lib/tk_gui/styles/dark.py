@@ -25,6 +25,7 @@ DarkGrey10 = Style(
     # checkbox_bg=(GREY_D_0, GREY_D_0, GREY_D_0),
     # checkbox_label_fg=(GREY_L_1, GREY_MD_0, RED_MD_0, GREY_L_1, GREY_L_1),
     # checkbox_label_bg=(GREY_D_0, GREY_D_0, GREY_D_0, GREY_D_0, GREY_D_0),
+    # TODO: Scroll bars seem to be using default grey
     arrows_fg=(GREY_L_0, BLACK, None, None),
     arrows_bg=(BLU_MD_0, GREY_ML_0, None, None),
     combo_fg=(BLU_ML_0, BLACK, WHITE, None, GREY_D_1),

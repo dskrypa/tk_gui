@@ -126,11 +126,26 @@ class Row(RowBase[E]):
         self.parent = parent
         self.elements = tuple(elements)
 
+    def __str__(self) -> str:
+        return self.repr(False)
+
     def __repr__(self) -> str:
-        parent_cls = self.parent.__class__.__name__
+        return self.repr(True)
+
+    def repr(self, include_index: bool = True) -> str:
+        parent = self.parent
+        parent_cls = parent.__class__.__name__
         n_eles = len(self.elements)
         anchor, expand, fill = self._anchor_expand_and_fill()
-        return f'<{self.__class__.__name__}[{parent_cls=!s}, {n_eles=}, {anchor=}, {expand=}, {fill=}]>'
+        if include_index:
+            # In some cases, including the index can result in an infinite loop
+            try:
+                index = parent.rows.index(self)
+            except (IndexError, ValueError, AttributeError):
+                index = '?'
+        else:
+            index = '?'
+        return f'<{self.__class__.__name__}[{parent_cls=!s}, {index=}, {n_eles=}, {anchor=}, {expand=}, {fill=}]>'
 
     @classmethod
     def custom(

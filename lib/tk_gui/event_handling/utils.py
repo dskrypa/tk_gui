@@ -99,4 +99,6 @@ def log_widget_data(
     prefix: str = 'Event Widget Info',
 ):
     data = EventWidgetData.for_event(window, event, parent=parent, config=config, attrs=attrs)
+    if parent:
+        prefix += ' [parent widget]'
     log.info(f'{prefix}: {data}')

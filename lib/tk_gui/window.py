@@ -257,15 +257,14 @@ class Window(BindMixin, RowContainer):
         return self
 
     def __repr__(self) -> str:
-        modal, title, title_bar = self.modal, self.title, not self.no_title_bar
+        modal, title, title_bar, rows = self.modal, self.title, not self.no_title_bar, len(self.rows)
         try:
             size, pos = self.true_size_and_pos
             has_focus = self.has_focus
         except AttributeError:  # No root
             size = pos = has_focus = None
-        return (
-            f'<{self.__class__.__name__}[{self._id}][{pos=}, {size=}, {has_focus=}, {modal=}, {title_bar=}, {title=}]>'
-        )
+        cls_name = self.__class__.__name__
+        return f'<{cls_name}[{self._id}][{pos=}, {size=}, {has_focus=}, {modal=}, {title_bar=}, {rows=}, {title=}]>'
 
     # region Run / Event Loop
 
@@ -684,7 +683,8 @@ class Window(BindMixin, RowContainer):
         kwargs = style.get_map(background='bg')
         scroll_y, scroll_x = self.scroll_y, self.scroll_x
         if not scroll_y and not scroll_x:
-            self.widget = self._root = self.root = root = Toplevel(**kwargs)
+            pad_x, pad_y = self.margins
+            self.widget = self._root = self.root = root = Toplevel(padx=pad_x, pady=pad_y, **kwargs)
             return root
 
         kwargs['inner_kwargs'] = kwargs.copy()  # noqa
@@ -735,8 +735,6 @@ class Window(BindMixin, RowContainer):
         self.pack_rows()
         if (inner := self.root) != outer:  # outer is scrollable
             self._update_scroll_region(outer, inner, self._get_init_inner_size(inner))
-        else:
-            outer.configure(padx=self.margins[0], pady=self.margins[1])
 
         self._set_init_size()
         if pos := self.config.position:
