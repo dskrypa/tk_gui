@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from .elements.element import Element, ElementBase  # noqa
     from .enums import BindTargets, BindEvent  # noqa
     from .pseudo_elements import Row
+    from .pseudo_elements.scroll import ScrollableToplevel  # noqa
     from .window import Window  # noqa
 
 # fmt: off
@@ -41,17 +42,19 @@ BindTarget = Union[BindCallback, EventCallback, ButtonEventCB, 'BindTargets', st
 AnyEle = Union['ElementBase', 'Element']
 E = TypeVar('E', bound=AnyEle)
 
+PathLike = Union['Path', str]
+OptInt = Optional[int]
 Bool = Union[bool, Any]
 XY = tuple[int, int]
 Axis = Literal['x', 'y']
 Orientation = Literal['horizontal', 'vertical']
-PathLike = Union['Path', str]
-OptInt = Optional[int]
+GrabAnywhere = Union[bool, Literal['control']]
 
 TkFill = Union[Literal['none', 'x', 'y', 'both'], None, bool]
 TkSide = Literal['left', 'right', 'top', 'bottom']
 TkJustify = Literal['left', 'center', 'right']
 
+Top = Union['ScrollableToplevel', 'Toplevel']
 TkContainer = Union['Toplevel', 'Frame', 'LabelFrame']
 FrameLike = TypeVar('FrameLike', bound=TkContainer)
 
@@ -128,4 +131,13 @@ class HasFrame(Protocol[FrameLike]):
     @property
     @abstractmethod
     def window(self) -> Window:
+        pass
+
+
+@runtime_checkable
+class SupportsBind(Protocol):
+    __slots__ = ()
+
+    @abstractmethod
+    def bind(self, event_pat: Bindable, cb: BindTarget, add: Bool = None):
         pass

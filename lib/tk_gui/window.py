@@ -13,7 +13,7 @@ from os import environ
 from time import monotonic
 from tkinter import Tk, Toplevel, PhotoImage, TclError, Event, CallWrapper, Frame, BaseWidget
 from tkinter.ttk import Sizegrip, Scrollbar, Treeview
-from typing import TYPE_CHECKING, Optional, Union, Type, Any, Iterable, Callable, Literal, Iterator, overload
+from typing import TYPE_CHECKING, Optional, Union, Type, Any, Iterable, Callable, Iterator, overload
 from weakref import finalize, WeakSet
 
 from PIL import ImageGrab
@@ -35,13 +35,11 @@ if TYPE_CHECKING:
     from PIL.Image import Image as PILImage
     from .elements.element import Element, ElementBase
     from .typing import XY, BindCallback, EventCallback, Key, BindTarget, Bindable, Layout, Bool, HasValue
-    from .typing import TkContainer
+    from .typing import TkContainer, GrabAnywhere, Top
 
 __all__ = ['Window']
 log = logging.getLogger(__name__)
 
-Top = Union[ScrollableToplevel, Toplevel]
-GrabAnywhere = Union[bool, Literal['control']]
 _GRAB_ANYWHERE_IGNORE = (
     Sizegrip, Scrollbar, Treeview,
     tk.Scale, tk.Scrollbar, tk.Entry, tk.Text, tk.PanedWindow, tk.Listbox, tk.OptionMenu, tk.Button,
@@ -202,6 +200,8 @@ class Window(BindMixin, RowContainer):
 
     # endregion
 
+    # region Init & Common Properties / Methods
+
     def __init__(
         self,
         layout: Layout = None,
@@ -266,6 +266,8 @@ class Window(BindMixin, RowContainer):
         cls_name = self.__class__.__name__
         return f'<{cls_name}[{self._id}][{pos=}, {size=}, {has_focus=}, {modal=}, {title_bar=}, {rows=}, {title=}]>'
 
+    # endregion
+
     # region Run / Event Loop
 
     # TODO: Queue for higher level events, with an iterator method that yields them?  Different bind target to generate
@@ -322,8 +324,6 @@ class Window(BindMixin, RowContainer):
             key = None
         return key, self.results, interrupt.event
 
-    # endregion
-
     def __call__(self, *, take_focus: Bool = False) -> Window:
         """
         Update settings for this window.  Intended as a helper for using this Window as a context manager.
@@ -344,6 +344,8 @@ class Window(BindMixin, RowContainer):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
+
+    # endregion
 
     # region Results
 

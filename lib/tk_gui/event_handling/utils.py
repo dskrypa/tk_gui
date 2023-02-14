@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import logging
+from functools import partial
 from tkinter import TclError, BaseWidget, Event
 from typing import TYPE_CHECKING, Any
 
@@ -12,10 +13,10 @@ from tk_gui.caching import cached_property
 
 if TYPE_CHECKING:
     from tk_gui.elements import Element
-    from tk_gui.typing import Bool
+    from tk_gui.typing import Bool, Color, SupportsBind
     from tk_gui.window import Window
 
-__all__ = ['EventWidgetData', 'log_widget_data']
+__all__ = ['ClickHighlighter', 'EventWidgetData', 'log_widget_data']
 log = logging.getLogger(__name__)
 
 
@@ -102,3 +103,49 @@ def log_widget_data(
     if parent:
         prefix += ' [parent widget]'
     log.info(f'{prefix}: {data}')
+
+
+class ClickHighlighter:
+    """
+    Highlights the clicked widget using the specified color while the specified mouse button is down, then restores the
+    original color upon button release.  Uses the background, red, and button 1 (left click) by default.
+    """
+    __slots__ = ('button_num', 'color', 'attr', '_widget_data')
+
+    def __init__(self, color: Color = '#ff0000', button_num: int = 1, attr: str = 'background'):
+        self.button_num = button_num
+        self.color = color
+        self.attr = attr
+        self._widget_data = {}
+
+    def register(self, supports_bind: SupportsBind):
+        supports_bind.bind(self.press_key, self.on_button_down, add=True)
+
+    @property
+    def press_key(self) -> str:
+        return f'<ButtonPress-{self.button_num}>'
+
+    @property
+    def release_key(self) -> str:
+        return f'<ButtonRelease-{self.button_num}>'
+
+    def on_button_down(self, event: Event):
+        try:
+            widget: BaseWidget = event.widget
+        except (AttributeError, TclError):
+            return
+        try:
+            old_widget_color = widget.configure()[self.attr][-1]
+        except KeyError:
+            return
+        widget.configure(**{self.attr: self.color})
+        release_bind_id = widget.bind(self.release_key, partial(self.on_button_release, widget), add=True)
+        self._widget_data[widget] = (old_widget_color, release_bind_id)
+
+    def on_button_release(self, widget: BaseWidget, event: Event = None):
+        try:
+            old_widget_color, release_bind_id = self._widget_data.pop(widget)
+        except KeyError:
+            return
+        widget.configure(**{self.attr: old_widget_color})
+        widget.unbind(self.release_key, release_bind_id)
