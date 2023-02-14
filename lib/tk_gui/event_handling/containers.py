@@ -1,5 +1,5 @@
 """
-
+Containers for events to bind to callbacks, and to store resulting function IDs for unbinding later.
 """
 
 from __future__ import annotations
@@ -14,13 +14,14 @@ if TYPE_CHECKING:
 
 __all__ = ['BindMap', 'BindManager']
 
+_NotSet = object()
 _BindVal = Union[BindTarget, Collection[BindTarget]]
 BindMapping = Mapping[Bindable, _BindVal]
 
 
 class BindMap(MutableMapping[Bindable, list[BindTarget]]):
     __slots__ = ('_data',)
-    # TODO: This should probably be renamed to something like MultiValDict or similar
+    _data: dict[Bindable, list[BindTarget]]
 
     def __init__(self, binds: BindMapping | BindMap = None, **kwargs: _BindVal):
         self._data = {}
@@ -125,6 +126,29 @@ class BindMap(MutableMapping[Bindable, list[BindTarget]]):
     def update_add(self, binds: BindMapping | BindMap = None, **kwargs: _BindVal):
         """Update this BindMap with the given new targets, extending any existing target callbacks."""
         self._update(binds, kwargs, True)
+
+    def remove(self, key: Bindable, target: BindTarget = _NotSet):
+        """
+        Remove the target from the binds for the given key, or all targets for the given key if no target is specified.
+        Raises :class:`KeyError` or :class:`ValueError` if the key or target are not present, respectively.
+        """
+        if target is _NotSet:
+            del self._data[key]
+        else:
+            targets = self._data[key]
+            targets.remove(target)
+            if not targets:
+                del self._data[key]
+
+    def discard(self, key: Bindable, target: BindTarget = _NotSet):
+        """
+        Remove the target from the binds for the given key, or all targets for the given key if no target is specified.
+        If the key or target are not present, then they will not be removed (no exception will be raised).
+        """
+        try:
+            self.remove(key, target)
+        except (KeyError, ValueError):
+            pass
 
     @classmethod
     def pop_and_normalize(cls, kwargs: dict[str, Any], key: str = 'binds') -> BindMap:

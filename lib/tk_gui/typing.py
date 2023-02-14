@@ -141,3 +141,7 @@ class SupportsBind(Protocol):
     @abstractmethod
     def bind(self, event_pat: Bindable, cb: BindTarget, add: Bool = None):
         pass
+
+    @abstractmethod
+    def unbind(self, event_pat: Bindable, func_id: str = None):
+        pass

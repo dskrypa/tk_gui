@@ -1,5 +1,5 @@
 """
-
+Mixins to facilitate handling TK event binds and custom events.
 """
 
 from __future__ import annotations
@@ -9,6 +9,7 @@ from itertools import count
 from tkinter import TclError, BaseWidget, Event
 from typing import TYPE_CHECKING, Any
 
+from tk_gui.enums import BindTargets
 from .containers import BindMap, BindMapping
 
 if TYPE_CHECKING:
@@ -16,6 +17,8 @@ if TYPE_CHECKING:
 
 __all__ = ['BindMixin', 'CustomEventResultsMixin']
 log = logging.getLogger(__name__)
+
+_NotSet = object()
 
 
 class BindMixin:
@@ -55,6 +58,30 @@ class BindMixin:
     def apply_binds(self):
         for event_pat, callback in self.binds.flat_items():
             self._bind(event_pat, callback, True)
+
+    def unbind(self, event_pat: Bindable, func_id_or_cb: str | BindTarget = _NotSet):
+        target, func_id = _NotSet, None
+        if isinstance(func_id_or_cb, str):
+            try:
+                target = BindTargets(func_id_or_cb)
+            except ValueError:
+                func_id = func_id_or_cb
+        elif callable(func_id_or_cb):
+            target = func_id_or_cb
+
+        if self._bind_widget:
+            self._unbind(event_pat, func_id)
+        elif target is not _NotSet:
+            self.binds.discard(event_pat, target)
+        else:
+            self.binds.discard(event_pat)
+
+    def _unbind(self, event_pat: Bindable, func_id: str = None):
+        # log.debug(f'Unbinding event={event_pat!r} with {func_id=}')
+        try:
+            self._bind_widget.unbind(event_pat, func_id)
+        except (TclError, RuntimeError) as e:
+            log.error(f'Unable to unbind event={event_pat!r}: {e}')
 
 
 class CustomEventResultsMixin:
