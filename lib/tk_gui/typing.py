@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from tkinter import Event, Toplevel, Frame, LabelFrame  # noqa
     from PIL.Image import Image as PILImage  # noqa
     from .elements.element import Element, ElementBase  # noqa
-    from .enums import BindTargets, BindEvent  # noqa
+    from .enums import BindTargets, BindEvent, ScrollUnit  # noqa
     from .pseudo_elements import Row
     from .pseudo_elements.scroll import ScrollableToplevel  # noqa
     from .window import Window  # noqa
@@ -53,6 +53,10 @@ GrabAnywhere = Union[bool, Literal['control']]
 TkFill = Union[Literal['none', 'x', 'y', 'both'], None, bool]
 TkSide = Literal['left', 'right', 'top', 'bottom']
 TkJustify = Literal['left', 'center', 'right']
+
+TkScrollWhat = Literal['units', 'pages', 'pixels']
+ScrollWhat = Union['ScrollUnit', TkScrollWhat]
+ScrollAmount = TypeVar('ScrollAmount', int, float)
 
 Top = Union['ScrollableToplevel', 'Toplevel']
 TkContainer = Union['Toplevel', 'Frame', 'LabelFrame']

@@ -16,7 +16,7 @@ from ..pseudo_elements.row import RowBase
 from ..pseudo_elements.row_container import RowContainer
 from ..pseudo_elements.scroll import ScrollableFrame, ScrollableLabelFrame
 from ..styles import Style, StyleSpec
-from ..utils import call_with_popped
+from ..utils import call_with_popped, extract_kwargs
 from .element import Element, InteractiveMixin
 
 if TYPE_CHECKING:
@@ -33,6 +33,8 @@ log = logging.getLogger(__name__)
 TkFrameType = Type[Union[TkFrame, LabelFrame]]
 FrameMode = Literal['inner', 'outer', 'both']
 _Anchor = Union[str, Anchor]
+
+SCROLL_PARAMS = frozenset({'fill_x', 'fill_y', 'amount_x', 'amount_y', 'what_x', 'what_y'})
 
 
 class FrameMixin:
@@ -324,6 +326,7 @@ class ScrollFrame(Element, CustomLayoutRowContainer, base_style_layer='frame'):
         grid: Bool = False,
         **kwargs,
     ):
+        self._scroll_kwargs = extract_kwargs(kwargs, SCROLL_PARAMS)
         self.init_container_from_kwargs(layout, kwargs=kwargs)
         Element.__init__(self, **kwargs)
         self.title = title
@@ -381,6 +384,7 @@ class ScrollFrame(Element, CustomLayoutRowContainer, base_style_layer='frame'):
 
         outer_kw['style'] = style
         outer_kw['inner_kwargs'] = inner_kw
+        outer_kw.update(self._scroll_kwargs)
         return outer_kw
 
     def _init_widget(self, tk_container: TkContainer):

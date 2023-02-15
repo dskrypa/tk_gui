@@ -11,16 +11,17 @@ import re
 import tkinter.constants as tkc
 from abc import ABC
 from itertools import count
-from tkinter import BaseWidget, Frame, LabelFrame, Canvas, Widget, Event, Tk, Toplevel, Text, Listbox
+from tkinter import BaseWidget, Frame, LabelFrame, Canvas, Widget, Event, Toplevel, Text, Listbox, TclError
 from tkinter.ttk import Scrollbar, Treeview
-from typing import TYPE_CHECKING, Type, Mapping, Union, Optional, Any, Iterator
+from typing import TYPE_CHECKING, Type, Mapping, Union, Optional, Any, Iterator, TypeVar, Generic
 
 from tk_gui.caching import cached_property
-from ..utils import ON_WINDOWS
+from tk_gui.enums import ScrollUnit
+from tk_gui.utils import ON_WINDOWS
 
 if TYPE_CHECKING:
     from ..styles import Style
-    from ..typing import Bool, BindCallback, Axis, XY
+    from ..typing import Bool, BindCallback, Axis, XY, TkContainer, ScrollWhat, TkScrollWhat
 
 __all__ = [
     'add_scroll_bar',
@@ -29,10 +30,28 @@ __all__ = [
 ]
 log = logging.getLogger(__name__)
 
-FrameLike = Union[Tk, Frame, LabelFrame]
 ScrollOuter = Union[BaseWidget, 'ScrollableBase', 'ScrollableContainer']
+ScrollAmount = TypeVar('ScrollAmount', int, float)
 
 AXIS_DIR_SIDE_ANCHOR = {'x': (tkc.HORIZONTAL, tkc.BOTTOM, tkc.S), 'y': (tkc.VERTICAL, tkc.RIGHT, tkc.E)}
+
+
+class AxisConfig(Generic[ScrollAmount]):
+    __slots__ = ('what', 'amount', 'scroll', 'fill')
+
+    def __init__(
+        self, scroll: bool = False, amount: ScrollAmount = 4, what: ScrollWhat = ScrollUnit.UNITS, fill: bool = False
+    ):
+        self.what = what = ScrollUnit(what)
+        if not isinstance(amount, int) and what != ScrollUnit.PIXELS:
+            raise TypeError(f'Invalid type={amount.__class__.__name__} for {amount=} with {what=}')
+        self.scroll = scroll
+        self.amount = amount
+        self.fill = fill
+
+    def view_scroll_args(self, positive: bool) -> tuple[ScrollAmount, TkScrollWhat]:
+        amount = self.amount if positive else -self.amount
+        return amount, self.what.value
 
 
 def add_scroll_bar(
@@ -184,38 +203,50 @@ def _scroll_x(event: Event):
 
 class ScrollableContainer(ScrollableBase, ABC):
     _y_bind, _x_bind = ('<MouseWheel>', 'Shift-MouseWheel') if ON_WINDOWS else ('<4>', '<5>')
-    _inner_widget_id: int
-    # _y_bind_id: Optional[str] = None
-    # _x_bind_id: Optional[str] = None
     canvas: Canvas
-    inner_widget: FrameLike
+    inner_widget: TkContainer
+    _x_config: AxisConfig
+    _y_config: AxisConfig
 
     def __init__(
         self: Union[Widget, Toplevel, ScrollableContainer],
         parent: Optional[BaseWidget] = None,
         scroll_y: Bool = False,
         scroll_x: Bool = False,
-        inner_cls: Type[FrameLike] = Frame,
+        inner_cls: Type[TkContainer] = Frame,
         style: Style = None,
         inner_kwargs: dict[str, Any] = None,
         pad: XY = None,
+        *,
+        fill_x: Bool = False,
+        fill_y: Bool = False,
+        amount_x: ScrollAmount = 4,
+        amount_y: ScrollAmount = 4,
+        what_x: ScrollWhat = ScrollUnit.UNITS,
+        what_y: ScrollWhat = ScrollUnit.UNITS,
         **kwargs,
     ):
         if 'relief' not in kwargs:
             kwargs.setdefault('borderwidth', 0)
         kwargs.setdefault('highlightthickness', 0)
+        self._x_config = AxisConfig(scroll_x, amount_x, what_x, fill_x)
+        self._y_config = AxisConfig(scroll_y, amount_y, what_y, fill_y)
         super().__init__(parent, **kwargs)
-        self.init_canvas(scroll_y, scroll_x, style, pad)
-        self.init_inner(inner_cls, scroll_y, scroll_x, **(inner_kwargs or {}))
+        self.init_canvas(style, pad)
+        self.init_inner(inner_cls, scroll_x or scroll_y, **(inner_kwargs or {}))
 
-    def init_canvas(
-        self: ScrollOuter, scroll_y: Bool = False, scroll_x: Bool = False, style: Style = None, pad: XY = None
-    ):
+    @cached_property
+    def _parent_widget(self: ScrollableContainer | Widget | Toplevel) -> TkContainer | None:
+        if (parent_name := self.winfo_parent()) == '.':
+            return None
+        return self.nametowidget(parent_name)
+
+    def init_canvas(self: ScrollOuter, style: Style = None, pad: XY = None):
         kwargs = style.get_map('frame', background='bg') if style else {}
         self.canvas = canvas = Canvas(self, borderwidth=0, highlightthickness=0, **kwargs)
-        if scroll_x:
+        if self._x_config.scroll:
             self.scroll_bar_x = add_scroll_bar(self, canvas, 'x', style, {'expand': 'false'})
-        if scroll_y:
+        if self._y_config.scroll:
             self.scroll_bar_y = add_scroll_bar(self, canvas, 'y', style, {'fill': 'y', 'expand': True})
 
         kwargs = {'side': 'left', 'fill': 'both', 'expand': True}
@@ -227,54 +258,72 @@ class ScrollableContainer(ScrollableBase, ABC):
         canvas.xview_moveto(0)
         canvas.yview_moveto(0)
 
-    def init_inner(self: ScrollOuter, cls: Type[FrameLike], scroll_y: Bool = False, scroll_x: Bool = False, **kwargs):
+    def init_inner(self: ScrollOuter, cls: Type[TkContainer], scroll_any: Bool = False, **kwargs):
         if 'relief' not in kwargs:
             kwargs.setdefault('borderwidth', 0)
         kwargs.setdefault('highlightthickness', 0)
         canvas = self.canvas
         self.inner_widget = inner_widget = cls(canvas, **kwargs)
-        self._inner_widget_id = canvas.create_window(0, 0, window=inner_widget, anchor='nw')
-        if scroll_y or scroll_x:
+        canvas.create_window(0, 0, window=inner_widget, anchor='nw')
+        if scroll_any:
             canvas.bind_all(self._y_bind, _scroll_y, add='+')
             canvas.bind_all(self._x_bind, _scroll_x, add='+')
-            # canvas.bind('<Enter>', self.hook_mouse_scroll)
-            # canvas.bind('<Leave>', self.unhook_mouse_scroll)
             self.bind('<Configure>', self.set_scroll_region, add=True)
 
     # def resize_inner(self, event: Event):
     #     log.debug(f'Resizing inner={self._inner_widget_id!r} to width={event.width}, height={event.height}')
     #     self.canvas.itemconfigure(self._inner_widget_id, width=event.width, height=event.height)
 
-    # def hook_mouse_scroll(self, event: Event):
-    #     log.debug(f'Hooking mouse scroll for {self!r} due to {event=}, {self.scroll_children=}')
-    #     canvas = self.canvas
-    #     self._y_bind_id = canvas.bind_all(self._y_bind, self.scroll_y, add='+')
-    #     self._x_bind_id = canvas.bind_all(self._x_bind, self.scroll_x, add='+')
-    #
-    # def unhook_mouse_scroll(self, event: Event = None):
-    #     log.debug(f'Unhooking mouse scroll for {self!r} due to {event=}')
-    #     canvas = self.canvas
-    #     self._y_bind_id = canvas.unbind(self._y_bind, self._y_bind_id)  # using no return as a shortcut to set to None
-    #     self._x_bind_id = canvas.unbind(self._x_bind, self._x_bind_id)
-    #     if parent := self.scroll_parent:
-    #         parent.hook_mouse_scroll(event)
-
     def scroll_y(self, event: Event):
         if (event.num == 5 or event.delta < 0) and (canvas := self.canvas).yview() != (0, 1):
             # TODO: event.delta / 120 units?
-            canvas.yview_scroll(4, 'units')
+            # canvas.yview_scroll(4, 'units')
+            canvas.yview_scroll(*self._y_config.view_scroll_args(True))
         elif (event.num == 4 or event.delta > 0) and (canvas := self.canvas).yview() != (0, 1):
-            canvas.yview_scroll(-4, 'units')
+            # canvas.yview_scroll(-4, 'units')
+            canvas.yview_scroll(*self._y_config.view_scroll_args(False))
 
     def scroll_x(self, event: Event):
         if event.num == 5 or event.delta < 0:
-            self.canvas.xview_scroll(4, 'units')
+            # self.canvas.xview_scroll(4, 'units')
+            self.canvas.xview_scroll(*self._x_config.view_scroll_args(True))
         elif event.num == 4 or event.delta > 0:
-            self.canvas.xview_scroll(-4, 'units')
+            # self.canvas.xview_scroll(-4, 'units')
+            self.canvas.xview_scroll(*self._x_config.view_scroll_args(False))
 
     def set_scroll_region(self, event: Event = None):
+        """
+        Updates the inner region that is scrollable in response to the window/widget being resized / the contents
+        changing.  Bound to the ``'<Configure>'`` event.
+        """
+        fill_x, fill_y = self._x_config.fill, self._y_config.fill
+        if not (fill_x or fill_y):
+            self._maybe_update_scroll_region()
+            return
+
+        inner_widget, parent_frame = self.inner_widget, self._parent_widget
+        pf_pack_info = parent_frame.pack_info()
+        try:
+            iw_pack_info = inner_widget.pack_info()
+        except TclError:  # Likely not packed yet
+            iw_pack_info = {'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 0}
+
+        kwargs = {}
+        if fill_x:
+            pf_width = parent_frame.winfo_width() - pf_pack_info['ipadx'] - iw_pack_info['padx']
+            if pf_width > inner_widget.winfo_width():
+                kwargs['width'] = pf_width
+        if fill_y:
+            pf_height = parent_frame.winfo_height() - pf_pack_info['ipady'] - iw_pack_info['pady']
+            if pf_height > inner_widget.winfo_height():
+                kwargs['height'] = pf_height
+
         canvas = self.canvas
-        bbox = canvas.bbox('all')
+        canvas.configure(scrollregion=canvas.bbox('all'), **kwargs)
+
+    def _maybe_update_scroll_region(self):
+        canvas = self.canvas
+        bbox = canvas.bbox('all')  # top left (x, y), bottom right (x, y) I think ==>> last 2 => (width, height)
         if canvas['scrollregion'] != '{} {} {} {}'.format(*bbox):
             # log.debug(f'Updating scroll region to {bbox=} != {canvas["scrollregion"]=} for {self}')
             canvas.configure(scrollregion=bbox)

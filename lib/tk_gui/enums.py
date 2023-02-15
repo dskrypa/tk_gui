@@ -16,7 +16,11 @@ from .utils import ON_MAC
 if TYPE_CHECKING:
     from .typing import TkFill
 
-__all__ = ['BindTargets', 'Anchor', 'BindEvent', 'CallbackAction', 'Justify', 'Side', 'StyleState', 'ListBoxSelectMode']
+__all__ = [
+    'Anchor', 'Justify', 'Side',
+    'BindEvent', 'BindTargets', 'CallbackAction',
+    'StyleState', 'ListBoxSelectMode', 'ScrollUnit',
+]
 
 # fmt: off
 ANCHOR_ALIASES = {
@@ -185,3 +189,9 @@ class ListBoxSelectMode(MissingMixin, Enum):
     SINGLE = tkc.SINGLE         #: Select 1 item; cannot drag mouse to move selection
     MULTIPLE = tkc.MULTIPLE     #: Select multiple items; each must be clicked individually
     EXTENDED = tkc.EXTENDED     #: Select multiple items; can drag mouse to select multiple items (lib default)
+
+
+class ScrollUnit(MissingMixin, Enum):
+    UNITS = 'units'     # Supports int values
+    PAGES = 'pages'     # Supports int values
+    PIXELS = 'pixels'   # Supports int and float values
