@@ -19,7 +19,7 @@ from tk_gui.enums import Justify, Anchor
 from tk_gui.event_handling import BindManager
 from tk_gui.pseudo_elements.scroll import ScrollableText
 from tk_gui.styles import Style, Font, StyleState, StyleLayer
-from tk_gui.utils import Inheritable, max_line_len, call_with_popped
+from tk_gui.utils import Inheritable, max_line_len, call_with_popped, unbind
 from ..element import Element, Interactive
 from ..mixins import DisableableMixin, TraceCallbackMixin
 from .links import LinkTarget, _Link
@@ -169,7 +169,7 @@ class LinkableMixin:
         self.add_tooltip(new.tooltip if new else self._tooltip_text)
         if old and new and old.bind != new.bind:
             widget = self.widget
-            widget.unbind(old.bind, self.__bound_id)
+            unbind(widget, old.bind, self.__bound_id)
             self.__bound_id = widget.bind(new.bind, self._open_link, add=True)
         elif new and not old:
             self._enable_link()
@@ -191,7 +191,7 @@ class LinkableMixin:
 
     def _disable_link(self, link_bind: str):
         widget, link = self.widget, self.__link
-        widget.unbind(link_bind, self.__bound_id)
+        unbind(widget, link_bind, self.__bound_id)
         self.__bound_id = None
         if link.use_link_style:
             style_layer, state = self.base_style_layer_and_state
