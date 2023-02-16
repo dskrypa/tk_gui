@@ -6,17 +6,18 @@ from __future__ import annotations
 
 import logging
 from functools import partial
-from tkinter import TclError, BaseWidget, Event
+from tkinter import TclError, BaseWidget, Misc, Event
 from typing import TYPE_CHECKING, Any
 
 from tk_gui.caching import cached_property
+from tk_gui.utils import unbind
 
 if TYPE_CHECKING:
     from tk_gui.elements import Element
     from tk_gui.typing import Bool, Color, SupportsBind
     from tk_gui.window import Window
 
-__all__ = ['ClickHighlighter', 'EventWidgetData', 'log_widget_data']
+__all__ = ['ClickHighlighter', 'EventWidgetData', 'log_widget_data', 'get_bound_events', 'log_bound_events']
 log = logging.getLogger(__name__)
 
 
@@ -125,7 +126,11 @@ class ClickHighlighter:
 
     def unregister(self, supports_bind: SupportsBind):
         if bind_id := self._bind_id:
-            supports_bind.unbind(self.press_key, bind_id)
+            # log.debug(f'Unbinding event={self.press_key!r} with {bind_id=}')
+            if isinstance(supports_bind, Misc):
+                unbind(supports_bind, self.press_key, bind_id)
+            else:
+                supports_bind.unbind(self.press_key, bind_id)
             self._bind_id = None
 
     def _key(self, action: str):
@@ -160,4 +165,17 @@ class ClickHighlighter:
         except KeyError:
             return
         widget.configure(**{self.attr: old_widget_color})
-        widget.unbind(self.release_key, release_bind_id)
+        # log_bound_events(widget, 'Before unbind', 14)
+        # log.debug(f'Unbinding event={self.release_key!r} with {release_bind_id=}')
+        unbind(widget, self.release_key, release_bind_id)
+        # log_bound_events(widget, 'After unbind', 13)
+
+
+def get_bound_events(widget: BaseWidget):
+    return {event: list(filter(None, map(str.strip, widget.bind(event).splitlines()))) for event in widget.bind()}
+
+
+def log_bound_events(widget: BaseWidget, prefix: str = None, color: int | str = None):
+    bound_str = '\n'.join(f'  - {e}: {line}' for e, lines in get_bound_events(widget).items() for line in lines)
+    intro = f'{prefix}, events' if prefix else 'Events'
+    log.debug(f'{intro} bound to {widget=}:\n{bound_str}', extra={'color': color})

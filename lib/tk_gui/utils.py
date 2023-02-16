@@ -18,12 +18,12 @@ from typing import TYPE_CHECKING, Optional, Type, Any, Callable, Collection, Ite
 from .constants import STYLE_CONFIG_KEYS
 
 if TYPE_CHECKING:
-    from tkinter import BaseWidget
+    from tkinter import BaseWidget, Misc
     from .typing import HasParent
 
 __all__ = [
     'ON_WINDOWS', 'ON_LINUX', 'ON_MAC', 'Inheritable', 'ProgramMetadata', 'ViewLoggerAdapter',
-    'tcl_version', 'max_line_len', 'call_with_popped', 'extract_kwargs', 'get_user_temp_dir',
+    'tcl_version', 'max_line_len', 'call_with_popped', 'extract_kwargs', 'get_user_temp_dir', 'unbind',
 ]
 log = logging.getLogger(__name__)
 
@@ -296,3 +296,21 @@ def _print_style_details(style, style_name, layout):
         for key, value in data.items():
             if not isinstance(value, str):
                 _print_style_details(style, style_name, value)
+
+
+def unbind(widget: Misc, sequence: str, func_id: str = None):
+    """
+    Unbind for the specified widget for event ``sequence`` the function identified with ``func_id``.  If no ``func_id``
+    is specified, then unbind all functions for event ``sequence``.
+
+    Based on: https://github.com/python/cpython/issues/75666
+    """
+    widget_id = widget._w  # noqa
+    if func_id:
+        widget.deletecommand(func_id)
+        funcs = widget.tk.call('bind', widget_id, sequence, None).split('\n')  # noqa
+        skip = f'if {{"[{func_id}'
+        bound = '\n'.join(f for f in funcs if not f.startswith(skip))
+    else:
+        bound = ''
+    widget.tk.call('bind', widget_id, sequence, bound)

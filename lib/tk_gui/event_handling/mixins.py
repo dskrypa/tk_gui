@@ -10,6 +10,7 @@ from tkinter import TclError, BaseWidget, Event
 from typing import TYPE_CHECKING, Any
 
 from tk_gui.enums import BindTargets
+from tk_gui.utils import unbind
 from .containers import BindMap, BindMapping
 
 if TYPE_CHECKING:
@@ -50,16 +51,19 @@ class BindMixin:
             return
         # log.debug(f'Binding event={event_pat!r} to {cb=}')
         try:
-            self._bind_widget.bind(event_pat, cb, add=add)
+            func_id = self._bind_widget.bind(event_pat, cb, add=add)
         except (TclError, RuntimeError) as e:
             log.error(f'Unable to bind event={event_pat!r}: {e}')
             # self._bind_widget.unbind_all(event_pat)
+        # else:
+        #     log.debug(f'Bound event={event_pat!r} for {cb=} with {add=} -> {func_id=}')
 
     def apply_binds(self):
         for event_pat, callback in self.binds.flat_items():
             self._bind(event_pat, callback, True)
 
     def unbind(self, event_pat: Bindable, func_id_or_cb: str | BindTarget = _NotSet):
+        # log.debug(f'Unbinding event={event_pat!r} with {func_id_or_cb=}')
         target, func_id = _NotSet, None
         if isinstance(func_id_or_cb, str):
             try:
@@ -79,7 +83,7 @@ class BindMixin:
     def _unbind(self, event_pat: Bindable, func_id: str = None):
         # log.debug(f'Unbinding event={event_pat!r} with {func_id=}')
         try:
-            self._bind_widget.unbind(event_pat, func_id)
+            unbind(self._bind_widget, event_pat, func_id)
         except (TclError, RuntimeError) as e:
             log.error(f'Unable to unbind event={event_pat!r}: {e}')
 

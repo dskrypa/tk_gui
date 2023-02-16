@@ -8,6 +8,7 @@ from collections.abc import MutableMapping, ItemsView, KeysView, ValuesView, Ite
 from typing import TYPE_CHECKING, Any, Mapping, Collection, Iterator, Union
 
 from tk_gui.typing import BindCallback, Bindable, BindTarget, Bool
+from tk_gui.utils import unbind
 
 if TYPE_CHECKING:
     from tkinter import BaseWidget
@@ -177,7 +178,7 @@ class BindManager:
 
     def unbind_all(self, widget: BaseWidget):
         for event_pat, cb_id in tuple(self.event_bound_id_map.items()):
-            widget.unbind(event_pat, cb_id)
+            unbind(widget, event_pat, cb_id)
 
         self.event_bound_id_map = {}
 
@@ -189,7 +190,7 @@ class BindManager:
 
     def unbind(self, event_pat: str, widget: BaseWidget):
         if cb_id := self.event_bound_id_map.pop(event_pat, None):
-            widget.unbind(event_pat, cb_id)
+            unbind(widget, event_pat, cb_id)
 
     def replace(self, event_pat: str, callback: BindCallback | None, widget: BaseWidget, add: Bool = True):
         self.unbind(event_pat, widget)

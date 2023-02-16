@@ -914,13 +914,15 @@ class Window(BindMixin, RowContainer):
         except KeyError:
             if cb is None:
                 raise TypeError(f'Invalid {cb=} for {bind_event=}')
-            log.debug(f'Binding event={tk_event!r} for {cb=}')
-            self._root.bind(tk_event, cb, add=add)
+            # log.debug(f'Binding event={tk_event!r} for {cb=} with {add=}')
+            func_id = self._root.bind(tk_event, cb, add=add)
+            log.debug(f'Bound event={tk_event!r} for {cb=} with {add=} -> {func_id=}')
         else:
             if tk_event not in self._bound_for_events:
                 method = getattr(self, window_method_name)
-                log.debug(f'Binding event={tk_event!r} to {method=}')
-                self._root.bind(tk_event, method, add=add)
+                # log.debug(f'Binding event={tk_event!r} to {method=} with {add=}')
+                func_id = self._root.bind(tk_event, method, add=add)
+                log.debug(f'Bound event={tk_event!r} to method={window_method_name} with {add=} -> {func_id=}')
                 self._bound_for_events.add(tk_event)
             if cb is not None:
                 self._event_cbs.add(bind_event, cb)
