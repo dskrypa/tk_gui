@@ -16,6 +16,7 @@ from tk_gui.elements.menu.items import CopySelection, GoogleSelection, SearchKpo
 from tk_gui.elements.menu.items import ToUpperCase, ToTitleCase, ToLowerCase, OpenFileLocation, OpenFile
 from tk_gui.elements.menu.items import CloseWindow
 from tk_gui.elements.text import Multiline, gui_log_handler
+from tk_gui.event_handling import ClickHighlighter
 from tk_gui.images.icons import Icons
 from tk_gui.images.utils import ICONS_DIR
 from tk_gui.popups.about import AboutPopup
@@ -57,7 +58,10 @@ class GuiTest(Command):
             [Image(ICONS_DIR.joinpath('exclamation-triangle-yellow.png'), popup=True, size=(150, 150))],
             [Multiline('\n'.join(map(chr, range(97, 123))), size=(40, 10))],
         ]
-        Window(layout, 'Scroll Test', size=(300, 500), exit_on_esc=True, scroll_y=True).run()
+
+        window = Window(layout, 'Scroll Test', size=(300, 500), exit_on_esc=True, scroll_y=True)
+        ClickHighlighter(log_event=True, log_event_kwargs={'window': window}).register(window)
+        window.run()
 
     @action
     def scroll_nested(self):

@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import logging
 from tkinter import BaseWidget, Misc, Event, TclError
-from typing import TYPE_CHECKING, Any, Collection, Literal, Iterator
+from typing import TYPE_CHECKING, Any, Collection, Literal, Iterator, Mapping
 
 from tk_gui.caching import cached_property
 
@@ -77,11 +77,13 @@ class WidgetData:
         show_element: Bool = None,
         show_event: Bool = None,
         show_pack_info: Bool = True,
+        hide_event_unset: Bool = True,
     ):
         self.widget = widget
         self.element = element
         self.event = event
         self.config_keys = config_keys
+        self.hide_event_unset = hide_event_unset
         self.show: ShowMap = {
             'config': show_config,
             'event_attrs': show_event_attrs,
@@ -91,14 +93,14 @@ class WidgetData:
         }
 
     @classmethod
-    def for_widget(cls, window: Window, widget: BaseWidget, *, parent: Bool = False, **kwargs):
+    def for_widget(cls, window: Window | None, widget: BaseWidget, *, parent: Bool = False, **kwargs):
         if parent:
             try:
                 widget = widget.nametowidget(widget.winfo_parent())
             except (AttributeError, TclError):
                 widget = None
 
-        if widget:
+        if widget and window:
             widget_id = widget._w  # noqa
             element = window.widget_id_element_map.get(widget_id)
         else:
@@ -107,7 +109,7 @@ class WidgetData:
         return cls(widget, element, **kwargs)
 
     @classmethod
-    def for_event(cls, window: Window, event: Event, *, parent: Bool = False, **kwargs):
+    def for_event(cls, window: Window | None, event: Event, *, parent: Bool = False, **kwargs):
         try:
             widget = event.widget
         except (AttributeError, TclError):
@@ -142,13 +144,20 @@ class WidgetData:
             return get_config_str(widget, self.config_keys)
         return '???'
 
+    @cached_property
+    def event_attrs(self) -> str:
+        data = self.event.__dict__
+        if self.hide_event_unset:
+            return '<{}>'.format(', '.join(f'{k}={v!r}' for k, v in data.items() if v != '??'))
+        return _mapping_repr(data)
+
     def __iter__(self) -> Iterator[str]:
         show, widget, state, geometry = self.show, self.widget, self.state, self.geometry
         yield '{'
         if show['event']:
             yield f'    event={self.event!r}'
         if show['event_attrs']:
-            yield f'    event.__dict__={self.event.__dict__!r}'
+            yield f'    event.__dict__={self.event_attrs}'
         if show['element']:
             yield f'    element={self.element!r}'
         yield f'    {widget=}'
@@ -167,7 +176,7 @@ class WidgetData:
 
 
 def log_event_widget_data(
-    window: Window,
+    window: Window | None,
     event: Event,
     *,
     parent: Bool = False,
@@ -186,7 +195,7 @@ def log_event_widget_data(
 
 
 def log_widget_data(
-    window: Window,
+    window: Window | None,
     widget: BaseWidget,
     *,
     parent: Bool = False,
@@ -209,12 +218,7 @@ def log_widget_data(
 
 
 def get_config_str(widget: Misc, keys: Collection[str] = None) -> str:
-    config = widget.configure()
-    if keys:
-        kv_pairs = (kv for kv in config.items() if kv[0] in keys)
-    else:
-        kv_pairs = config.items()
-    return '{\n' + ',\n'.join(f'        {k!r}: {v!r}' for k, v in sorted(kv_pairs)) + '\n}'
+    return _mapping_repr(widget.configure(), keys)
 
 
 def log_config_str(widget: Misc, prefix: str = '', keys: Collection[str] = None, level: int = logging.DEBUG):
@@ -283,3 +287,13 @@ def _print_style_details(style, style_name, layout):
 
 
 # endregion
+
+
+def _mapping_repr(data: Mapping, keys: Collection[str] = None, sort: Bool = True) -> str:
+    if keys:
+        kv_pairs = (kv for kv in data.items() if kv[0] in keys)
+    else:
+        kv_pairs = data.items()
+    if sort:
+        kv_pairs = sorted(kv_pairs)
+    return '{\n' + ',\n'.join(f'        {k!r}: {v!r}' for k, v in kv_pairs) + '\n}'

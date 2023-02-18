@@ -7,12 +7,12 @@ from __future__ import annotations
 import logging
 from functools import partial
 from tkinter import TclError, BaseWidget, Misc, Event
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Mapping, Any
 
-from tk_gui.widgets.utils import unbind
+from tk_gui.widgets.utils import unbind, log_event_widget_data
 
 if TYPE_CHECKING:
-    from tk_gui.typing import Color, SupportsBind
+    from tk_gui.typing import Color, SupportsBind, Bool
 
 __all__ = ['ClickHighlighter']
 log = logging.getLogger(__name__)
@@ -23,15 +23,25 @@ class ClickHighlighter:
     Highlights the clicked widget using the specified color while the specified mouse button is down, then restores the
     original color upon button release.  Uses the background, red, and button 1 (left click) by default.
     """
-    __slots__ = ('modifier', 'button_num', 'color', 'attr', '_widget_data', '_bind_id')
+    __slots__ = ('modifier', 'button_num', 'color', 'attr', '_widget_data', '_bind_id', 'log_event', 'log_event_kwargs')
 
-    def __init__(self, color: Color = '#ff0000', button_num: int = 1, attr: str = 'background', modifier: str = None):
+    def __init__(
+        self,
+        color: Color = '#ff0000',
+        button_num: int = 1,
+        attr: str = 'background',
+        modifier: str = None,
+        log_event: Bool = False,
+        log_event_kwargs: Mapping[str, Any] = None,
+    ):
         self.modifier = modifier
         self.button_num = button_num
         self.color = color
         self.attr = attr
         self._widget_data = {}
         self._bind_id = None
+        self.log_event = log_event
+        self.log_event_kwargs = log_event_kwargs
 
     def register(self, supports_bind: SupportsBind):
         self._bind_id = supports_bind.bind(self.press_key, self.on_button_down, add=True)
@@ -58,7 +68,16 @@ class ClickHighlighter:
     def release_key(self) -> str:
         return self._key('ButtonRelease')
 
+    def _maybe_log_event(self, event: Event):
+        kwargs = {'window': None}
+        if extra_kwargs := self.log_event_kwargs:
+            kwargs.update(extra_kwargs)
+
+        log_event_widget_data(event=event, **kwargs)
+
     def on_button_down(self, event: Event):
+        if self.log_event:
+            self._maybe_log_event(event)
         try:
             widget: BaseWidget = event.widget
         except (AttributeError, TclError):
