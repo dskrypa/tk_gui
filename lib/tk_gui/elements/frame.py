@@ -11,17 +11,17 @@ from abc import ABC
 from tkinter import Frame as TkFrame, LabelFrame
 from typing import TYPE_CHECKING, Optional, Union, Type, Literal, Any, Callable, Sequence
 
-from ..enums import Anchor
-from ..pseudo_elements.row import RowBase
-from ..pseudo_elements.row_container import RowContainer
-from ..pseudo_elements.scroll import ScrollableFrame, ScrollableLabelFrame
-from ..styles import Style, StyleSpec
-from ..utils import call_with_popped, extract_kwargs
+from tk_gui.enums import Anchor
+from tk_gui.pseudo_elements.row import RowBase
+from tk_gui.pseudo_elements.row_container import RowContainer
+from tk_gui.styles import Style, StyleSpec
+from tk_gui.utils import call_with_popped, extract_kwargs
+from tk_gui.widgets.scroll import ScrollableFrame, ScrollableLabelFrame
 from .element import Element, InteractiveMixin
 
 if TYPE_CHECKING:
-    from ..typing import Layout, Bool, XY, TkContainer
-    from ..pseudo_elements.row import Row
+    from tk_gui.typing import Layout, Bool, XY, TkContainer
+    from tk_gui.pseudo_elements.row import Row
 
 __all__ = [
     'RowFrame', 'InteractiveRowFrame', 'BasicRowFrame', 'BasicInteractiveRowFrame',

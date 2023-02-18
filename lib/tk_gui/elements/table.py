@@ -15,14 +15,14 @@ from unicodedata import normalize
 from wcwidth import wcswidth
 
 from tk_gui.caching import cached_property
-from ..pseudo_elements.scroll import ScrollableTreeview
+from tk_gui.widgets.scroll import ScrollableTreeview
 from .element import Element
 
 if TYPE_CHECKING:
     from tkinter import BaseWidget
-    from ..pseudo_elements import Row
-    from ..styles import Font, Layer
-    from ..typing import TkContainer
+    from tk_gui.pseudo_elements import Row
+    from tk_gui.styles import Font, Layer
+    from tk_gui.typing import TkContainer
 
 __all__ = ['TableColumn', 'Table']
 log = logging.getLogger(__name__)

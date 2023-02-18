@@ -13,16 +13,16 @@ from tkinter import Toplevel, Frame, BaseWidget
 from typing import TYPE_CHECKING, Optional, Union, Any, Iterator, Type, Generic, overload
 
 from tk_gui.caching import cached_property
-from ..enums import Anchor, Justify, Side
-from ..styles import Style, StyleSpec
-from ..utils import call_with_popped
-from ..typing import XY, Layout, Bool, TkContainer, E
+from tk_gui.enums import Anchor, Justify, Side
+from tk_gui.styles import Style, StyleSpec
+from tk_gui.utils import call_with_popped
+from tk_gui.typing import XY, Layout, Bool, TkContainer, E
 from .row import Row, RowBase
 
 if TYPE_CHECKING:
-    from ..elements.element import ElementBase
-    from ..window import Window
-    from .scroll import ScrollableContainer, ScrollableToplevel
+    from tk_gui.elements.element import ElementBase
+    from tk_gui.window import Window
+    from tk_gui.widgets.scroll import ScrollableContainer, ScrollableToplevel
 
 __all__ = ['RowContainer', 'CONTAINER_PARAMS']
 log = logging.getLogger(__name__)

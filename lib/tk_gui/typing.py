@@ -14,11 +14,11 @@ if TYPE_CHECKING:
     from pathlib import Path  # noqa
     from tkinter import Event, Toplevel, Frame, LabelFrame  # noqa
     from PIL.Image import Image as PILImage  # noqa
-    from .elements.element import Element, ElementBase  # noqa
-    from .enums import BindTargets, BindEvent, ScrollUnit  # noqa
-    from .pseudo_elements import Row
-    from .pseudo_elements.scroll import ScrollableToplevel  # noqa
-    from .window import Window  # noqa
+    from tk_gui.elements.element import Element, ElementBase  # noqa
+    from tk_gui.enums import BindTargets, BindEvent, ScrollUnit  # noqa
+    from tk_gui.pseudo_elements import Row
+    from tk_gui.widgets.scroll import ScrollableToplevel  # noqa
+    from tk_gui.window import Window  # noqa
 
 # fmt: off
 __all__ = [

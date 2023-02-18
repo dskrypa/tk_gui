@@ -18,9 +18,9 @@ from weakref import WeakValueDictionary
 
 from tk_gui.caching import cached_property
 from tk_gui.enums import ListBoxSelectMode, Anchor
-from tk_gui.pseudo_elements.scroll import ScrollableListbox
 from tk_gui.typing import Bool, T, BindTarget, BindCallback, TraceCallback, TkContainer, HasFrame
 from tk_gui.utils import max_line_len, extract_kwargs
+from tk_gui.widgets.scroll import ScrollableListbox
 from ._utils import normalize_underline
 from .element import Interactive
 from .exceptions import NoActiveGroup, BadGroupCombo

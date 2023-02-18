@@ -26,9 +26,9 @@ from .event_handling import BindMixin, BindMapping, BindMap, BindManager
 from .exceptions import DuplicateKeyError
 from .positioning import positioner, Monitor
 from .pseudo_elements.row_container import RowContainer
-from .pseudo_elements.scroll import ScrollableToplevel
 from .styles import Style, StyleSpec
 from .utils import ON_LINUX, ON_WINDOWS, ProgramMetadata, extract_kwargs
+from .widgets.scroll import ScrollableToplevel
 from .widgets.utils import log_event_widget_data  # noqa
 
 if TYPE_CHECKING:
