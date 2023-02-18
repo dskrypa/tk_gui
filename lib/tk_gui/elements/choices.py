@@ -430,7 +430,7 @@ class CheckBox(DisableableMixin, CallbackCommandMixin, TraceCallbackMixin, Inter
 
         self._maybe_add_var_trace()
         self.widget = Checkbutton(tk_container, **kwargs)
-        # from tk_gui.utils import dump_ttk_widget_info
+        # from tk_gui.widgets.utils import dump_ttk_widget_info
         # dump_ttk_widget_info(self.widget)
 
 

@@ -19,7 +19,8 @@ from tk_gui.enums import Justify, Anchor
 from tk_gui.event_handling import BindManager
 from tk_gui.pseudo_elements.scroll import ScrollableText
 from tk_gui.styles import Style, Font, StyleState, StyleLayer
-from tk_gui.utils import Inheritable, max_line_len, call_with_popped, unbind
+from tk_gui.utils import Inheritable, max_line_len, call_with_popped
+from tk_gui.widgets.utils import unbind
 from ..element import Element, Interactive
 from ..mixins import DisableableMixin, TraceCallbackMixin
 from .links import LinkTarget, _Link

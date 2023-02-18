@@ -8,7 +8,7 @@ from collections.abc import MutableMapping, ItemsView, KeysView, ValuesView, Ite
 from typing import TYPE_CHECKING, Any, Mapping, Collection, Iterator, Union
 
 from tk_gui.typing import BindCallback, Bindable, BindTarget, Bool
-from tk_gui.utils import unbind
+from tk_gui.widgets.utils import unbind
 
 if TYPE_CHECKING:
     from tkinter import BaseWidget

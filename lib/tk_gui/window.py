@@ -22,13 +22,14 @@ from .assets import PYTHON_LOGO
 from .config import WindowConfig, WindowConfigProperty
 from .elements.menu import Menu
 from .enums import BindTargets, Anchor, Justify, Side, BindEvent, CallbackAction
-from .event_handling import BindMixin, BindMapping, BindMap, BindManager, log_widget_data  # noqa
+from .event_handling import BindMixin, BindMapping, BindMap, BindManager
 from .exceptions import DuplicateKeyError
 from .positioning import positioner, Monitor
 from .pseudo_elements.row_container import RowContainer
 from .pseudo_elements.scroll import ScrollableToplevel
 from .styles import Style, StyleSpec
 from .utils import ON_LINUX, ON_WINDOWS, ProgramMetadata, extract_kwargs
+from .widgets.utils import log_event_widget_data  # noqa
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -1022,8 +1023,8 @@ class Window(BindMixin, RowContainer):
 
     # @_tk_event_handler(BindEvent.LEFT_CLICK, True)
     # def _handle_left_click(self, event: Event):
-    #     log_widget_data(self, event, prefix='Tkinter Click')
-    #     # log_widget_data(self, event, prefix='Tkinter Click', config=True)
+    #     log_event_widget_data(self, event, prefix='Tkinter Click')
+    #     # log_event_widget_data(self, event, prefix='Tkinter Click', show_config=True)
 
     # endregion
 

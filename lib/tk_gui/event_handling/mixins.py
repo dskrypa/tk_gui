@@ -10,7 +10,7 @@ from tkinter import TclError, BaseWidget, Event
 from typing import TYPE_CHECKING, Any
 
 from tk_gui.enums import BindTargets
-from tk_gui.utils import unbind
+from tk_gui.widgets.utils import unbind
 from .containers import BindMap, BindMapping
 
 if TYPE_CHECKING:
