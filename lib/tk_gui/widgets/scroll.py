@@ -190,9 +190,6 @@ class ScrollableContainer(ScrollableBase, ABC):
         self.init_inner(inner_cls, **(inner_kwargs or {}))
         if self._y_config.fill or self._x_config.fill:
             get_parent_or_none(self).bind('<Configure>', self._maybe_resize_scroll_region, add=True)  # noqa
-            # parent = get_parent_or_none(self)
-            # log.debug(f'Binding _maybe_resize_scroll_region via {parent=}')
-            # parent.bind('<Configure>', self._maybe_resize_scroll_region, add=True)
 
     def init_canvas(self: ScrollOuter, style: Style = None, pad: XY = None):
         kwargs = style.get_map('frame', background='bg') if style else {}
@@ -254,6 +251,10 @@ class ScrollableContainer(ScrollableBase, ABC):
     #     log.debug(f'Resizing inner={self._inner_widget_id!r} to width={event.width}, height={event.height}')
     #     self.canvas.itemconfigure(self._inner_widget_id, width=event.width, height=event.height)
 
+    @cached_property
+    def _top_level(self) -> Toplevel:
+        return self.winfo_toplevel()
+
     def resize_scroll_region(self, size: XY | None, update_idletasks: Bool = True, force: Bool = False):
         inner = self.inner_widget
         if update_idletasks:
@@ -274,12 +275,13 @@ class ScrollableContainer(ScrollableBase, ABC):
         canvas.configure(scrollregion=canvas.bbox('all'), width=width, height=height)
         self._last_size = (width, height)
 
-    @delayed_event_handler
-    def _maybe_resize_scroll_region(self, event: Event):
-        size = (event.width if self._x_config.fill else None, event.height if self._y_config.fill else None)
+    @delayed_event_handler(delay_ms=50)
+    def _maybe_resize_scroll_region(self, event: Event = None):
+        top = self._top_level
+        size = (top.winfo_width() if self._x_config.fill else None, top.winfo_height() if self._y_config.fill else None)
         self.resize_scroll_region(size, False, False)
 
-    @delayed_event_handler
+    @delayed_event_handler(delay_ms=50)
     def _maybe_update_scroll_region(self, event: Event = None):
         canvas = self.canvas
         bbox = canvas.bbox('all')  # top left (x, y), bottom right (x, y) I think ==>> last 2 => (width, height)

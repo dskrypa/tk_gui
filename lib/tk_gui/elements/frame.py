@@ -400,6 +400,7 @@ class ScrollFrame(Element, CustomLayoutRowContainer, base_style_layer='frame'):
         else:
             self.pack_rows()
         outer_frame.resize_scroll_region(self.size)
+        # TODO: Add auto-fill support for non-scrollable frames
         self.pack_widget()
 
     def update_scroll_region(self, size: Optional[XY] = None):
