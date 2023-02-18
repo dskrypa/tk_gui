@@ -13,6 +13,7 @@ from tk_gui.enums import ScrollUnit
 from tk_gui.utils import extract_kwargs
 
 if TYPE_CHECKING:
+    from tkinter import BaseWidget
     from tk_gui.typing import Bool, Axis, TkContainer, ScrollWhat, TkScrollWhat
 
 __all__ = ['AxisConfig', 'ScrollAmount']
@@ -85,7 +86,22 @@ class AxisConfig(Generic[ScrollAmount]):
             return size_div
         return self._default_divs[self.axis]
 
-    def target_size(self, tk_container: TkContainer) -> int:
+    def target_size(self, inner_container: TkContainer) -> int:
         # Target size for a scrollable region
-        req_value = tk_container.winfo_reqheight() if self.axis == 'y' else tk_container.winfo_reqwidth()
-        return req_value // self.size_div
+        if self.fill:
+            # Even if this overshoots the available space, it is handled well
+            top_level = inner_container.winfo_toplevel()
+            # target = req_value = _get_size(top_level, 'width' if self.axis == 'x' else 'height')
+            # log.debug(f'Using {target=} = {req_value=} for axis={self.axis} from {top_level=}')
+            return _get_size(top_level, 'width' if self.axis == 'x' else 'height')
+        else:
+            req_value = _get_size(inner_container, 'reqwidth' if self.axis == 'x' else 'reqheight')
+            # target = req_value // self.size_div
+            # log.debug(f'Using {target=} = {req_value=} // {self.size_div} for axis={self.axis}')
+            return req_value // self.size_div
+        # return target
+
+
+def _get_size(widget: BaseWidget, attr: str) -> int:
+    # Equivalent to widget.winfo_{req}{height|width}()
+    return int(widget.tk.call('winfo', attr, widget._w))  # noqa

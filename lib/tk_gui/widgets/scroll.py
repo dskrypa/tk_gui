@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Type, Mapping, Union, Optional, Any, Iterator
 from tk_gui.caching import cached_property
 from tk_gui.utils import ON_WINDOWS
 from .config import AxisConfig
+from .utils import get_parent_or_none
 
 if TYPE_CHECKING:
     from tk_gui.styles import Style
@@ -160,6 +161,7 @@ class ScrollableContainer(ScrollableBase, ABC):
     canvas: Canvas
     inner_widget: TkContainer
     _last_scroll_region: tuple[int, int, int, int] = ()
+    _last_size: XY = ()
     _x_config: AxisConfig
     _y_config: AxisConfig
 
@@ -185,6 +187,8 @@ class ScrollableContainer(ScrollableBase, ABC):
         super().__init__(parent, **kwargs)
         self.init_canvas(style, pad)
         self.init_inner(inner_cls, **(inner_kwargs or {}))
+        if self._y_config.fill or self._x_config.fill:
+            get_parent_or_none(self).bind('<Configure>', self._maybe_resize_scroll_region, add=True)
 
     def init_canvas(self: ScrollOuter, style: Style = None, pad: XY = None):
         kwargs = style.get_map('frame', background='bg') if style else {}
@@ -246,20 +250,29 @@ class ScrollableContainer(ScrollableBase, ABC):
     #     log.debug(f'Resizing inner={self._inner_widget_id!r} to width={event.width}, height={event.height}')
     #     self.canvas.itemconfigure(self._inner_widget_id, width=event.width, height=event.height)
 
-    def resize_scroll_region(self, size: XY | None):
+    def resize_scroll_region(self, size: XY | None, update_idletasks: Bool = True, force: Bool = False):
         inner = self.inner_widget
-        inner.update_idletasks()  # Required for the required height/width to be correct
+        if update_idletasks:
+            inner.update_idletasks()  # Required for the required height/width to be correct
         try:
             width, height = size
         except TypeError:
             width = self._x_config.target_size(inner)
             height = self._y_config.target_size(inner)
+            size = (width, height)
 
-        self.update_scroll_region(width, height)
+        if force or size != self._last_size:
+            self.update_scroll_region(width, height)
 
-    def update_scroll_region(self, width: int, height: int):
+    def update_scroll_region(self, width: int = None, height: int = None):
         canvas = self.canvas
+        # log.debug(f'{self!r}.update_scroll_region: size=({width}, {height})')
         canvas.configure(scrollregion=canvas.bbox('all'), width=width, height=height)
+        self._last_size = (width, height)
+
+    def _maybe_resize_scroll_region(self, event: Event):
+        size = (event.width if self._x_config.fill else None, event.height if self._y_config.fill else None)
+        self.resize_scroll_region(size, False, False)
 
     def _maybe_update_scroll_region(self, event: Event = None):
         canvas = self.canvas
@@ -268,12 +281,6 @@ class ScrollableContainer(ScrollableBase, ABC):
             # log.debug(f'Updating scroll region to {bbox=} != {self._last_scroll_region=} for {self}')
             canvas.configure(scrollregion=bbox)
             self._last_scroll_region = bbox
-
-    # @cached_property
-    # def _parent_widget(self: ScrollableContainer | Widget | Toplevel) -> TkContainer | None:
-    #     if (parent_name := self.winfo_parent()) == '.':
-    #         return None
-    #     return self.nametowidget(parent_name)
 
     @cached_property
     def widgets(self) -> list[BaseWidget]:
