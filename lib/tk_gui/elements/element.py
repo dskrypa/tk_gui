@@ -13,18 +13,18 @@ from itertools import count
 from typing import TYPE_CHECKING, Optional, Callable, Union, Any, overload
 
 from tk_gui.caching import ClearableCachedPropertyMixin, cached_property
-from ..enums import StyleState, Anchor, Justify, Side, BindTargets
-from ..event_handling import BindMixin, BindMapping
-from ..pseudo_elements.tooltips import ToolTip
-from ..styles import Style, StyleSpec, StyleLayer, Layer
-from ..utils import Inheritable, call_with_popped, extract_style
-from ._utils import find_descendants
+from tk_gui.enums import StyleState, Anchor, Justify, Side, BindTargets
+from tk_gui.event_handling import BindMixin, BindMapping
+from tk_gui.pseudo_elements.tooltips import ToolTip
+from tk_gui.styles import Style, StyleSpec, StyleLayer, Layer
+from tk_gui.utils import Inheritable, call_with_popped, extract_style
+from tk_gui.widgets.utils import find_descendants
 
 if TYPE_CHECKING:
     from tkinter import Widget, Event, BaseWidget
-    from ..pseudo_elements.row import RowBase, Row
-    from ..typing import XY, Bool, BindCallback, Key, TkFill, BindTarget, HasFrame, TkContainer
-    from ..window import Window
+    from tk_gui.pseudo_elements.row import RowBase
+    from tk_gui.typing import XY, Bool, BindCallback, Key, TkFill, BindTarget, HasFrame, TkContainer
+    from tk_gui.window import Window
     from .menu import Menu
 
 __all__ = ['ElementBase', 'Element', 'Interactive', 'InteractiveMixin']
@@ -130,7 +130,7 @@ class ElementBase(ClearableCachedPropertyMixin, ABC):
             x, y = 5, 3
         return {'padx': x, 'pady': y}
 
-    def pack_into_row(self, row: Row):
+    def pack_into_row(self, row: RowBase):
         self.parent = row
         self.pack_into(row)
 
@@ -138,7 +138,7 @@ class ElementBase(ClearableCachedPropertyMixin, ABC):
     def _init_widget(self, tk_container: TkContainer):
         raise NotImplementedError
 
-    def pack_into(self, row: Row):
+    def pack_into(self, row: RowBase):
         self._init_widget(row.frame)
         self.pack_widget()
 

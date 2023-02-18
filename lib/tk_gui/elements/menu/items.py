@@ -15,7 +15,8 @@ from typing import TYPE_CHECKING, Union, Optional, Any, Callable
 from urllib.parse import quote_plus, urlparse
 
 from tk_gui.enums import CallbackAction
-from tk_gui.elements._utils import get_selection_pos, explore, launch
+from tk_gui.elements._utils import explore, launch
+from tk_gui.widgets.utils import get_selection_pos
 from .menu import Mode, CustomMenuItem
 from .utils import MenuMode, get_text, replace_selection, get_any_text
 

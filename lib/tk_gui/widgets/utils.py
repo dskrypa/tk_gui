@@ -5,24 +5,58 @@ Widget-related utilities.
 from __future__ import annotations
 
 import logging
-from tkinter import BaseWidget, Misc, Event, TclError
+from tkinter import BaseWidget, Misc, Event, TclError, Entry, Text
 from typing import TYPE_CHECKING, Any, Collection, Literal, Iterator, Mapping
 
 from tk_gui.caching import cached_property
 
 if TYPE_CHECKING:
     from tk_gui.elements import Element
-    from tk_gui.typing import Bool
+    from tk_gui.typing import Bool, SelectionPos
     from tk_gui.window import Window
 
 __all__ = [
+    'get_parent_or_none', 'get_widget_ancestor', 'find_descendants',
     'unbind', 'get_bound_events', 'log_bound_events',
     'get_config_str', 'log_config_str', 'WidgetData', 'log_event_widget_data', 'log_widget_data',
+    'get_selection_pos',
 ]
 log = logging.getLogger(__name__)
 
 ShowKey = Literal['config', 'event_attrs', 'event', 'element', 'pack_info']
 ShowMap = dict[ShowKey, 'Bool']
+
+
+# region Widget Ancestors & Descendants
+
+
+def get_parent_or_none(widget: BaseWidget) -> BaseWidget | None:
+    if (parent_name := widget.winfo_parent()) == '.':
+        return None
+    return widget.nametowidget(parent_name)
+
+
+def get_widget_ancestor(widget: BaseWidget, level: int = 1, permissive: Bool = True) -> BaseWidget:
+    while level > 0:
+        try:
+            widget = widget.nametowidget(widget.winfo_parent())
+        except (AttributeError, TclError):
+            if permissive:
+                return widget
+            else:
+                raise
+        level -= 1
+
+    return widget
+
+
+def find_descendants(widget: BaseWidget) -> Iterator[BaseWidget]:
+    for child in widget.children.values():
+        yield child
+        yield from find_descendants(child)
+
+
+# endregion
 
 
 # region Bind / Unbind / Bound Events
@@ -109,11 +143,14 @@ class WidgetData:
         return cls(widget, element, **kwargs)
 
     @classmethod
-    def for_event(cls, window: Window | None, event: Event, *, parent: Bool = False, **kwargs):
-        try:
-            widget = event.widget
-        except (AttributeError, TclError):
-            widget = None
+    def for_event(
+        cls, window: Window | None, event: Event, *, parent: Bool = False, widget: BaseWidget = None, **kwargs
+    ):
+        if widget is None:
+            try:
+                widget = event.widget
+            except (AttributeError, TclError):
+                widget = None
         return cls.for_widget(window, widget, event=event, parent=parent, **kwargs)
 
     @cached_property
@@ -287,6 +324,22 @@ def _print_style_details(style, style_name, layout):
 
 
 # endregion
+
+
+def get_selection_pos(widget: Entry | Text, raw: Bool = False) -> SelectionPos:
+    try:
+        first, last = widget.index('sel.first'), widget.index('sel.last')
+    except (AttributeError, TclError):
+        return None, None
+    if raw:
+        return first, last
+    try:
+        return int(first), int(last)
+    except ValueError:
+        pass
+    first_line, first_index = map(int, first.split('.', 1))
+    last_line, last_index = map(int, last.split('.', 1))
+    return (first_line, first_index), (last_line, last_index)
 
 
 def _mapping_repr(data: Mapping, keys: Collection[str] = None, sort: Bool = True) -> str:
