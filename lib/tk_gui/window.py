@@ -22,7 +22,7 @@ from .assets import PYTHON_LOGO
 from .config import WindowConfig, WindowConfigProperty
 from .elements.menu import Menu
 from .enums import BindTargets, Anchor, Justify, Side, BindEvent, CallbackAction
-from .event_handling import BindMixin, BindMapping, BindMap, BindManager
+from .event_handling import BindMixin, BindMapping, BindMap, BindManager, delayed_event_handler
 from .exceptions import DuplicateKeyError
 from .positioning import positioner, Monitor
 from .pseudo_elements.row_container import RowContainer
@@ -75,6 +75,10 @@ class _TkEventHandler:
         if self.always_bind:
             owner._always_bind_events.add(bind_event)
         setattr(owner, name, self.func)  # replace wrapper with the original function
+        try:
+            self.func.__set_name__(owner, name)  # noqa
+        except AttributeError:
+            pass
 
 
 class Interrupt:
@@ -131,7 +135,6 @@ class Window(BindMixin, RowContainer):
     _last_known_size: Optional[XY] = None
     _last_run: float = 0
     _motion_tracker: MotionTracker = None
-    _motion_end_cb_id = None
     _grab_anywhere_mgr: BindManager | None = None
     _grab_anywhere: GrabAnywhere = False  #: Whether the window should move on mouse click + movement
     _root: Optional[Top] = None
@@ -963,17 +966,9 @@ class Window(BindMixin, RowContainer):
         return False
 
     @_tk_event_handler('<Configure>', True)
-    def handle_config_changed(self, event: Event):
-        # log.debug(f'{self}: Config changed: {event=}')
-        root = self._root
-        if self._motion_end_cb_id:
-            root.after_cancel(self._motion_end_cb_id)
-
-        self._motion_end_cb_id = root.after(100, self._handle_motion_stopped, event)
-
+    @delayed_event_handler(widget_attr='_root')
     def _handle_motion_stopped(self, event: Event):
         # log.debug(f'Motion stopped: {event=}')
-        self._motion_end_cb_id = None
         with self.config as config:
             new_size, new_pos = self.true_size_and_pos  # The event x/y/size are not the final pos/size
             if new_pos != self._last_known_pos:
