@@ -163,7 +163,7 @@ class WidgetData:
     def pack_info(self) -> str | dict[str, Any]:
         try:
             return self.widget.pack_info()  # noqa
-        except AttributeError:  # Toplevel does not extend Pack
+        except (AttributeError, TclError):  # Toplevel does not extend Pack
             return '???'
 
     @cached_property
