@@ -341,7 +341,7 @@ class ScrollFrame(Element, CustomLayoutRowContainer, base_style_layer='frame'):
 
     def __repr__(self) -> str:
         key, size, visible, rows = self._key, self.size, self._visible, len(self.rows)
-        scroll_x, scroll_y = self.scroll_x, self.scroll_y
+        scroll_x, scroll_y = self.x_config.scroll, self.y_config.scroll
         key_str = f'{key=}, ' if key else ''
         cls_name = self.__class__.__name__
         return f'<{cls_name}[id={self.id}, {key_str}{size=}, {visible=}, {rows=}, {scroll_x=}, {scroll_y=}]>'
@@ -389,9 +389,11 @@ class ScrollFrame(Element, CustomLayoutRowContainer, base_style_layer='frame'):
 
     def _init_widget(self, tk_container: TkContainer):
         kwargs = self._prepare_pack_kwargs()
-        labeled = self.title_mode in {'outer', 'both'}
+        labeled = self.title and self.title_mode in {'outer', 'both'}
         outer_cls = ScrollableLabelFrame if labeled else ScrollableFrame
-        self.widget = outer_frame = outer_cls(self.parent.frame, self.scroll_y, self.scroll_x, **kwargs)
+        self.widget = outer_frame = outer_cls(
+            self.parent.frame, x_config=self.x_config, y_config=self.y_config, **kwargs
+        )
         self.inner_frame = outer_frame.inner_widget
 
     def pack_into(self, row: Row):
@@ -401,11 +403,11 @@ class ScrollFrame(Element, CustomLayoutRowContainer, base_style_layer='frame'):
             self.grid_rows()
         else:
             self.pack_rows()
-        self._update_scroll_region(outer_frame, outer_frame.inner_widget, self.size)
+        outer_frame.resize_scroll_region(self.size)
         self.pack_widget()
 
     def update_scroll_region(self, size: Optional[XY] = None):
-        self._update_scroll_region(self.widget, self.inner_frame, size)
+        self.widget.resize_scroll_region(size)
 
 
 class InteractiveScrollFrame(InteractiveFrameMixin, ScrollFrame):
@@ -415,7 +417,7 @@ class InteractiveScrollFrame(InteractiveFrameMixin, ScrollFrame):
 
     def __repr__(self) -> str:
         key, size, visible, rows, disabled = self._key, self.size, self._visible, len(self.rows), self.disabled
-        scroll_x, scroll_y = self.scroll_x, self.scroll_y
+        scroll_x, scroll_y = self.x_config.scroll, self.y_config.scroll
         key_str = f'{key=}, ' if key else ''
         cls_name = self.__class__.__name__
         return (

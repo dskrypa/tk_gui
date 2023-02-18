@@ -462,7 +462,7 @@ class Window(BindMixin, RowContainer):
     def update_scroll_region(self, size: Optional[XY] = None):
         outer, inner = self._root, self.root
         if outer != inner:
-            self._update_scroll_region(outer, inner, size)
+            outer.resize_scroll_region(size)
         else:
             raise TypeError(f'Unable to update scroll region for non-scrollable window={self!r}')
 
@@ -684,15 +684,15 @@ class Window(BindMixin, RowContainer):
     def _init_root_widget(self) -> Top:
         style = self.style
         kwargs = style.get_map(background='bg')
-        scroll_y, scroll_x = self.scroll_y, self.scroll_x
-        if not scroll_y and not scroll_x:
+        x_config, y_config = self.x_config, self.y_config
+        if not (y_config.scroll or x_config.scroll):
             pad_x, pad_y = self.margins
             self.widget = self._root = self.root = root = Toplevel(padx=pad_x, pady=pad_y, **kwargs)
             return root
 
         kwargs['inner_kwargs'] = kwargs.copy()  # noqa
         self.widget = self._root = root = ScrollableToplevel(
-            scroll_y=scroll_y, scroll_x=scroll_x, style=style, pad=self.margins, **kwargs
+            x_config=x_config, y_config=y_config, style=style, pad=self.margins, **kwargs
         )
         self.root = root.inner_widget
         return root
@@ -719,17 +719,17 @@ class Window(BindMixin, RowContainer):
     def _get_init_inner_size(self, inner: TkContainer) -> Optional[XY]:
         if size := self.config.size:
             return size
-        x_div, y_div = self._scroll_divisors()
+        y_div = self.y_config.size_div
         if y_div <= 1 or not (monitor := self._get_monitor(True)):
             return None
 
         inner.update_idletasks()
-        width: int = inner.winfo_reqwidth() // x_div  # noqa
+        width = self.x_config.target_size(inner)
         height = inner.winfo_reqheight()
         max_outer_height = monitor.height - 130
         max_inner_height = max_outer_height - 50
         if height > max_outer_height / 3:
-            height = min(max_inner_height, height // y_div)  # noqa
+            height = min(max_inner_height, height // y_div)
 
         return width, height
 
@@ -737,7 +737,7 @@ class Window(BindMixin, RowContainer):
         outer = self._init_root()
         self.pack_rows()
         if (inner := self.root) != outer:  # outer is scrollable
-            self._update_scroll_region(outer, inner, self._get_init_inner_size(inner))
+            outer.resize_scroll_region(self._get_init_inner_size(inner))
 
         self._set_init_size()
         if pos := self.config.position:
