@@ -70,7 +70,7 @@ class ScrollableBase(BaseWidget, ABC):
             widget = parent
 
     @abstractmethod
-    def find_scroll_cb(self, scroll_bar_name: str, axis: Axis) -> Optional[BindCallback]:
+    def find_container_scroll_cb(self, scroll_bar_name: str, axis: Axis) -> Optional[BindCallback]:
         raise NotImplementedError
 
     def has_scrollable_bar(self, scroll_bar_name: str) -> bool:
@@ -152,7 +152,7 @@ class ScrollableWidget(ScrollableBase, ABC):
     def configure_inner_widget(self, **kwargs):
         return self.inner_widget.configure(**kwargs)
 
-    def find_scroll_cb(self, scroll_bar_name: str, axis: Axis) -> Optional[BindCallback]:
+    def find_container_scroll_cb(self, scroll_bar_name: str, axis: Axis) -> Optional[BindCallback]:
         # A scrollable widget may or may not have been actually configured to scroll on this axis.
         # If it was, then None is returned so that its scroll action will be triggered, skipping any container cbs.
         if self.has_scrollable_bar(scroll_bar_name):
@@ -274,7 +274,7 @@ class ScrollableContainer(ScrollableBase, ABC):
             # self.canvas.xview_scroll(-4, 'units')
             self.canvas.xview_scroll(*self._x_config.view_scroll_args(False))
 
-    def find_scroll_cb(self, scroll_bar_name: str, axis: Axis) -> Optional[BindCallback]:
+    def find_container_scroll_cb(self, scroll_bar_name: str, axis: Axis) -> Optional[BindCallback]:
         if self.has_scrollable_bar(scroll_bar_name):
             # This widget has a bar for this axis that is not soft-disabled
             # log.debug(f'find_scroll_cb: [found bar for scrollable={self}] {axis=}')
@@ -350,12 +350,12 @@ class ScrollableLabelFrame(ScrollableContainer, LabelFrame):
 # region Scroll Callback Handling
 
 
-def _find_scroll_cb(widget: BaseWidget, scroll_bar_name: str, axis: Axis) -> Optional[BindCallback]:
+def _find_container_scroll_cb(widget: BaseWidget, scroll_bar_name: str, axis: Axis) -> Optional[BindCallback]:
     while widget:
         if isinstance(widget, ScrollableBase):
             # This checks for ScrollableBase instead of ScrollableContainer because the container should not scroll
             # when a scrollable widget within it was under the mouse cursor - all cases are handled in find_scroll_cb
-            return widget.find_scroll_cb(scroll_bar_name, axis)
+            return widget.find_container_scroll_cb(scroll_bar_name, axis)
 
         try:
             if (parent_name := widget.winfo_parent()) == '.':
@@ -369,12 +369,12 @@ def _find_scroll_cb(widget: BaseWidget, scroll_bar_name: str, axis: Axis) -> Opt
 
 
 def _scroll_y(event: Event):
-    if cb := _find_scroll_cb(event.widget, 'scroll_bar_y', 'y'):
+    if cb := _find_container_scroll_cb(event.widget, 'scroll_bar_y', 'y'):
         cb(event)
 
 
 def _scroll_x(event: Event):
-    if cb := _find_scroll_cb(event.widget, 'scroll_bar_x', 'x'):
+    if cb := _find_container_scroll_cb(event.widget, 'scroll_bar_x', 'x'):
         cb(event)
 
 
