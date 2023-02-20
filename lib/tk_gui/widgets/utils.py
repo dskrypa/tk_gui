@@ -23,7 +23,7 @@ __all__ = [
 ]
 log = logging.getLogger(__name__)
 
-ShowKey = Literal['config', 'event_attrs', 'event', 'element', 'pack_info']
+ShowKey = Literal['config', 'event_attrs', 'event', 'element', 'pack_info', 'get_result']
 ShowMap = dict[ShowKey, 'Bool']
 
 
@@ -111,6 +111,7 @@ class WidgetData:
         show_element: Bool = None,
         show_event: Bool = None,
         show_pack_info: Bool = True,
+        show_get_result: Bool = True,
         hide_event_unset: Bool = True,
     ):
         self.widget = widget
@@ -124,6 +125,7 @@ class WidgetData:
             'event': (event is not None) if show_event is None else show_event,
             'element': (element is not None) if show_element is None else show_element,
             'pack_info': show_pack_info,
+            'get_result': show_get_result,
         }
 
     @classmethod
@@ -188,6 +190,15 @@ class WidgetData:
             return '<{}>'.format(', '.join(f'{k}={v!r}' for k, v in data.items() if v != '??'))
         return _mapping_repr(data)
 
+    @cached_property
+    def get_result(self) -> str:
+        if widget := self.widget:
+            try:
+                return repr(widget.get())  # noqa
+            except (AttributeError, TclError, TypeError):
+                pass
+        return '???'
+
     def __iter__(self) -> Iterator[str]:
         show, widget, state, geometry = self.show, self.widget, self.state, self.geometry
         yield '{'
@@ -203,6 +214,8 @@ class WidgetData:
             yield f'    config={self.config_str}'
         if show['pack_info']:
             yield f'    pack_info={self.pack_info!r}'
+        if show['get_result']:
+            yield f'    get_result={self.get_result}'
         yield '}'
 
     def __str__(self) -> str:

@@ -9,8 +9,8 @@ from __future__ import annotations
 import logging
 import re
 import tkinter.constants as tkc
-from abc import ABC
-from tkinter import BaseWidget, Frame, LabelFrame, Canvas, Widget, Event, Toplevel, Text, Listbox
+from abc import ABC, abstractmethod
+from tkinter import BaseWidget, Frame, LabelFrame, Canvas, Widget, Event, Toplevel, Text, Listbox, TclError
 from tkinter.ttk import Scrollbar, Treeview
 from typing import TYPE_CHECKING, Type, Mapping, Union, Optional, Any, Iterator
 
@@ -38,60 +38,78 @@ AXIS_DIR_SIDE_ANCHOR = {'x': (tkc.HORIZONTAL, tkc.BOTTOM, tkc.S), 'y': (tkc.VERT
 class ScrollableBase(BaseWidget, ABC):
     """Base class for scrollable widgets and containers."""
     _tk_w_cls_search = re.compile(r'^(.*?)\d*$').search
-    _scrollable_cls_names = set()
+    _scrollable_container_cls_names = set()
 
     _w: str  # Inherited from BaseWidget
     scroll_bar_y: Optional[Scrollbar] = None
     scroll_bar_x: Optional[Scrollbar] = None
 
-    def __init_subclass__(cls, **kwargs):
-        super().__init_subclass__(**kwargs)
-        cls._scrollable_cls_names.add(cls.__name__.lower())
-
     def __repr__(self) -> str:
-        # return f'<{self.__class__.__name__}[{id(self)}, parent={self.scroll_parent!r}]>'
         return f'<{self.__class__.__name__}[{self._w}]>'
 
+    # region Scroll Callback Handling
+
     @cached_property
-    def scroll_parent(self) -> Optional[ScrollableBase]:
-        """The widget that is a subclass of :class:`ScrollableBase` that contains this widget, if any."""
-        self_id: str = self._w
-        id_parts = self_id.split('.!')[:-1]
-        for i, id_part in enumerate(reversed(id_parts)):
-            if (m := self._tk_w_cls_search(id_part)) and m.group(1) in self._scrollable_cls_names:  # noqa
+    def scroll_parent_container(self) -> Optional[ScrollableContainer]:
+        """The widget that is a subclass of :class:`ScrollableContainer` that contains this widget, if any."""
+        id_parts = self._w.split('.!')[:-1]
+        for i, id_part in enumerate(id_parts[::-1]):
+            if (m := self._tk_w_cls_search(id_part)) and m.group(1) in self._scrollable_container_cls_names:
                 return self.nametowidget('.!'.join(id_parts[:-i]))
         return None
 
-    @cached_property
-    def scroll_parents(self) -> list[ScrollableBase]:
+    def scroll_ancestors(self) -> Iterator[ScrollableContainer]:
         """
-        The scrollable widgets (instances of classes that extend :class:`ScrollableBase`) that contain this widget.
-        Items in the returned list are sorted from inner-most first to outer-most last, such that the first item in is
-        this widget's :attr:`.scroll_parent`, followed by that widget's scroll_parent, and so on.
+        The scrollable widgets (instances of classes that extend :class:`ScrollableContainer`) that contain this widget.
+        Items are yielded starting with the inner-most :attr:`.scroll_parent_container`, working outwards to provide
+        that widget's scroll_parent_container, and so on.
         """
-        parents = []
-        sc = self
-        while parent := sc.scroll_parent:
-            parents.append(parent)
-            sc = parent
-        return parents
+        widget = self
+        while parent := widget.scroll_parent_container:
+            yield parent
+            widget = parent
 
-    @cached_property
-    def scroll_children(self) -> list[ScrollableBase]:
-        """
-        All top-level scrollable descendants (instances of classes that extend :class:`ScrollableBase`) that are inside
-        this widget.  If a scrollable widget is nested inside a non-scrollable widget inside this widget, then it will
-        be included.  Scrollable widgets nested within other scrollable widgets will NOT be included.
-        """
-        children = []
-        all_children = self.winfo_children()
-        while all_children:
-            child = all_children.pop()
-            if isinstance(child, ScrollableBase):
-                children.append(child)
-            else:
-                all_children.extend(child.winfo_children())
-        return children
+    @abstractmethod
+    def find_scroll_cb(self, scroll_bar_name: str, axis: Axis) -> Optional[BindCallback]:
+        raise NotImplementedError
+
+    def has_scrollable_bar(self, scroll_bar_name: str) -> bool:
+        if not (scroll_bar := getattr(self, scroll_bar_name)):
+            return False
+        # Even if it has a scroll bar, there may or may not be anything to scroll.
+        # If pos == (0, 1), then the inner size matches the outer size, and the bar is essentially soft-disabled.
+        try:
+            pos = scroll_bar.get()
+        except (AttributeError, TclError, TypeError):
+            return False
+        else:
+            return pos != (0, 1)
+
+    def find_ancestor_scroll_cb(self, scroll_bar_name: str, axis: Axis) -> Optional[BindCallback]:
+        for ancestor in self.scroll_ancestors():
+            if ancestor.has_scrollable_bar(scroll_bar_name):
+                # log.debug(f'find_scroll_cb: [found bar for {ancestor=}] {axis=}, scrollable={self}')
+                return getattr(ancestor, f'scroll_{axis}')
+        return None
+
+    # endregion
+
+    # @cached_property
+    # def scroll_children(self) -> list[ScrollableBase]:
+    #     """
+    #     All top-level scrollable descendants (instances of classes that extend :class:`ScrollableBase`) that are inside
+    #     this widget.  If a scrollable widget is nested inside a non-scrollable widget inside this widget, then it will
+    #     be included.  Scrollable widgets nested within other scrollable widgets will NOT be included.
+    #     """
+    #     children = []
+    #     all_children = self.winfo_children()
+    #     while all_children:
+    #         child = all_children.pop()
+    #         if isinstance(child, ScrollableBase):
+    #             children.append(child)
+    #         else:
+    #             all_children.extend(child.winfo_children())
+    #     return children
 
     def _widgets(self) -> Iterator[BaseWidget]:
         yield self
@@ -134,6 +152,13 @@ class ScrollableWidget(ScrollableBase, ABC):
     def configure_inner_widget(self, **kwargs):
         return self.inner_widget.configure(**kwargs)
 
+    def find_scroll_cb(self, scroll_bar_name: str, axis: Axis) -> Optional[BindCallback]:
+        # A scrollable widget may or may not have been actually configured to scroll on this axis.
+        # If it was, then None is returned so that its scroll action will be triggered, skipping any container cbs.
+        if self.has_scrollable_bar(scroll_bar_name):
+            return None
+        return self.find_ancestor_scroll_cb(scroll_bar_name, axis)
+
 
 class ScrollableTreeview(ScrollableWidget, Frame, inner_cls=Treeview):
     inner_widget: Treeview
@@ -165,6 +190,10 @@ class ScrollableContainer(ScrollableBase, ABC):
     _last_size: XY = ()
     _x_config: AxisConfig
     _y_config: AxisConfig
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        cls._scrollable_container_cls_names.add(cls.__name__.lower())
 
     # region Initialization
 
@@ -245,6 +274,14 @@ class ScrollableContainer(ScrollableBase, ABC):
             # self.canvas.xview_scroll(-4, 'units')
             self.canvas.xview_scroll(*self._x_config.view_scroll_args(False))
 
+    def find_scroll_cb(self, scroll_bar_name: str, axis: Axis) -> Optional[BindCallback]:
+        if self.has_scrollable_bar(scroll_bar_name):
+            # This widget has a bar for this axis that is not soft-disabled
+            # log.debug(f'find_scroll_cb: [found bar for scrollable={self}] {axis=}')
+            return getattr(self, f'scroll_{axis}')
+        else:
+            return self.find_ancestor_scroll_cb(scroll_bar_name, axis)
+
     # endregion
 
     # def resize_inner(self, event: Event):
@@ -310,10 +347,15 @@ class ScrollableLabelFrame(ScrollableContainer, LabelFrame):
 # endregion
 
 
-def get_scrollable(widget: Widget) -> Optional[ScrollableBase]:
+# region Scroll Callback Handling
+
+
+def _find_scroll_cb(widget: BaseWidget, scroll_bar_name: str, axis: Axis) -> Optional[BindCallback]:
     while widget:
         if isinstance(widget, ScrollableBase):
-            return widget
+            # This checks for ScrollableBase instead of ScrollableContainer because the container should not scroll
+            # when a scrollable widget within it was under the mouse cursor - all cases are handled in find_scroll_cb
+            return widget.find_scroll_cb(scroll_bar_name, axis)
 
         try:
             if (parent_name := widget.winfo_parent()) == '.':
@@ -326,27 +368,17 @@ def get_scrollable(widget: Widget) -> Optional[ScrollableBase]:
     return None
 
 
-def find_scroll_cb(event: Event, axis: Axis) -> Optional[BindCallback]:
-    if not (scrollable := get_scrollable(event.widget)):  # Another window, or scrolling away from a scrollable area
-        return None
-    elif not isinstance(scrollable, ScrollableContainer):  # it's a ScrollableWidget
-        # TODO: If the mouse is over a ScrollableWidget that has no scroll bar for this axis, but is inside a
-        #  scrollable container, then that parent should be discovered here, and its scroll cb should be called
-        return None
-    elif not getattr(scrollable, f'scroll_bar_{axis}'):  # no scroll bar for this axis is configured
-        return None
-    # log.debug(f'Returning {axis} scroll func for {scrollable=}')
-    return getattr(scrollable, f'scroll_{axis}')
-
-
 def _scroll_y(event: Event):
-    if cb := find_scroll_cb(event, 'y'):
+    if cb := _find_scroll_cb(event.widget, 'scroll_bar_y', 'y'):
         cb(event)
 
 
 def _scroll_x(event: Event):
-    if cb := find_scroll_cb(event, 'x'):
+    if cb := _find_scroll_cb(event.widget, 'scroll_bar_x', 'x'):
         cb(event)
+
+
+# endregion
 
 
 def _add_scroll_bar(

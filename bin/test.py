@@ -57,19 +57,12 @@ class GuiTest(Command):
             [ScrollFrame(frame_content, size=(100, 100), scroll_y=True)],
             [Image(ICONS_DIR.joinpath('exclamation-triangle-yellow.png'), popup=True, size=(150, 150))],
             [Multiline('\n'.join(map(chr, range(97, 123))), size=(40, 10))],
+            [Multiline('\n'.join(map(chr, range(97, 105))), size=(40, 10))],
         ]
 
         window = Window(layout, 'Scroll Test', size=(300, 500), exit_on_esc=True, scroll_y=True)
         ClickHighlighter(log_event=True, log_event_kwargs={'window': window}).register(window)
         window.run()
-
-    @action
-    def scroll_nested(self):
-        # TODO: If the mouse is over a ScrollableWidget that has no scroll bar for the scroll axis, but is inside a
-        #  scrollable container, then that parent container should scroll instead of the nested widget suppressing
-        #  the scroll.
-        # TODO: Implement with the fix for the TODO in pseudo_elements.scroll.find_scroll_cb()
-        pass
 
     @action
     def max_size(self):
@@ -181,6 +174,10 @@ class GuiTest(Command):
         # Window(layout, 'Test One', anchor_elements='c', binds={'<Escape>': 'exit'}).run()
         # results = Window(layout, binds={'<Escape>': 'exit'}, right_click_menu=RightClickMenu()).run().results
         window = Window(layout, 'Mixed Test', right_click_menu=RightClickMenu(), exit_on_esc=True, grab_anywhere=True)
+
+        # log_event_kwargs = {'window': window, 'show_event_attrs': True, 'show_config': True, 'show_get_result': True}
+        # ClickHighlighter(log_event=True, log_event_kwargs=log_event_kwargs).register(window)
+
         with gui_log_handler(multiline):
             results = window.run().results
         print(f'Results: {results}')
