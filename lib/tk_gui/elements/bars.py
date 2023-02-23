@@ -125,6 +125,12 @@ class ProgressBar(Element, base_style_layer='progress'):
         else:
             bar['value'] = value
 
+    def increment(self):
+        self.widget['value'] += 1
+
+    def decrement(self):
+        self.widget['value'] -= 1
+
     def __call__(self, iterable: Iterable[T]) -> Iterator[T]:
         bar = self.widget
         for i, item in enumerate(iterable, bar['value'] + 1):
