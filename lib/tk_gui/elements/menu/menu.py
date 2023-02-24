@@ -355,6 +355,8 @@ class Menu(CustomEventResultsMixin, ContainerMixin, ElementBase, metaclass=MenuM
             self.members = list(self.members)
         return self
 
+    # region Common Methods
+
     @property
     def style_config(self) -> dict[str, Any]:
         style = self.style
@@ -366,14 +368,20 @@ class Menu(CustomEventResultsMixin, ContainerMixin, ElementBase, metaclass=MenuM
         }
 
     def prepare(self, parent: BaseWidget = None, event: Event = None, kwargs: dict[str, Any] = None) -> TkMenu:
+        """Used to initialize / populate the tkinter Menu for both menu bars and popup/right-click menus."""
         style = self.style_config
         menu = TkMenu(parent, tearoff=0, takefocus=int(self.allow_focus), **style)
         cb_inst = self.cb_inst
         for member in self.members:
+            # TODO: Add way to support separators (to be translated to `tkinter.Menu.add_separator(...)` calls)
             member.maybe_add(menu, style, event, kwargs, cb_inst)
             # log.debug(f'Menu.prepare: {added=} for {member=}')
 
         return menu
+
+    # endregion
+
+    # region Menu Bar Methods
 
     def _init_widget(self, tk_container: TkContainer):
         self.widget = menu = self.prepare(tk_container)
@@ -384,6 +392,10 @@ class Menu(CustomEventResultsMixin, ContainerMixin, ElementBase, metaclass=MenuM
 
     def grid_into(self, parent: HasFrame, row: int, column: int, **kwargs):
         self._init_widget(parent.window._root)
+
+    # endregion
+
+    # region Menu Popup Methods
 
     def show(self, event: Event, parent: BaseWidget = None, **kwargs):
         return self.popup((event.x_root, event.y_root), parent, event, **kwargs)
@@ -398,6 +410,8 @@ class Menu(CustomEventResultsMixin, ContainerMixin, ElementBase, metaclass=MenuM
             menu.tk_popup(*position)
         finally:
             menu.grab_release()
+
+    # endregion
 
 
 class MenuProperty(Generic[M]):

@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import logging
+import time
 
 from cli_command_parser import Command, Action, Counter, Option, main
 
@@ -8,11 +9,13 @@ from tk_gui.__version__ import __author_email__, __version__, __author__, __url_
 from tk_gui.elements import Text, Input, Multiline, Frame, InteractiveScrollFrame, InteractiveFrame, VerticalSeparator
 from tk_gui.elements.choices import Radio, RadioGroup, Combo, ListBox, CheckBox
 from tk_gui.elements.bars import ProgressBar, Slider
-from tk_gui.elements.buttons import Button
+from tk_gui.elements.buttons import Button, EventButton
 from tk_gui.elements.element import Interactive
 from tk_gui.elements.rating import Rating
+from tk_gui.event_handling import button_handler
 from tk_gui.popups import Popup
 from tk_gui.popups.raw import PickFolder, PickColor
+from tk_gui.views.view import View
 from tk_gui.window import Window
 
 
@@ -71,6 +74,11 @@ class GuiInputTest(Command):
         for _ in bar(range(99)):
             window._root.after(50, window.interrupt)
             window.run()
+            # time.sleep(0.3)
+
+    @action
+    def progress_view(self):
+        ProgressView().run()
 
     @action
     def slider(self):
@@ -166,6 +174,23 @@ def _labeled(elements: list[Interactive]):
 
 
 # endregion
+
+
+class ProgressView(View, title='Progress Bar Test View'):
+    window_kwargs = {'exit_on_esc': True}
+    progress_bar: ProgressBar
+
+    def get_post_window_layout(self):
+        self.progress_bar = ProgressBar(100)
+        yield [Text('Processing...')]
+        yield [self.progress_bar]
+        yield [EventButton('Run', key='run')]
+
+    @button_handler('run')
+    def run_progress_test(self, event, key=None):
+        for _ in self.progress_bar(range(99)):
+            # window._root.after(50, window.interrupt)
+            time.sleep(0.3)
 
 
 if __name__ == '__main__':

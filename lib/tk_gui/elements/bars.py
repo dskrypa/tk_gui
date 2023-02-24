@@ -124,25 +124,34 @@ class ProgressBar(Element, base_style_layer='progress'):
             bar['value'] += value
         else:
             bar['value'] = value
+        bar.update_idletasks()
 
     def increment(self):
-        self.widget['value'] += 1
+        bar = self.widget
+        bar['value'] += 1
+        bar.update_idletasks()
 
     def decrement(self):
-        self.widget['value'] -= 1
+        bar = self.widget
+        bar['value'] -= 1
+        bar.update_idletasks()
 
     def __call__(self, iterable: Iterable[T]) -> Iterator[T]:
         bar = self.widget
         for i, item in enumerate(iterable, bar['value'] + 1):
+            # TODO: Interrupt on window close
             yield item
             bar['value'] = i
+            bar.update_idletasks()
 
     def __enter__(self) -> ProgressBar:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self.max_on_exit:
-            self.widget['value'] = self.max_value
+            bar = self.widget
+            bar['value'] = self.max_value
+            bar.update_idletasks()
 
 
 class Slider(DisableableMixin, CallbackCommandMixin, Interactive, base_style_layer='slider'):

@@ -112,6 +112,7 @@ class GuiOptions:
             self.options[name].kwargs['value'] = parsed[name]  # Save the value even if an exception will be raised
 
         self.parsed = True
+        # TODO: Respect disable_on_parsed
         if errors:
             raise errors[0] if len(errors) == 1 else MultiParsingError(errors)
 

@@ -4,23 +4,23 @@ Helpers for writing logs to GUI elements.
 
 from __future__ import annotations
 
-import logging
 from contextlib import contextmanager
 from datetime import datetime
+from logging import NOTSET, DEBUG, Handler, Formatter, Logger, getLogger
 from tkinter import TclError
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ContextManager
 
 if TYPE_CHECKING:
     from .text import Multiline
 
 __all__ = ['GuiTextHandler', 'gui_log_handler']
-log = logging.getLogger(__name__)
+log = getLogger(__name__)
 
 _NotSet = object()
 
 
-class GuiTextHandler(logging.Handler):
-    def __init__(self, element: Multiline, level: int = logging.NOTSET):
+class GuiTextHandler(Handler):
+    def __init__(self, element: Multiline, level: int = NOTSET):
         super().__init__(level)
         self.element = element
 
@@ -36,7 +36,7 @@ class GuiTextHandler(logging.Handler):
             self.handleError(record)
 
 
-class DatetimeFormatter(logging.Formatter):
+class DatetimeFormatter(Formatter):
     """Enables use of ``%f`` (micro/milliseconds) in datetime formats."""
 
     def formatTime(self, record, datefmt=None):
@@ -51,30 +51,30 @@ class DatetimeFormatter(logging.Formatter):
 @contextmanager
 def gui_log_handler(
     element: Multiline,
-    logger_name: str | None = _NotSet,
-    *,
-    level: int = logging.DEBUG,
+    *loggers: str | Logger | None,
+    level: int = DEBUG,
     entry_fmt: str = None,
     detail: bool = False,
-    logger: logging.Logger = None,
-):
-    handler = GuiTextHandler(element, level)
+) -> ContextManager[GuiTextHandler]:
+    gui_handler = GuiTextHandler(element, level)
     if detail and entry_fmt:
         raise ValueError(f'Unable to combine {detail=} with {entry_fmt=} - choose one or the other')
     if detail:
         entry_fmt = '%(asctime)s %(levelname)s %(threadName)s %(name)s %(lineno)d %(message)s'
         # handler.setFormatter(DatetimeFormatter(entry_fmt, '%Y-%m-%d %H:%M:%S %Z'))
-        handler.setFormatter(DatetimeFormatter(entry_fmt, '%Y-%m-%d %H:%M:%S'))
+        gui_handler.setFormatter(DatetimeFormatter(entry_fmt, '%Y-%m-%d %H:%M:%S'))
     elif entry_fmt:
-        handler.setFormatter(logging.Formatter(entry_fmt))
+        gui_handler.setFormatter(Formatter(entry_fmt))
 
-    loggers = [logger] if logger is not None else []
-    if (name := None if logger_name is not _NotSet and not loggers else logger_name) is not _NotSet:
-        loggers.append(logging.getLogger(name))
+    if loggers:
+        loggers = [logger if isinstance(logger, Logger) else getLogger(logger) for logger in loggers]
+    else:
+        loggers = [getLogger(None)]
+
     for logger in loggers:
-        logger.addHandler(handler)
+        logger.addHandler(gui_handler)
     try:
-        yield handler
+        yield gui_handler
     finally:
         for logger in loggers:
-            logger.removeHandler(handler)
+            logger.removeHandler(gui_handler)
