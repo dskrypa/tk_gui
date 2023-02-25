@@ -1,5 +1,18 @@
 """
 Utilities that are useful for debugging Tkinter / tk_gui GUIs.
+
+Notes:
+    - For an event with multiple bound callbacks, if one returns `'break'`, then remaining callbacks for that event will
+      be skipped.
+    - `Bind modifiers <https://tcl.tk/man/tcl8.6.13/TkCmd/bind.htm#M6>`__:
+        - Control, Alt, Shift, Lock, Extended, Command, Option, Meta / M, Mod[1-5] / M[1-5]
+        - Button[1-5] / B[1-5]
+        - Double, Triple, Quadruple
+    - `Event types <https://tcl.tk/man/tcl8.6.13/TkCmd/bind.htm#M7>`__:
+        - ButtonPress / Button, ButtonRelease, MouseWheel, Motion
+        - KeyPress / Key, KeyRelease
+        - Activate, Deactivate, Enter, Leave, FocusIn, FocusOut
+        - Configure, Destroy, Visibility
 """
 
 from __future__ import annotations

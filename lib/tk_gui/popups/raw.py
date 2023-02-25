@@ -6,25 +6,23 @@ Tkinter GUI low level popups, including file prompts
 
 from __future__ import annotations
 
-import logging
 from abc import ABC
 from pathlib import Path
-from tkinter import filedialog, colorchooser
-from typing import TYPE_CHECKING, Union, Collection, Optional
+from tkinter.colorchooser import askcolor
+from tkinter.filedialog import Open, Directory, SaveAs as TkSaveAs
+from typing import TYPE_CHECKING, Collection, Optional
 
-from .base import BasePopup
 from ..utils import ON_MAC
+from .base import BasePopup
 
 if TYPE_CHECKING:
-    from tk_gui.typing import RGB
+    from tk_gui.typing import RGB, PathLike
 
 __all__ = [
     'PickFolder', 'PickFile', 'PickFiles', 'SaveAs', 'PickColor',
     'pick_folder_popup', 'pick_file_popup', 'pick_files_popup', 'save_as_popup', 'pick_color_popup',
 ]
-log = logging.getLogger(__name__)
 
-PathLike = Union[Path, str]
 FileTypes = Collection[tuple[str, str]]
 
 ALL_FILES = (('ALL Files', '*.* *'),)
@@ -56,7 +54,7 @@ class PickFolder(FilePopup):
 
     def _run(self) -> Optional[Path]:
         kwargs = {} if ON_MAC else {'parent': self._get_root()}
-        if name := filedialog.askdirectory(initialdir=self.initial_dir, title=self.title, **kwargs):
+        if name := Directory(initialdir=self.initial_dir, title=self.title, **kwargs).show():
             return Path(name)
         return None
 
@@ -74,7 +72,7 @@ class PickFile(FilePopup):
         return {'parent': self._get_root(), 'filetypes': self.file_types or ALL_FILES}
 
     def _run(self) -> Optional[Path]:
-        if name := filedialog.askopenfilename(initialdir=self.initial_dir, title=self.title, **self._dialog_kwargs()):
+        if name := Open(initialdir=self.initial_dir, title=self.title, **self._dialog_kwargs()).show():
             return Path(name)
         return None
 
@@ -83,7 +81,7 @@ class PickFiles(PickFile):
     __slots__ = ()
 
     def _run(self) -> list[Path]:
-        if names := filedialog.askopenfilenames(initialdir=self.initial_dir, title=self.title, **self._dialog_kwargs()):
+        if names := Open(initialdir=self.initial_dir, title=self.title, multiple=1, **self._dialog_kwargs()).show():
             return [Path(name) for name in names]
         return []
 
@@ -105,7 +103,7 @@ class SaveAs(PickFile):
     def _run(self) -> Optional[Path]:
         kwargs = self._dialog_kwargs()
         kwargs['defaultextension'] = self.default_ext
-        if name := filedialog.asksaveasfilename(initialdir=self.initial_dir, title=self.title, **kwargs):
+        if name := TkSaveAs(initialdir=self.initial_dir, title=self.title, **kwargs).show():
             return Path(name)
         return None
 
@@ -147,7 +145,7 @@ class PickColor(RawPopup):
         self.initial_color = initial_color
 
     def _run(self) -> Optional[tuple[RGB, str]]:
-        if color := colorchooser.askcolor(self.initial_color, title=self.title, parent=self._get_root()):
+        if color := askcolor(self.initial_color, title=self.title, parent=self._get_root()):
             return color  # noqa  # hex RGB
         return None
 
