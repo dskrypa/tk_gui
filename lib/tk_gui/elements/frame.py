@@ -15,7 +15,7 @@ from tk_gui.enums import Anchor
 from tk_gui.pseudo_elements.row import RowBase
 from tk_gui.pseudo_elements.row_container import RowContainer
 from tk_gui.styles import Style, StyleSpec
-from tk_gui.utils import call_with_popped, extract_kwargs
+from tk_gui.utils import call_with_popped
 from tk_gui.widgets.scroll import ScrollableFrame, ScrollableLabelFrame
 from .element import Element, InteractiveMixin
 

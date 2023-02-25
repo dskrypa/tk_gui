@@ -9,17 +9,20 @@ from __future__ import annotations
 import logging
 import tkinter.constants as tkc
 from math import floor, ceil
-from tkinter import Scale, IntVar, DoubleVar, TclError
-from tkinter.ttk import Separator as TtkSeparator, Progressbar
+from tkinter import Scale, IntVar, DoubleVar, TclError, Event
+from tkinter.ttk import Separator as TtkSeparator, Progressbar, Style as TtkStyle
 from typing import TYPE_CHECKING, Iterable, Iterator, Union, Any
 
+from tk_gui.caching import cached_property
+from tk_gui.event_handling.decorators import delayed_event_handler
+from tk_gui.widgets.config import FillConfig
 from ..exceptions import WindowClosed
 from .element import ElementBase, Element, Interactive
 from .mixins import DisableableMixin, CallbackCommandMixin
 
 if TYPE_CHECKING:
     from ..pseudo_elements import Row
-    from ..typing import Bool, Orientation, T, BindTarget, TkContainer
+    from ..typing import Bool, Orientation, T, BindTarget, TkContainer, OptXY
 
 __all__ = ['Separator', 'HorizontalSeparator', 'VerticalSeparator', 'ProgressBar', 'Slider']
 log = logging.getLogger(__name__)
@@ -67,6 +70,10 @@ class VerticalSeparator(Separator):
 
 class ProgressBar(Element, base_style_layer='progress'):
     widget: Progressbar
+    x_config: FillConfig
+    y_config: FillConfig
+    _last_thickness: int = None
+    _last_length: int = None
 
     def __init__(
         self,
@@ -76,6 +83,8 @@ class ProgressBar(Element, base_style_layer='progress'):
         max_on_exit: Bool = True,
         **kwargs,
     ):
+        self.x_config = FillConfig.from_kwargs('x', kwargs)
+        self.y_config = FillConfig.from_kwargs('y', kwargs)
         super().__init__(**kwargs)
         self.max_value = max_value
         self.default = default
@@ -112,12 +121,26 @@ class ProgressBar(Element, base_style_layer='progress'):
     def decrement(self, amount: int = 1):
         self.increment(-amount)
 
+    def update(self, value: int, increment: Bool = True, max_value: int = None):
+        if max_value is not None:
+            self.max_value = max_value
+            self.widget.configure(maximum=max_value)
+        if increment:
+            self.increment(value)
+        else:
+            self.value = value
+
     # endregion
 
+    # region Style Methods
+
+    @cached_property
+    def _ttk_style(self) -> tuple[str, TtkStyle]:
+        return self.style.make_ttk_style(f'.{self.orientation.title()}.TProgressbar')
+
     def _prepare_ttk_style(self, thickness: int = None) -> str:
-        style = self.style
-        name, ttk_style = style.make_ttk_style(f'.{self.orientation.title()}.TProgressbar')
-        kwargs = style.get_map(
+        name, ttk_style = self._ttk_style
+        kwargs = self.style.get_map(
             'progress', background='bg',
             troughcolor='trough_color', troughrelief='relief',
             borderwidth='border_width', thickness='bar_width',
@@ -128,16 +151,21 @@ class ProgressBar(Element, base_style_layer='progress'):
         ttk_style.configure(name, **kwargs)
         return name
 
-    def _init_widget(self, tk_container: TkContainer):
-        horizontal = self.orientation == tkc.HORIZONTAL
+    def _style_configure(self, **kwargs):
+        name, ttk_style = self._ttk_style
+        ttk_style.configure(name, **kwargs)
         try:
-            if horizontal:
-                length, thickness = self.size
-            else:
-                thickness, length = self.size
-        except TypeError:
-            length = thickness = None
+            thickness = kwargs['thickness']
+        except KeyError:
+            return
+        self._last_thickness = thickness
 
+    # endregion
+
+    # region Widget Init & Config
+
+    def _init_widget(self, tk_container: TkContainer):
+        self._last_length, self._last_thickness = length, thickness = self._get_size(tk_container)
         kwargs = {
             'style': self._prepare_ttk_style(thickness),
             'orient': self.orientation,
@@ -147,15 +175,37 @@ class ProgressBar(Element, base_style_layer='progress'):
             **self.style_config,
         }
         self.widget = Progressbar(tk_container, mode='determinate', **kwargs)
+        tk_container.bind('<Configure>', self._maybe_resize, add=True)
 
-    def update(self, value: int, increment: Bool = True, max_value: int = None):
-        if max_value is not None:
-            self.max_value = max_value
-            self.widget.configure(maximum=max_value)
-        if increment:
-            self.increment(value)
+    def _get_size(self, tk_container: TkContainer) -> OptXY:
+        try:
+            x_len, y_len = self.size
+        except TypeError:
+            x_len = y_len = None
+        x_len = self.x_config.target_size(tk_container, x_len)
+        y_len = self.y_config.target_size(tk_container, y_len)
+        if self.orientation == tkc.HORIZONTAL:
+            length, thickness = x_len, y_len
         else:
-            self.value = value
+            thickness, length = x_len, y_len
+        return length, thickness
+
+    # endregion
+
+    # region Event Handlers
+
+    @delayed_event_handler(delay_ms=50, widget_attr='widget')
+    def _maybe_resize(self, event: Event = None):
+        length, thickness = self._get_size(self.parent.frame)
+        if thickness is not None and thickness != self._last_thickness:
+            self._style_configure(thickness=thickness)
+        if length is not None and length != self._last_length:
+            self.widget.configure(length=length)
+            self._last_length = length
+
+    # endregion
+
+    # region Iteration / Context Manager Methods
 
     def __call__(self, iterable: Iterable[T], quiet_interrupt: bool = False) -> Iterator[T]:
         bar = self.widget
@@ -179,6 +229,8 @@ class ProgressBar(Element, base_style_layer='progress'):
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self.max_on_exit:
             self.value = self.max_value
+
+    # endregion
 
 
 class Slider(DisableableMixin, CallbackCommandMixin, Interactive, base_style_layer='slider'):

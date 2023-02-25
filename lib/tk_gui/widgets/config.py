@@ -15,12 +15,16 @@ from .utils import get_root_widget
 
 if TYPE_CHECKING:
     from tkinter import BaseWidget
-    from tk_gui.typing import Bool, Axis, TkContainer, ScrollWhat, TkScrollWhat
+    from tk_gui.typing import Bool, Axis, TkContainer, ScrollWhat, TkScrollWhat, OptInt
 
-__all__ = ['AxisConfig', 'ScrollAmount']
+__all__ = ['AxisConfig', 'ScrollAmount', 'FillConfig']
 log = logging.getLogger(__name__)
 
 ScrollAmount = TypeVar('ScrollAmount', int, float)
+
+
+def _fill_config_key_map(axis: Axis):
+    return {f'fill_{axis}': 'fill', f'fill_{axis}_pct': 'fill_pct', f'fill_pct_{axis}': 'fill_pct'}
 
 
 def _axis_config_key_map(axis: Axis):
@@ -101,6 +105,51 @@ class AxisConfig(Generic[ScrollAmount]):
             # log.debug(f'Using {target=} = {req_value=} // {self.size_div} for axis={self.axis}')
             return req_value // self.size_div
         # return target
+
+
+class FillConfig:
+    __slots__ = ('axis', 'fill', '_fill_pct')
+    _default_percents = {'x': 1, 'y': 0.8}
+    _key_maps = {'x': _fill_config_key_map('x'), 'y': _fill_config_key_map('y')}
+    _keys = {axis: frozenset(key_map) for axis, key_map in _key_maps.items()}
+
+    def __init__(self, axis: Axis, fill: bool = False, fill_pct: float = None):
+        self.axis = axis
+        self.fill = fill
+        if fill_pct is not None and not (0 < fill_pct <= 1):
+            raise TypeError(f'Invalid {fill_pct=} for {axis=} - must be greater than 0 and <= 1')
+        self._fill_pct = fill_pct
+
+    @classmethod
+    def from_kwargs(cls, axis: Axis, kwargs: dict[str, Any]) -> FillConfig:
+        if extracted := extract_kwargs(kwargs, cls._keys[axis]):
+            key_map = cls._key_maps[axis]
+            return cls(axis, **{key_map[key]: val for key, val in extracted.items()})
+        return cls(axis)
+
+    def __repr__(self) -> str:
+        return f'<{self.__class__.__name__}({self.arg_str()})>'
+
+    def arg_str(self, include_axis: Bool = False) -> str:
+        format_key = f'{{}}_{self.axis}'.format if include_axis else str
+        data = {'fill': self.fill, 'fill_pct': self.fill_pct}
+        return ', '.join(f'{format_key(k)}={v!r}' for k, v in data.items())
+
+    @property
+    def fill_pct(self) -> float:
+        if fill_pct := self._fill_pct:
+            return fill_pct
+        return self._default_percents[self.axis]
+
+    def target_size(self, inner_container: TkContainer, default: int = None) -> OptInt:
+        if not self.fill:
+            return default
+        top_level = get_root_widget(inner_container)
+        req_value = _get_size(top_level, 'width' if self.axis == 'x' else 'height')
+        # result = int(req_value * self.fill_pct)
+        # # log.debug(f'Using {result=} from {req_value=} for {self}, widget={top_level!r}')
+        # return result
+        return int(req_value * self.fill_pct)
 
 
 def _get_size(widget: BaseWidget, attr: str) -> int:
