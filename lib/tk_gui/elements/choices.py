@@ -18,7 +18,7 @@ from weakref import WeakValueDictionary
 
 from tk_gui.caching import cached_property
 from tk_gui.enums import ListBoxSelectMode, Anchor
-from tk_gui.typing import Bool, T, BindTarget, BindCallback, TraceCallback, TkContainer, HasFrame
+from tk_gui.typing import Bool, T, BindTarget, BindCallback, TraceCallback, TkContainer, HasFrame, XY
 from tk_gui.utils import max_line_len, extract_kwargs
 from tk_gui.widgets.scroll import ScrollableListbox
 from ._utils import normalize_underline
@@ -844,18 +844,30 @@ class ListBox(DisableableMixin, Interactive, base_style_layer='listbox'):
             **self._style_config,
         }
 
+    def _init_size(self) -> XY:
+        try:
+            width, height = self.size
+        except TypeError:
+            width = max_line_len(self.choices) + 1
+            height = len(self.choices) or 3
+        else:
+            if width is None:
+                width = max_line_len(self.choices) + 1
+            if height is None:
+                height = len(self.choices) or 3
+
+        return width, height
+
     def _init_widget(self, tk_container: TkContainer):
+        width, height = self._init_size()
         kwargs = {
             'exportselection': False,  # Prevent selections in this box from affecting others / the primary selection
             'selectmode': self.select_mode.value,
             'takefocus': int(self.allow_focus),
+            'width': width,
+            'height': height,
             **self.style_config,
         }
-        try:
-            kwargs['width'], kwargs['height'] = self.size
-        except TypeError:
-            kwargs['width'] = max_line_len(self.choices) + 1
-
         """
         activestyle: Literal["dotbox", "none", "underline"]
         setgrid: bool
