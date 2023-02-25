@@ -14,6 +14,7 @@ from enum import Enum
 from tkinter import Event, Entry, Text, BaseWidget, TclError, StringVar
 from typing import TYPE_CHECKING, Optional, Union, Any, Mapping, Iterator, Sequence, TypeVar, Callable
 
+from tk_gui.widgets.utils import get_root_widget
 from ..exceptions import NoActiveGroup
 
 if TYPE_CHECKING:
@@ -227,7 +228,7 @@ def wrap_menu_cb(
 
         widget = event.widget if event else menu_item.root_menu.widget
         num = menu_item.root_menu.add_result(result)
-        widget.winfo_toplevel().event_generate('<<Custom:MenuCallback>>', state=num)
+        get_root_widget(widget).event_generate('<<Custom:MenuCallback>>', state=num)
 
     return run_menu_cb
 

@@ -5,18 +5,18 @@ Widget-related utilities.
 from __future__ import annotations
 
 import logging
-from tkinter import BaseWidget, Misc, Event, TclError, Entry, Text
+from tkinter import BaseWidget, Misc, Event, TclError, Entry, Text, Tk
 from typing import TYPE_CHECKING, Any, Collection, Literal, Iterator, Mapping
 
 from tk_gui.caching import cached_property
 
 if TYPE_CHECKING:
     from tk_gui.elements import Element
-    from tk_gui.typing import Bool, SelectionPos
+    from tk_gui.typing import Bool, SelectionPos, Top
     from tk_gui.window import Window
 
 __all__ = [
-    'get_parent_or_none', 'get_widget_ancestor', 'find_descendants',
+    'get_parent_or_none', 'get_root_widget', 'get_widget_ancestor', 'find_descendants',
     'unbind', 'get_bound_events', 'log_bound_events',
     'get_config_str', 'log_config_str', 'WidgetData', 'log_event_widget_data', 'log_widget_data',
     'get_selection_pos',
@@ -31,23 +31,55 @@ ShowMap = dict[ShowKey, 'Bool']
 
 
 def get_parent_or_none(widget: BaseWidget) -> BaseWidget | None:
-    if (parent_name := widget.winfo_parent()) == '.':
+    # if (parent_name := widget.winfo_parent()) == '.':
+    #     return None
+    # return widget.nametowidget(parent_name)
+    parent_parts = widget._w.split('.!')[:-1]  # noqa
+    if len(parent_parts) < 2:
         return None
-    return widget.nametowidget(parent_name)
+    return widget.nametowidget('.!'.join(parent_parts))
+
+
+def get_root_widget(widget: BaseWidget | Misc | Top | Tk) -> Top | Tk:
+    """
+    Return the top-level widget that contains the given widget.  This function is necessary because
+    :meth:`python:tkinter.Misc.winfo_toplevel` does not always return the true root widget.
+    """
+    w_id: str = widget._w  # noqa
+    root_id = '.!'.join(w_id.split('.!')[:2])
+    if root_id == w_id:
+        return widget
+    return widget.nametowidget(root_id)
 
 
 def get_widget_ancestor(widget: BaseWidget, level: int = 1, permissive: Bool = True) -> BaseWidget:
-    while level > 0:
-        try:
-            widget = widget.nametowidget(widget.winfo_parent())
-        except (AttributeError, TclError):
-            if permissive:
-                return widget
-            else:
-                raise
-        level -= 1
+    if level < 1:
+        if permissive:
+            return widget
+        raise ValueError(f'Invalid {level=} for {widget=} - must be greater than 0')
 
-    return widget
+    parts = widget._w.split('.!')  # noqa
+    ancestor_parts = parts[:-level]
+    if len(ancestor_parts) < 2:
+        if not permissive:
+            raise ValueError(f'Invalid {level=} for {widget=} - it only has {len(parts) - 2} ancestors')
+        ancestor_parts = parts[:2]
+
+    return widget.nametowidget('.!'.join(ancestor_parts))
+
+
+# def get_widget_ancestor(widget: BaseWidget, level: int = 1, permissive: Bool = True) -> BaseWidget:
+#     while level > 0:
+#         try:
+#             widget = widget.nametowidget(widget.winfo_parent())
+#         except (AttributeError, TclError):
+#             if permissive:
+#                 return widget
+#             else:
+#                 raise
+#         level -= 1
+#
+#     return widget
 
 
 def find_descendants(widget: BaseWidget) -> Iterator[BaseWidget]:

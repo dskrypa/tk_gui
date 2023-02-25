@@ -18,7 +18,7 @@ from tk_gui.caching import cached_property
 from tk_gui.event_handling.decorators import delayed_event_handler
 from tk_gui.utils import ON_WINDOWS
 from .config import AxisConfig
-from .utils import get_parent_or_none
+from .utils import get_parent_or_none, get_root_widget
 
 if TYPE_CHECKING:
     from tk_gui.styles import Style
@@ -54,6 +54,7 @@ class ScrollableBase(BaseWidget, ABC):
         """The widget that is a subclass of :class:`ScrollableContainer` that contains this widget, if any."""
         id_parts = self._w.split('.!')[:-1]
         for i, id_part in enumerate(id_parts[::-1]):
+            # Note: The below may break if a class extending ScrollableContainer has a numeric suffix in its name
             if (m := self._tk_w_cls_search(id_part)) and m.group(1) in self._scrollable_container_cls_names:
                 return self.nametowidget('.!'.join(id_parts[:-i]))
         return None
@@ -290,7 +291,7 @@ class ScrollableContainer(ScrollableBase, ABC):
 
     @cached_property
     def _top_level(self) -> Toplevel:
-        return self.winfo_toplevel()
+        return get_root_widget(self)
 
     def resize_scroll_region(self, size: XY | None, update_idletasks: Bool = True, force: Bool = False):
         inner = self.inner_widget

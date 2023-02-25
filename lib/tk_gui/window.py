@@ -29,7 +29,7 @@ from .pseudo_elements.row_container import RowContainer
 from .styles import Style, StyleSpec
 from .utils import ON_LINUX, ON_WINDOWS, ProgramMetadata, extract_kwargs
 from .widgets.scroll import ScrollableToplevel
-from .widgets.utils import log_event_widget_data  # noqa
+from .widgets.utils import log_event_widget_data, get_root_widget  # noqa
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -602,7 +602,7 @@ class Window(BindMixin, RowContainer):
             focus_widget = None
         if focus_widget is None:  # focus_get may also return None
             return False
-        return focus_widget.winfo_toplevel() == self._root
+        return get_root_widget(focus_widget) == self._root
 
     # endregion
 
@@ -956,6 +956,7 @@ class Window(BindMixin, RowContainer):
         :param element: The element that handled the event / returned the given result
         :return: True if this Window is closing due to the result, False otherwise
         """
+        # log.debug(f'_handle_callback_action: {cb_result=} for {event=}')
         if isinstance(cb_result, CallbackAction):
             if cb_result == CallbackAction.EXIT:
                 self.close(event)

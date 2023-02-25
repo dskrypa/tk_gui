@@ -21,7 +21,7 @@ from .utils import get_current_menu_group, wrap_menu_cb, find_member, copy_menu_
 
 if TYPE_CHECKING:
     from tk_gui.pseudo_elements import Row
-    from tk_gui.typing import Bool, XY, EventCallback, ProvidesEventCallback, TkContainer, HasFrame
+    from tk_gui.typing import Bool, XY, EventCallback, ProvidesEventCallback, Top, HasFrame
 
 __all__ = ['MenuEntry', 'MenuItem', 'MenuGroup', 'Menu', 'CustomMenuItem', 'MenuProperty']
 log = logging.getLogger(__name__)
@@ -383,9 +383,9 @@ class Menu(CustomEventResultsMixin, ContainerMixin, ElementBase, metaclass=MenuM
 
     # region Menu Bar Methods
 
-    def _init_widget(self, tk_container: TkContainer):
-        self.widget = menu = self.prepare(tk_container)
-        tk_container.configure(menu=menu)
+    def _init_widget(self, tk_top_level: Top):
+        self.widget = menu = self.prepare(tk_top_level)
+        tk_top_level.configure(menu=menu)  # Only Tk and Toplevel support menu bars
 
     def pack_into(self, row: Row):
         self._init_widget(row.window._root)

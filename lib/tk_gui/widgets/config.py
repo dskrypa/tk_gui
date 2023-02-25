@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any, TypeVar, Generic
 
 from tk_gui.enums import ScrollUnit
 from tk_gui.utils import extract_kwargs
+from .utils import get_root_widget
 
 if TYPE_CHECKING:
     from tkinter import BaseWidget
@@ -90,7 +91,7 @@ class AxisConfig(Generic[ScrollAmount]):
         # Target size for a scrollable region
         if self.fill:
             # Even if this overshoots the available space, it is handled well
-            top_level = inner_container.winfo_toplevel()
+            top_level = get_root_widget(inner_container)
             # target = req_value = _get_size(top_level, 'width' if self.axis == 'x' else 'height')
             # log.debug(f'Using {target=} = {req_value=} for axis={self.axis} from {top_level=}')
             return _get_size(top_level, 'width' if self.axis == 'x' else 'height')
