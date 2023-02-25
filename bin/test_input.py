@@ -181,15 +181,14 @@ class ProgressView(View, title='Progress Bar Test View'):
     progress_bar: ProgressBar
 
     def get_post_window_layout(self):
-        self.progress_bar = ProgressBar(100)
+        self.progress_bar = ProgressBar(100, size=(500, 50))
         yield [Text('Processing...')]
         yield [self.progress_bar]
         yield [EventButton('Run', key='run')]
 
     @button_handler('run')
     def run_progress_test(self, event, key=None):
-        # for _ in self.progress_bar(range(99), True):
-        for _ in self.progress_bar(range(99)):
+        for _ in self.progress_bar(range(99), True):
             # window._root.after(50, window.interrupt)
             time.sleep(0.3)
 

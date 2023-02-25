@@ -114,7 +114,7 @@ class ProgressBar(Element, base_style_layer='progress'):
 
     # endregion
 
-    def _prepare_ttk_style(self) -> str:
+    def _prepare_ttk_style(self, thickness: int = None) -> str:
         style = self.style
         name, ttk_style = style.make_ttk_style(f'.{self.orientation.title()}.TProgressbar')
         kwargs = style.get_map(
@@ -123,25 +123,29 @@ class ProgressBar(Element, base_style_layer='progress'):
             borderwidth='border_width', thickness='bar_width',
         )
         kwargs.setdefault('troughrelief', 'groove')
+        if thickness is not None:
+            kwargs['thickness'] = thickness
         ttk_style.configure(name, **kwargs)
         return name
 
     def _init_widget(self, tk_container: TkContainer):
         horizontal = self.orientation == tkc.HORIZONTAL
+        try:
+            if horizontal:
+                length, thickness = self.size
+            else:
+                thickness, length = self.size
+        except TypeError:
+            length = thickness = None
+
         kwargs = {
-            'style': self._prepare_ttk_style(),
+            'style': self._prepare_ttk_style(thickness),
             'orient': self.orientation,
             'value': self.default,
             'takefocus': int(self.allow_focus),
+            'length': length,
             **self.style_config,
         }
-        try:
-            width, height = self.size  # TODO: Fix - it's always the same width right now
-        except TypeError:
-            pass
-        else:
-            kwargs['length'] = width if horizontal else height
-
         self.widget = Progressbar(tk_container, mode='determinate', **kwargs)
 
     def update(self, value: int, increment: Bool = True, max_value: int = None):
