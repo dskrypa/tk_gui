@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from .typing import Key, HasValue
     from .window import Window
 
-__all__ = ['TkGuiException', 'DuplicateKeyError']
+__all__ = ['TkGuiException', 'DuplicateKeyError', 'WindowClosed']
 
 
 class TkGuiException(Exception):
@@ -34,3 +34,7 @@ class DuplicateKeyError(TkGuiException):
             f'Invalid key={self.key!r} for element={self.new!r} in window={self.window!r}'
             f' - it is already associated with element={self.old!r}'
         )
+
+
+class WindowClosed(TkGuiException):
+    """Raised when an action could not be completed because the window was closed."""

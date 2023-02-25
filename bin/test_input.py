@@ -188,6 +188,7 @@ class ProgressView(View, title='Progress Bar Test View'):
 
     @button_handler('run')
     def run_progress_test(self, event, key=None):
+        # for _ in self.progress_bar(range(99), True):
         for _ in self.progress_bar(range(99)):
             # window._root.after(50, window.interrupt)
             time.sleep(0.3)

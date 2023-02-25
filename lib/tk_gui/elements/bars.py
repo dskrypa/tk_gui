@@ -9,10 +9,11 @@ from __future__ import annotations
 import logging
 import tkinter.constants as tkc
 from math import floor, ceil
-from tkinter import Scale, IntVar, DoubleVar
+from tkinter import Scale, IntVar, DoubleVar, TclError
 from tkinter.ttk import Separator as TtkSeparator, Progressbar
 from typing import TYPE_CHECKING, Iterable, Iterator, Union, Any
 
+from ..exceptions import WindowClosed
 from .element import ElementBase, Element, Interactive
 from .mixins import DisableableMixin, CallbackCommandMixin
 
@@ -81,9 +82,37 @@ class ProgressBar(Element, base_style_layer='progress'):
         self.orientation = orientation
         self.max_on_exit = max_on_exit
 
+    # region Value
+
     @property
     def value(self) -> int:
         return self.widget['value']
+
+    @value.setter
+    def value(self, value: int):
+        bar = self.widget
+        try:
+            bar['value'] = value
+            bar.update()  # Update is required to handle things like window close events - update_idletasks does not
+        except TclError as e:
+            if self.window.closed:
+                raise WindowClosed(f'Interrupted while processing item {value} / {self.max_value}') from e
+            raise
+
+    def increment(self, amount: int = 1):
+        bar = self.widget
+        try:
+            bar['value'] += amount
+            bar.update()  # Update is required to handle things like window close events - update_idletasks does not
+        except TclError as e:
+            if self.window.closed:
+                raise WindowClosed(f'Interrupted while processing item ? / {self.max_value}') from e
+            raise
+
+    def decrement(self, amount: int = 1):
+        self.increment(-amount)
+
+    # endregion
 
     def _prepare_ttk_style(self) -> str:
         style = self.style
@@ -107,7 +136,7 @@ class ProgressBar(Element, base_style_layer='progress'):
             **self.style_config,
         }
         try:
-            width, height = self.size
+            width, height = self.size  # TODO: Fix - it's always the same width right now
         except TypeError:
             pass
         else:
@@ -116,42 +145,36 @@ class ProgressBar(Element, base_style_layer='progress'):
         self.widget = Progressbar(tk_container, mode='determinate', **kwargs)
 
     def update(self, value: int, increment: Bool = True, max_value: int = None):
-        bar = self.widget
         if max_value is not None:
             self.max_value = max_value
-            bar.configure(maximum=max_value)
+            self.widget.configure(maximum=max_value)
         if increment:
-            bar['value'] += value
+            self.increment(value)
         else:
-            bar['value'] = value
-        bar.update_idletasks()
+            self.value = value
 
-    def increment(self):
-        bar = self.widget
-        bar['value'] += 1
-        bar.update_idletasks()
-
-    def decrement(self):
-        bar = self.widget
-        bar['value'] -= 1
-        bar.update_idletasks()
-
-    def __call__(self, iterable: Iterable[T]) -> Iterator[T]:
+    def __call__(self, iterable: Iterable[T], quiet_interrupt: bool = False) -> Iterator[T]:
         bar = self.widget
         for i, item in enumerate(iterable, bar['value'] + 1):
-            # TODO: Interrupt on window close
             yield item
-            bar['value'] = i
-            bar.update_idletasks()
+            try:
+                bar['value'] = i
+                bar.update()  # Update is required to handle things like window close events - update_idletasks does not
+            except TclError as e:
+                if self.window.closed:
+                    message = f'Interrupted while processing item {i} / {self.max_value}'
+                    if quiet_interrupt:
+                        log.debug(message)
+                        break
+                    raise WindowClosed(message) from e
+                raise
 
     def __enter__(self) -> ProgressBar:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self.max_on_exit:
-            bar = self.widget
-            bar['value'] = self.max_value
-            bar.update_idletasks()
+            self.value = self.max_value
 
 
 class Slider(DisableableMixin, CallbackCommandMixin, Interactive, base_style_layer='slider'):
