@@ -18,7 +18,7 @@ from tk_gui.caching import cached_property
 from tk_gui.event_handling.decorators import delayed_event_handler
 from tk_gui.utils import ON_WINDOWS
 from .config import AxisConfig
-from .utils import get_root_widget
+from .utils import get_parent_or_none, get_root_widget
 
 if TYPE_CHECKING:
     from tk_gui.styles import Style
@@ -208,6 +208,7 @@ class ScrollableContainer(ScrollableBase, ABC):
         *,
         x_config: AxisConfig = None,
         y_config: AxisConfig = None,
+        resize_offset: int = 43,  # Not sure whether this value is dynamic
         **kwargs,
     ):
         if 'relief' not in kwargs:
@@ -218,8 +219,10 @@ class ScrollableContainer(ScrollableBase, ABC):
         super().__init__(parent, **kwargs)
         self.init_canvas(style, pad)
         self.init_inner(inner_cls, **(inner_kwargs or {}))
+        self.resize_offset = resize_offset
         if self._y_config.fill or self._x_config.fill:
-            get_root_widget(self).bind('<Configure>', self._maybe_resize_scroll_region, add=True)  # noqa
+            # If this was bound to the window, it would not handle some events well (ends up not filling)
+            get_parent_or_none(self).bind('<Configure>', self._maybe_resize_scroll_region, add=True)  # noqa
 
     def init_canvas(self: ScrollOuter, style: Style = None, pad: XY = None):
         kwargs = style.get_map('frame', background='bg') if style else {}
@@ -313,17 +316,23 @@ class ScrollableContainer(ScrollableBase, ABC):
         canvas.configure(scrollregion=canvas.bbox('all'), width=width, height=height)
         self._last_size = (width, height)
 
-    @delayed_event_handler(delay_ms=50)
+    @delayed_event_handler(delay_ms=75)
     def _maybe_resize_scroll_region(self, event: Event = None):
-        # TODO: When not storing window size, this can still be somewhat problematic
         # log.debug(f'{self!r}._maybe_resize_scroll_region: {event=}')
-        # top = self._top_level
-        # size = (top.winfo_width() if self._x_config.fill else None, top.winfo_height() if self._y_config.fill else None)
-        size = (event.width if self._x_config.fill else None, event.height if self._y_config.fill else None)
+        top = self._top_level
+        resize_offset = self.resize_offset  # 43 by default; whether this is static or how to calculate is unknown
+        # Without the offset, a resize storm will occur when the Window size is not stored
+        size = (
+            top.winfo_width() - resize_offset if self._x_config.fill else None,
+            top.winfo_height() - resize_offset if self._y_config.fill else None,
+        )
+        # Note: event.width - 7 seems to work for Windows where the size is not stored, but causes continuous shrinking
+        # for ones that store size.
+        # size = (event.width - 7 if self._x_config.fill else None, event.height - 7 if self._y_config.fill else None)
         # log.debug(f'{self!r}._maybe_resize_scroll_region: {event=}, {size=}', extra={'color': 'yellow'})
         self.resize_scroll_region(size, False, False)
 
-    @delayed_event_handler(delay_ms=50)
+    @delayed_event_handler(delay_ms=75)
     def _maybe_update_scroll_region(self, event: Event = None):
         canvas = self.canvas
         bbox = canvas.bbox('all')  # top left (x, y), bottom right (x, y) I think ==>> last 2 => (width, height)
