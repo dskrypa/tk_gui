@@ -15,7 +15,7 @@ __all__ = ['GuiOptionsView']
 
 
 class GuiOptionsView(View, title='Options'):
-    window_kwargs = {'exit_on_esc': True}
+    window_kwargs = {'exit_on_esc': True, 'is_popup': True}
 
     def __init__(self, gui_options: GuiOptions, **kwargs):
         super().__init__(**kwargs)

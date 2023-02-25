@@ -13,7 +13,7 @@ from tk_gui.caching import cached_property
 from tk_gui.elements import Text, Element, Button, Input, BasicRowFrame
 from tk_gui.elements.choices import Combo, ListBox, CheckBox
 from tk_gui.popups.base import BasePopup
-from tk_gui.popups import PickFolder
+from tk_gui.popups import PickFolder, popup_get_text
 from .exceptions import SingleParsingError
 
 if TYPE_CHECKING:
@@ -219,16 +219,23 @@ class ListboxOption(Option, opt_type='listbox'):
         yield self._label_element()
         kwargs = self.kwargs
         choices = kwargs['choices']
-        yield ListBox(
+        list_box = ListBox(
             choices,
             default=val or choices,
             scroll_y=False,
             select_mode=kwargs['select_mode'],
             **self.common_kwargs(disable_all, change_cb),
         )
+        yield list_box
         if kwargs['extendable']:
-            # TODO: This button needs to be handled here...
-            yield Button('Add...', key=f'btn::{self.name}', disabled=disable_all or self.disabled)
+
+            def add_value_cb(event=None):
+                if value := popup_get_text(
+                    f'Enter a new value that should be added to the list:', 'Add Value', bind_esc=True
+                ):
+                    list_box.append_choice(value, True)
+
+            yield Button('Add...', key=f'btn::{self.name}', disabled=disable_all or self.disabled, cb=add_value_cb)
 
 
 class PopupOption(Option, opt_type='popup'):
