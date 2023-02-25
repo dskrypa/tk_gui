@@ -52,9 +52,9 @@ class BasePopup(ABC):
     def __init__(self, title: str = None, parent: Window = _NotSet, return_focus: Bool = None):
         self.title = title or self._default_title
         if parent is _NotSet:
-            if (active := Window.get_active_windows(False)) and (len(active) == 1):
-                parent = active[0]
-            else:
+            try:
+                parent = Window.get_active_windows(sort_by_last_focus=True)[0]
+            except IndexError:
                 parent = None
         self.parent = parent
         self.return_focus = self._return_focus if return_focus is None else return_focus

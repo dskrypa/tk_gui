@@ -134,6 +134,7 @@ class Window(BindMixin, RowContainer):
     _last_known_pos: Optional[XY] = None
     _last_known_size: Optional[XY] = None
     _last_run: float = 0
+    _last_focus: float = 0
     _motion_tracker: MotionTracker = None
     _grab_anywhere_mgr: BindManager | None = None
     _grab_anywhere: GrabAnywhere = False  #: Whether the window should move on mouse click + movement
@@ -1017,6 +1018,10 @@ class Window(BindMixin, RowContainer):
         for cb in self._iter_event_callbacks(BindEvent.MENU_RESULT):
             cb(event, result)
 
+    @_tk_event_handler('<FocusIn>', True)
+    def _handle_gain_focus(self, event: Event):
+        self._last_focus = monotonic()
+
     # @_tk_event_handler(BindEvent.LEFT_CLICK, True)
     # def _handle_left_click(self, event: Event):
     #     log_event_widget_data(self, event, prefix='Tkinter Click')
@@ -1103,11 +1108,16 @@ class Window(BindMixin, RowContainer):
         return ImageGrab.grab((x, y, x + width, y + height))
 
     @classmethod
-    def get_active_windows(cls, is_popup: Bool = None) -> list[Window]:
+    def get_active_windows(cls, is_popup: Bool = None, *, sort_by_last_focus: bool = False) -> list[Window]:
         if is_popup is None:
-            return [w for w in cls._instances if not w.closed]
+            windows = [w for w in cls._instances if not w.closed]
         else:
-            return [w for w in cls._instances if not w.closed and w.is_popup == is_popup]
+            windows = [w for w in cls._instances if not w.closed and w.is_popup == is_popup]
+
+        if sort_by_last_focus:
+            windows.sort(key=lambda w: w._last_focus, reverse=True)
+
+        return windows
 
 
 def _normalize_bind_event(event_pat: Bindable) -> Bindable:

@@ -665,6 +665,16 @@ class Style(ClearableCachedPropertyMixin):
         return tk_font.measure('A')
 
     def measure(self, text: str, layer: Layer = 'base', state: StyleStateVal = StyleState.DEFAULT) -> int:
+        """
+        Char widths for the default font::
+
+            {3: 'I', 6: 'J', 7: 'LTXZ', 8: 'F', 9: 'ABCDEHKNPRSUVY', 10: 'GOQ', 11: 'M', 13: 'W'}
+
+        :param text: The text for which the width should be measured.
+        :param layer: The style layer containing the font that should be used .
+        :param state: The state of the specirfied style layer containing the font that should be used.
+        :return: The width of the given text.
+        """
         tk_font: TkFont = getattr(self, layer).tk_font[state]
         return tk_font.measure(text)
 

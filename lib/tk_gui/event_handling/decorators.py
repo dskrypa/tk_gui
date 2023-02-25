@@ -62,6 +62,7 @@ class DelayedEventHandler:
 def delayed_event_handler(
     func: BindMethod = None, *, widget_attr: str = None, delay_ms: int = 200
 ) -> DelayedEventHandler | Callable[[BindMethod], DelayedEventHandler]:
+    # TODO: Maybe refactor to just look at a Window attr to determine whether initialization is done or not?
     if func is not None:
         return DelayedEventHandler(func, widget_attr, delay_ms)
 

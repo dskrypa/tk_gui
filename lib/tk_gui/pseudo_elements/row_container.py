@@ -39,6 +39,7 @@ ElementLike = Union[RowBase, E, 'RowContainer']
 class RowContainer(Generic[E], ABC):
     _counter = count()
     ignore_grab: bool = False
+    style: Style
     x_config: AxisConfig
     y_config: AxisConfig
     anchor_elements: Anchor
