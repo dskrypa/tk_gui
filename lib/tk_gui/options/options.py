@@ -161,6 +161,7 @@ class InputOption(Option, opt_type='input'):
                 raise SingleParsingError(
                     self.value_key, self, f'Error parsing {value=} for option={self.name!r}: {e}', value
                 )
+        return value
 
 
 class DropdownOption(Option, opt_type='dropdown'):

@@ -105,6 +105,7 @@ class ImagePopup(Popup):
         self._last_size = init_size = self._init_size()
         self._gui_image = gui_image = Image(value, size=init_size, pad=(2, 2))
         if new_size := _get_new_size(gui_image, *init_size):
+            # TODO: init size still needs work - may need to account for title bar size?
             gui_image.size = new_size
         if image:
             log.debug(
