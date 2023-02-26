@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Optional, Union, Callable, TypeVar, ParamSpec
 from PIL.Image import MIME
 
 from tk_gui.caching import cached_property
+from tk_gui.elements import Text
 from tk_gui.elements.images import AnimatedType, Image, Animation, ClockImage, SpinnerImage, get_size
 from tk_gui.event_handling import event_handler
 from tk_gui.event_handling.futures import run_func_in_future
@@ -38,9 +39,19 @@ class ImagePopup(Popup):
     _empty: bool = True
     _gui_image: Image = _NotSet
     _last_size: XY
+    text: str = None
+    text_above_img: bool = True
     orig_size: XY
 
-    def __init__(self, image: Union[ImageType, AnimatedType], title: str = None, **kwargs):
+    def __init__(
+        self,
+        image: Union[ImageType, AnimatedType],
+        title: str = None,
+        *,
+        text: str = None,
+        text_above_img: bool = True,
+        **kwargs,
+    ):
         kwargs.setdefault('margins', (0, 0))
         kwargs.setdefault('bind_esc', True)
         kwargs.setdefault('keep_on_top', False)
@@ -50,6 +61,9 @@ class ImagePopup(Popup):
             # This will only happen for non-cached properties, but it will also (intentionally) force subclasses that
             # usa a cached_property to populate the value immediately.
             self.gui_image = image
+        if text:
+            self.text = text
+            self.text_above_img = text_above_img
 
     # region Title
 
@@ -73,7 +87,11 @@ class ImagePopup(Popup):
         return f'<{self.__class__.__name__}[title={self.title!r}, orig={self.orig_size}, empty: {self._empty}]>'
 
     def get_layout(self) -> Layout:
-        return [[self.gui_image]]
+        image_row = [self.gui_image]
+        if text := self.text:
+            text_row = [Text(text, side='t')]
+            return [text_row, image_row] if self.text_above_img else [image_row, text_row]
+        return [image_row]
 
     @property
     def gui_image(self) -> Image:
@@ -158,7 +176,7 @@ class AnimatedPopup(ImagePopup):
         :param kwargs: Keyword arguments to pass to that function.
         :return: The return value from that function.
         """
-        self.run_async()
+        tk_future = self.run_async()
         future = Future()
         func_thread = Thread(target=run_func_in_future, args=(future, func, args, kwargs), daemon=True)
         func_thread.start()
@@ -167,6 +185,7 @@ class AnimatedPopup(ImagePopup):
         # log.debug(f'Finished thread for {func=}', extra={'color': (0, 11)})
         self.stop()
         # log.debug(f'Stopped spinner for {func=}', extra={'color': (0, 10)})
+        tk_future.cancel()  # In case the function finished before the animation could be displayed
         return future.result()
 
 
