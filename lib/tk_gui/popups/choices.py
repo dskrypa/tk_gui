@@ -52,15 +52,15 @@ class ChoiceMapPopup(Generic[K, V], BasicPopup):
     def get_frame_size(self) -> XY | None:
         return None
 
-    def get_layout(self):
+    def get_pre_window_layout(self):
         yield from self.prepare_text()
         submit_button = Button('Submit', disabled=True, bind_enter=True)
         with RadioGroup('item_choices', change_cb=lambda *a: submit_button.enable(), include_label=True):
             yield [ScrollFrame(self.prepare_choices(), scroll_y=True, expand=True, size=self.get_frame_size())]
         yield [submit_button]
 
-    def run(self) -> tuple[K, V] | None:
-        results = super().run()
+    def get_results(self) -> tuple[K, V] | None:
+        results = super().get_results()
         return results.get('item_choices')
 
 
@@ -107,7 +107,7 @@ class ChooseImagePopup(ChoiceMapPopup[K, 'ImageType']):
         return Image(image, size=self.img_size, popup=True, popup_title=popup_title)
 
     def get_frame_size(self) -> XY | None:
-        monitor_height = self._get_monitor().height
+        monitor_height = self.get_monitor().height
         img_width, img_height = self.img_size
         per_img_height = (img_height + 20)
         images_shown = max(1, min(monitor_height // per_img_height, len(self.items)))
@@ -132,9 +132,9 @@ class ChooseImagePopup(ChoiceMapPopup[K, 'ImageType']):
             height = label.count('\n') + 1
             yield [Radio(label, title, size=(label_width, height)), image]
 
-    def run(self) -> tuple[K, V] | None:
+    def get_results(self) -> tuple[K, V] | None:
         try:
-            label, title = super().run()
+            label, title = super().get_results()
         except TypeError:
             return None
         else:

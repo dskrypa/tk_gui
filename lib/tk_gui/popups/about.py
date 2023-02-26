@@ -33,7 +33,7 @@ class AboutPopup(Popup):
         meta = ProgramMetadata()
         return {'Program:': meta.name, 'Author:': meta.author, 'Version:': meta.version, 'Project URL:': meta.url}
 
-    def get_layout(self) -> Layout:
+    def get_pre_window_layout(self) -> Layout:
         data = self.get_about_data()
         size = (max(map(len, data)), 1)
         layout = [[Text(key, size=size), (Link if 'url' in key.lower() else Text)(val)] for key, val in data.items()]

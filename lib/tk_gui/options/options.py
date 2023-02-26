@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any, Optional, Collection, Iterator, Mapping, 
 from tk_gui.caching import cached_property
 from tk_gui.elements import Text, Element, Button, Input, BasicRowFrame
 from tk_gui.elements.choices import Combo, ListBox, CheckBox
-from tk_gui.popups.base import BasePopup
+from tk_gui.popups.base import AnyPopup
 from tk_gui.popups import PickFolder, popup_get_text
 from .exceptions import SingleParsingError
 
@@ -245,7 +245,7 @@ class PopupOption(Option, opt_type='popup'):
         self,
         name: str,
         label: str,
-        popup_cls: Type[BasePopup],
+        popup_cls: Type[AnyPopup],
         button: str = 'Choose...',
         default: Any = _NotSet,
         popup_kwargs: Mapping[str, Any] = None,
@@ -280,7 +280,7 @@ class PathOption(PopupOption, opt_type='path'):
         self,
         name: str,
         label: str,
-        popup_cls: Type[BasePopup],
+        popup_cls: Type[AnyPopup],
         button: str = 'Browse',
         default: Any = _NotSet,
         disabled: bool = False,
@@ -325,7 +325,7 @@ class DirectoryOption(PathOption, opt_type='directory'):
         self,
         name: str,
         label: str,
-        popup_cls: Type[BasePopup] = PickFolder,
+        popup_cls: Type[AnyPopup] = PickFolder,
         button: str = 'Browse',
         default: Any = _NotSet,
         disabled: bool = False,

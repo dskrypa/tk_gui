@@ -13,69 +13,42 @@ from typing import TYPE_CHECKING, Union, Collection, Mapping, Callable, Any
 
 from tk_gui.caching import cached_property
 from tk_gui.elements import Button, Text, Image, Multiline
-from tk_gui.event_handling import HandlesEvents, BindMap
 from tk_gui.event_handling.futures import TkFuture
-from tk_gui.positioning import positioner
 from tk_gui.styles import Style, StyleSpec
 from tk_gui.utils import max_line_len
+from tk_gui.views.base import WindowInitializer
 from tk_gui.window import Window
 
 if TYPE_CHECKING:
     from tkinter import Event
-    from screeninfo import Monitor
+    from tk_gui.event_handling import BindMap
     from tk_gui.typing import XY, Layout, Bool, ImageType, Key
 
-__all__ = ['Popup', 'BasicPopup']
+__all__ = ['Popup', 'BasicPopup', 'AnyPopup']
 log = logging.getLogger(__name__)
 
 _NotSet = object()
 
 
-class BasePopup(ABC):
-    __slots__ = ('title', 'parent', 'return_focus')
-
-    _default_title: str = None
-    _return_focus: Bool = True
-    title: str | None
+class PopupMixin(ABC):
+    return_focus: Bool = True
     parent: Window | None
-    return_focus: Bool
 
-    def __init_subclass__(cls, title: str = None, return_focus: Bool = None, **kwargs):
+    def __init_subclass__(cls, return_focus: Bool = None, **kwargs):
         super().__init_subclass__(**kwargs)
-        if title:
-            cls._default_title = title
         if return_focus is not None:
-            cls._return_focus = return_focus
-
-    def __init__(self, title: str = None, parent: Window = _NotSet, return_focus: Bool = None):
-        self.title = title or self._default_title
-        if parent is _NotSet:
-            try:
-                parent = Window.get_active_windows(sort_by_last_focus=True)[0]
-            except IndexError:
-                parent = None
-        self.parent = parent
-        self.return_focus = self._return_focus if return_focus is None else return_focus
+            cls.return_focus = return_focus
 
     @classmethod
     def as_callback(cls, *args, **kwargs) -> Callable:
         def callback(event: Event = None):
-            return cls(*args, **kwargs).run()
+            return cls(*args, **kwargs).run()  # noqa
 
         return callback
 
-    def __repr__(self) -> str:
-        return f'<{self.__class__.__name__}[title={self.title!r}]>'
-
     @abstractmethod
-    def _run(self) -> dict[Key, Any]:
+    def _run(self):
         raise NotImplementedError
-
-    def _get_monitor(self) -> Monitor | None:
-        if parent := self.parent:
-            return positioner.get_monitor(*parent.position)
-        else:
-            return positioner.get_monitor(0, 0)
 
     def run(self):
         if current_thread() == main_thread():
@@ -93,57 +66,83 @@ class BasePopup(ABC):
         return result
 
 
-class Popup(BasePopup, HandlesEvents):
+class BasePopup(PopupMixin, ABC):
+    _default_title: str = None
+    title: str | None
+
+    def __init_subclass__(cls, title: str = None, **kwargs):
+        super().__init_subclass__(**kwargs)
+        if title:
+            cls._default_title = title
+
+    def __init__(self, title: str = None, parent: Window = _NotSet, return_focus: Bool = None):
+        self.title = title or self._default_title
+        if parent is _NotSet:
+            try:
+                parent = Window.get_active_windows(sort_by_last_focus=True)[0]
+            except IndexError:
+                parent = None
+        self.parent = parent
+        if return_focus is not None:
+            self.return_focus = return_focus
+
+    def __repr__(self) -> str:
+        return f'<{self.__class__.__name__}[title={self.title!r}]>'
+
+
+class Popup(PopupMixin, WindowInitializer):
     def __init__(
         self,
         layout: Layout = (),
         title: str = None,
         *,
-        parent: Window = _NotSet,
         bind_esc: Bool = False,
         keep_on_top: Bool = False,
         can_minimize: Bool = False,
         return_focus: Bool = None,
         **kwargs
     ):
-        super().__init__(title, parent, return_focus)
-        self.layout = layout
         kwargs['keep_on_top'] = keep_on_top
         kwargs['can_minimize'] = can_minimize
-        binds = BindMap.pop_and_normalize(kwargs) | self.event_handler_binds()
-        if bind_esc:
-            binds.add('<Escape>', 'exit')
-        if binds:
-            kwargs['binds'] = binds
-        self.window_kwargs = kwargs
+        super().__init__(title=title, **kwargs)
+        if return_focus is not None:
+            self.return_focus = return_focus
+        self._bind_esc = bind_esc
+        self.layout = layout
 
-    def get_layout(self) -> Layout:
+    @property
+    def window_kwargs(self) -> dict[str, Any]:
+        kwargs = self._window_kwargs
+        kwargs['is_popup'] = True
+        return kwargs
+
+    @window_kwargs.setter
+    def window_kwargs(self, value: dict[str, Any]):
+        self._window_kwargs = value
+
+    def _get_bind_map(self) -> BindMap:
+        bind_map = super()._get_bind_map()
+        if self._bind_esc:
+            bind_map.add('<Escape>', 'exit')
+        return bind_map
+
+    def get_pre_window_layout(self) -> Layout:
         return self.layout
 
-    def prepare_window(self) -> Window:
-        return Window(self.get_layout(), title=self.title, is_popup=True, **self.window_kwargs)
-
-    @cached_property
-    def window(self) -> Window:
-        window = self.prepare_window()
-        if parent := self.parent:
-            window.move_to_center(parent)
-        return window
-
-    def _run(self) -> dict[Key, Any]:
-        with self.window(take_focus=True) as window:
+    def _run(self):
+        with self.finalize_window()(take_focus=True) as window:
             window.run()
-            return window.results
+            return self.get_results()
 
     def run_async(self) -> TkFuture[Window]:
-        window = self.window(take_focus=True)
+        window = self.finalize_window()(take_focus=True)
         tk_future = TkFuture.submit(window._root, window.run)
         tk_future.add_done_callback(lambda *a: window.close())
         return tk_future
 
     def stop(self, event: Event = None) -> dict[Key, Any]:
         self.window.interrupt(event)
-        return self.window.results
+        return self.get_results()
 
 
 class BasicPopup(Popup):
@@ -184,7 +183,7 @@ class BasicPopup(Popup):
         lines = self.lines
         n_lines = len(lines)
         if self.multiline:
-            monitor = self._get_monitor()
+            monitor = self.get_monitor()
             lines_to_show = max(1, min(monitor.height // self.style.char_height(), n_lines) + 1)
         else:
             lines_to_show = 1
@@ -235,6 +234,9 @@ class BasicPopup(Popup):
         else:
             yield [text]
 
-    def get_layout(self) -> Layout:
+    def get_pre_window_layout(self) -> Layout:
         yield from self.prepare_text()
         yield self.prepare_buttons()
+
+
+AnyPopup = Union[BasePopup, Popup]

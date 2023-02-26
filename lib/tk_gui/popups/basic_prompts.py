@@ -36,8 +36,8 @@ class BoolPopup(BasicPopup):
         buttons = (tb, fb) if tf else (fb, tb)
         super().__init__(text, buttons=buttons, **kwargs)
 
-    def run(self) -> Optional[bool]:
-        results = super().run()
+    def get_results(self) -> Optional[bool]:
+        results = super().get_results()
         if results[self.true_key]:
             return True
         elif results[self.false_key]:
@@ -62,13 +62,13 @@ class SubmitOrCancelPopup(BasicPopup):
 class TextPromptPopup(SubmitOrCancelPopup):
     input_key = 'input'
 
-    def get_layout(self):
+    def get_pre_window_layout(self):
         yield from self.prepare_text()
         yield [Input(key=self.input_key, focus=True)]
         yield self.prepare_buttons()
 
-    def run(self) -> Optional[str]:
-        results = super().run()
+    def get_results(self) -> Optional[str]:
+        results = super().get_results()
         if results[self.submit_key]:
             return results[self.input_key]
         else:
@@ -85,14 +85,14 @@ class LoginPromptPopup(SubmitOrCancelPopup, title='Login'):
         super().__init__(text, button_text=button_text, cancel_text=cancel_text, **kwargs)
         self.password_char = password_char
 
-    def get_layout(self):
+    def get_pre_window_layout(self):
         yield from self.prepare_text()
         yield [Text('Username:'), Input(key=self.user_key, focus=True)]
         yield [Text('Password:'), Input(key=self.pw_key, password_char=self.password_char)]
         yield self.prepare_buttons()
 
-    def run(self) -> tuple[Optional[str], Optional[str]]:
-        results = super().run()
+    def get_results(self) -> tuple[Optional[str], Optional[str]]:
+        results = super().get_results()
         if results[self.submit_key]:
             return results[self.user_key], results[self.pw_key]
         else:
@@ -108,13 +108,13 @@ class PasswordPromptPopup(SubmitOrCancelPopup, title='Password'):
         super().__init__(text, button_text=button_text, cancel_text=cancel_text, **kwargs)
         self.password_char = password_char
 
-    def get_layout(self):
+    def get_pre_window_layout(self):
         yield from self.prepare_text()
         yield [Text('Password:'), Input(key=self.pw_key, password_char=self.password_char, focus=True)]
         yield self.prepare_buttons()
 
-    def run(self) -> Optional[str]:
-        results = super().run()
+    def get_results(self) -> Optional[str]:
+        results = super().get_results()
         if results[self.submit_key]:
             return results[self.pw_key]
         else:

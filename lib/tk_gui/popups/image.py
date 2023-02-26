@@ -86,7 +86,7 @@ class ImagePopup(Popup):
     def __repr__(self) -> str:
         return f'<{self.__class__.__name__}[title={self.title!r}, orig={self.orig_size}, empty: {self._empty}]>'
 
-    def get_layout(self) -> Layout:
+    def get_pre_window_layout(self) -> Layout:
         image_row = [self.gui_image]
         if text := self.text:
             text_row = [Text(text, side='t')]
@@ -103,33 +103,40 @@ class ImagePopup(Popup):
         self._empty = image is None
         self.orig_size = image.size if image else (0, 0)
         self._last_size = init_size = self._init_size()
-        self._gui_image = Image(value, size=init_size, pad=(2, 2))
+        self._gui_image = gui_image = Image(value, size=init_size, pad=(2, 2))
+        if new_size := _get_new_size(gui_image, *init_size):
+            gui_image.size = new_size
         if image:
-            log.debug(f'{self}: Displaying {image=} with {image.format=} mime={MIME.get(image.format)!r}')
+            log.debug(
+                f'{self}: Using {init_size=}, {new_size=} to display {image=}'
+                f' with {image.format=} mime={MIME.get(image.format)!r}'
+            )
 
     def _init_size(self) -> XY:
         width, height = self.orig_size
         if parent := self.parent:
             if monitor := positioner.get_monitor(*parent.position):
+                log.debug(f'_init_size: monitor size={(monitor.width, monitor.height)}')
                 return min(monitor.width - 70, width or 0), min(monitor.height - 70, height or 0)
         return width, height
 
     def _get_new_size(self, new_w: int, new_h: int) -> Optional[XY]:
-        image = self.gui_image
-        px, py = image.pad
-        new_size = (new_w - px * 2 - 2, new_h - py * 2 - 2)
-        new_img = image.target_size(*new_size)
-        if new_img != image.size:
-            # log.debug(
-            #     f'Resizing from old_win={self._last_size} to new_win={(new_w, new_h)},'
-            #     f' old_img={image.size} to {new_img=}, using {new_size=} due to event for {self}'
-            # )
-            return new_size
-        # log.debug(
-        #     f'Not resizing: old_win={self._last_size}, new_win={(new_w, new_h)},'
-        #     f' old_img={image.size} == {new_img=}, using {new_size=} for {self}'
-        # )
-        return None
+        # image = self.gui_image
+        # px, py = image.pad
+        # new_size = (new_w - px * 2 - 2, new_h - py * 2 - 2)
+        # new_img = image.target_size(*new_size)
+        # if new_img != image.size:
+        #     # log.debug(
+        #     #     f'Resizing from old_win={self._last_size} to new_win={(new_w, new_h)},'
+        #     #     f' old_img={image.size} to {new_img=}, using {new_size=} due to event for {self}'
+        #     # )
+        #     return new_size
+        # # log.debug(
+        # #     f'Not resizing: old_win={self._last_size}, new_win={(new_w, new_h)},'
+        # #     f' old_img={image.size} == {new_img=}, using {new_size=} for {self}'
+        # # )
+        # return None
+        return _get_new_size(self.gui_image, new_w, new_h)
 
     @event_handler('SIZE_CHANGED')
     def handle_size_changed(self, event: Event, size: XY):
@@ -141,6 +148,15 @@ class ImagePopup(Popup):
             self._last_size = size
             self.gui_image.resize(*new_size)
             self.window.set_title(self.title)
+
+
+def _get_new_size(image: Image, new_w: int, new_h: int) -> XY | None:
+    px, py = image.pad
+    new_size = (new_w - px * 2 - 2, new_h - py * 2 - 2)
+    new_img = image.target_size(*new_size)
+    if new_img != image.size:
+        return new_size
+    return None
 
 
 class AnimatedPopup(ImagePopup):

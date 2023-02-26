@@ -1,4 +1,4 @@
-from .base import Popup, BasicPopup
+from .base import Popup, BasicPopup, AnyPopup
 from .basic_prompts import BoolPopup, TextPromptPopup, LoginPromptPopup, PasswordPromptPopup
 from .image import ImagePopup, AnimatedPopup, SpinnerPopup, ClockPopup
 from .raw import PickFolder, PickFile, PickFiles, SaveAs, PickColor
