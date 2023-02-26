@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     from tkinter import Scrollbar, Listbox as TkListbox, Frame as TkFrame
     from tkinter.ttk import Style as TtkStyle
     from tk_gui.pseudo_elements import Row
+    from tk_gui.window import Window
 
 __all__ = ['Radio', 'RadioGroup', 'CheckBox', 'Combo', 'ComboMap', 'Dropdown', 'ListBox', 'make_checkbox_grid']
 log = logging.getLogger(__name__)
@@ -169,6 +170,11 @@ class RadioGroup(TraceCallbackMixin):
             self.var_change_cb = change_cb
         self.include_label = include_label
 
+    def __repr__(self) -> str:
+        return f'<{self.__class__.__name__}(key={self.key!r})[id={self.id}, choices={len(self.choices)}]>'
+
+    # region Tk Variable
+
     @property
     def tk_var(self) -> IntVar | None:
         try:
@@ -185,6 +191,10 @@ class RadioGroup(TraceCallbackMixin):
             self._maybe_add_var_trace()
             return tk_var
 
+    # endregion
+
+    # region Radio Registration & Related Methods
+
     @classmethod
     def get_group(cls, group: Union[RadioGroup, int, None]) -> RadioGroup:
         if group is None:
@@ -192,6 +202,13 @@ class RadioGroup(TraceCallbackMixin):
         elif isinstance(group, cls):
             return group
         return cls._instances[group]
+
+    def __enter__(self) -> RadioGroup:
+        _radio_group_stack.get().append(self)
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        _radio_group_stack.get().pop()
 
     def register(self, choice: Radio) -> int:
         value = len(self.choices) + 1
@@ -204,6 +221,14 @@ class RadioGroup(TraceCallbackMixin):
 
     def add_choice(self, text: str, value: Any = _NotSet, **kwargs) -> Radio:
         return Radio(text, value, group=self, **kwargs)
+
+    # endregion
+
+    @cached_property
+    def window(self) -> Window:
+        return next(radio.window for radio in self.choices.values())
+
+    # region Set or Get Selected Choice
 
     def select(self, choice: Radio | int | str):
         if isinstance(choice, int):
@@ -221,6 +246,9 @@ class RadioGroup(TraceCallbackMixin):
     def reset(self, default: Bool = True):
         self.selection_var.set(self.default.choice_id if default and self.default else 0)
 
+    def __getitem__(self, value: int) -> Radio:
+        return self.choices[value]
+
     def get_choice(self) -> Optional[Radio]:
         return self.choices.get(self.selection_var.get())
 
@@ -230,18 +258,7 @@ class RadioGroup(TraceCallbackMixin):
             return (choice.label, choice.value) if self.include_label else choice.value
         return None
 
-    def __repr__(self) -> str:
-        return f'<{self.__class__.__name__}(key={self.key!r})[id={self.id}, choices={len(self.choices)}]>'
-
-    def __getitem__(self, value: int) -> Radio:
-        return self.choices[value]
-
-    def __enter__(self) -> RadioGroup:
-        _radio_group_stack.get().append(self)
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        _radio_group_stack.get().pop()
+    # endregion
 
 
 def get_current_radio_group(silent: bool = False) -> Optional[RadioGroup]:
