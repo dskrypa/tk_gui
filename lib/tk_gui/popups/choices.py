@@ -9,7 +9,6 @@ from textwrap import wrap
 from typing import TYPE_CHECKING, TypeVar, Generic, Collection, Mapping, Callable, Any, Type
 
 from ..elements import Button, RadioGroup, Radio, ScrollFrame, Image
-from ..images import as_image
 from ..images.icons import placeholder_icon_cache
 from .base import BasicPopup
 
@@ -100,10 +99,7 @@ class ChooseImagePopup(ChoiceMapPopup[K, 'ImageType']):
     def with_auto_prompt(cls, items: Mapping[K, ImageType], *, item_name: str = 'image', **kwargs) -> ChooseImagePopup:
         return super().with_auto_prompt(items, item_name=item_name, **kwargs)
 
-    def _prepare_image(self, title: K, orig_image: ImageType) -> Image:
-        image = as_image(orig_image)
-        # if image is orig_image:
-        #     image = image.copy()
+    def _prepare_image(self, title: K, image: ImageType) -> Image:
         if img_title_fmt := self.img_title_fmt:
             popup_title = img_title_fmt.format(title=title)
         else:

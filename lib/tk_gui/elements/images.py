@@ -495,7 +495,11 @@ class _GuiImage:
             except OSError as e:
                 log.debug(f'Error loading cached thumbnail from path={path.as_posix()}: {e}')
 
-        image = src.resize(dst_size, Resampling.LANCZOS)
+        if src.mode == 'P':
+            # In this case, Image.resize ignores the resample arg and uses Resampling.NEAREST, so convert to RGB first
+            image = src.convert('RGB').resize(dst_size, Resampling.LANCZOS)
+        else:
+            image = src.resize(dst_size, Resampling.LANCZOS)
         return False, image, PhotoImage(image)
 
     # endregion
