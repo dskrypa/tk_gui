@@ -16,10 +16,9 @@ from PIL.ImageDraw import ImageDraw, Draw
 
 from .color import color_to_rgb, find_unused_color
 from .cycle import FrameCycle
-from .utils import prepare_dir
 
 if TYPE_CHECKING:
-    from ..typing import XY
+    from ..typing import XY, PathLike
 
 __all__ = ['Spinner']
 log = logging.getLogger(__name__)
@@ -119,8 +118,8 @@ class Spinner:
     def cycle(self, wrapper: Callable = None, duration: int = None, default_duration: int = 100) -> FrameCycle:
         return FrameCycle(self.frames(), wrapper, duration, default_duration)
 
-    def save_frames(self, path: Union[Path, str], prefix: str = 'frame_', format: str = 'PNG', mode: str = None):  # noqa
-        path = prepare_dir(path)
+    def save_frames(self, path: PathLike, prefix: str = 'frame_', format: str = 'PNG', mode: str = None):  # noqa
+        path = _prepare_dir(path)
         name_fmt = prefix + '{:0' + str(len(str(len(self)))) + 'd}.' + format.lower()
         for i, frame in enumerate(self.frames()):
             if mode and mode != frame.mode:
@@ -129,3 +128,13 @@ class Spinner:
             log.info(f'Saving {frame_path.as_posix()}')
             with frame_path.open('wb') as f:
                 frame.save(f, format=format)
+
+
+def _prepare_dir(path: PathLike) -> Path:
+    path = Path(path).expanduser().resolve() if isinstance(path, str) else path
+    if path.exists():
+        if not path.is_dir():
+            raise ValueError(f'Invalid path={path.as_posix()!r} - it must be a directory')
+    else:
+        path.mkdir(parents=True, exist_ok=True)
+    return path

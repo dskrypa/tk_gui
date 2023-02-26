@@ -11,7 +11,7 @@ from io import BytesIO
 from importlib.resources import path as get_data_path
 from math import floor, ceil
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, Union
+from typing import TYPE_CHECKING, Callable
 
 from PIL.Image import Image as PILImage, open as open_image
 from PIL.JpegImagePlugin import RAWMODE
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from ..typing import XY, ImageType
 
 __all__ = [
-    'as_image', 'image_path', 'image_to_bytes', 'scale_image', 'calculate_resize', 'prepare_dir', 'get_image_and_hash'
+    'as_image', 'get_image_and_hash', 'icon_path', 'get_image_path', 'image_to_bytes', 'scale_image', 'calculate_resize'
 ]
 
 
@@ -28,18 +28,8 @@ with get_data_path('tk_gui', 'icons') as _icon_path:
     ICONS_DIR = _icon_path
 
 
-def image_path(rel_path: str) -> Path:
+def icon_path(rel_path: str) -> Path:
     return ICONS_DIR.joinpath(rel_path)
-
-
-def prepare_dir(path: Union[Path, str]) -> Path:
-    path = Path(path).expanduser().resolve() if isinstance(path, str) else path
-    if path.exists():
-        if not path.is_dir():
-            raise ValueError(f'Invalid path={path.as_posix()!r} - it must be a directory')
-    else:
-        path.mkdir(parents=True, exist_ok=True)
-    return path
 
 
 def as_image(image: ImageType) -> PILImage:
@@ -71,6 +61,18 @@ def get_image_and_hash(image: ImageType) -> tuple[PILImage | None, str | None]:
         return image, sha256(_image_to_bytes(image)).hexdigest()
     else:
         raise TypeError(f'Image must be bytes, None, Path, str, or a PIL.Image.Image - found {type(image)}')
+
+
+def get_image_path(image: ImageType, no_path_ok: bool = False) -> Path | None:
+    if isinstance(image, Path):
+        return image
+    elif isinstance(image, str):
+        return Path(image).expanduser()
+    elif path := getattr(image, 'filename', None) or getattr(getattr(image, 'fp', None), 'name', None):
+        return Path(path)
+    if no_path_ok:
+        return None
+    raise ValueError(f'Unexpected image type for {image=}')
 
 
 def image_to_bytes(image: ImageType, format: str = None, size: XY = None, **kwargs) -> bytes:  # noqa

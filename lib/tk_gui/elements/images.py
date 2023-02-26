@@ -22,7 +22,7 @@ from ..enums import Anchor
 from ..images import SevenSegmentDisplay, calculate_resize, as_image
 from ..images.cycle import FrameCycle, PhotoImageCycle
 from ..images.spinner import Spinner
-from ..images.utils import get_image_and_hash
+from ..images.utils import get_image_and_hash, get_image_path
 from ..styles import Style, StyleSpec
 from ..utils import get_user_temp_dir
 from .element import Element
@@ -83,6 +83,8 @@ class Image(Element, base_style_layer='image'):
         if anchor_image:
             self.anchor_image = Anchor(anchor_image)
 
+    # region Image Data
+
     @property
     def image(self) -> Optional[_GuiImage]:
         return self._image
@@ -91,7 +93,22 @@ class Image(Element, base_style_layer='image'):
     def image(self, data: ImageType):
         self._image = _GuiImage(data)
         if self.widget is not None:
-            self.refresh()
+            self.resize(*self.size)
+
+    # endregion
+
+    # region Style
+
+    @property
+    def style_config(self) -> dict[str, Any]:
+        return {
+            **self.style.get_map('image', bd='border_width', background='bg', relief='relief'),
+            **self._style_config,
+        }
+
+    # endregion
+
+    # region Widget Init & Packing
 
     def _init_widget(self, tk_container: TkContainer):
         pass
@@ -108,13 +125,6 @@ class Image(Element, base_style_layer='image'):
         # TODO: Right-click menu: save as
         image, width, height = self._image.as_size(width, height)
         self._pack_into(row, image, width, height)
-
-    @property
-    def style_config(self) -> dict[str, Any]:
-        return {
-            **self.style.get_map('image', bd='border_width', background='bg', relief='relief'),
-            **self._style_config,
-        }
 
     def _pack_into(self, row: Row, image: _Image, width: int, height: int):
         # log.debug(f'Packing {image=} into row with {width=}, {height=}')
@@ -144,11 +154,10 @@ class Image(Element, base_style_layer='image'):
         widget.image = image
         widget.pack(**self.pad_kw)
 
+    # endregion
+
     def target_size(self, width: int, height: int) -> XY:
         return self._image.target_size(width, height)
-
-    def refresh(self):
-        self.resize(*self.size)
 
     def resize(self, width: int, height: int):
         image, width, height = self._image.as_size(width, height)
@@ -181,10 +190,6 @@ class Animation(Image, animated=True):
         self._run = not paused
         self._callback = callback
 
-    @property
-    def paused(self):
-        return not self._run
-
     def pack_into(self, row: Row):
         # log.debug(f'pack_into: {self.size=}')
         self.image_cycle = image_cycle = normalize_image_cycle(self.__image, self.size, self._last_frame_num)
@@ -200,6 +205,8 @@ class Animation(Image, animated=True):
         self._pack_into(row, frame, width, height)
         if self._run:
             self._next_id = self.widget.after(delay, self.next)
+
+    # region Size & Resize
 
     def target_size(self, width: int, height: int) -> XY:
         try:
@@ -229,7 +236,15 @@ class Animation(Image, animated=True):
     def _resize_cycle(self, size: XY) -> ImageCycle:
         return normalize_image_cycle(self.__image, size, self.image_cycle.n)
 
+    # endregion
+
+    # region Display Animation Frames
+
     def next(self):
+        """
+        Display the next frame in the animation.  While running, it is continuously registered to be called by the
+        widget, after a delay.
+        """
         frame, delay = next(self.image_cycle)
         width, height = self.size
         self.widget.configure(image=frame, width=width, height=height)
@@ -237,11 +252,32 @@ class Animation(Image, animated=True):
             self._next_id = self.widget.after(delay, self.next)
 
     def previous(self):
+        """
+        Display the previous frame in the animation.  Similar to :meth:`.next`, while running in reverse, it is
+        continuously registered to be called by the widget, after a delay.
+        """
         frame, delay = self.image_cycle.back()
         width, height = self.size
         self.widget.configure(image=frame, width=width, height=height)
         if self._run:
             self._next_id = self.widget.after(delay, self.previous)
+
+    # endregion
+
+    # region Animation State & Play / Stop Controls
+
+    @property
+    def running(self) -> bool:
+        return self._run
+
+    def play(self):
+        if not self._run:
+            self._run = True
+            self.next()
+
+    def stop(self):
+        self._run = False
+        self._cancel()
 
     def _cancel(self):
         if next_id := self._next_id:
@@ -251,13 +287,7 @@ class Animation(Image, animated=True):
                 log.debug(f'Error canceling next animation step: {e}')
             self._next_id = None
 
-    def pause(self):
-        self._run = False
-        self._cancel()
-
-    def resume(self):
-        self._run = True
-        self.next()
+    # endregion
 
 
 class SpinnerImage(Animation):
@@ -266,6 +296,10 @@ class SpinnerImage(Animation):
     DEFAULT_KWARGS = {'frame_fade_pct': 0.01, 'frame_duration_ms': 20, 'frames_per_spoke': 1}
 
     def __init__(self, **kwargs):
+        """
+        Supported Spinner params: size, color, spokes, bg, size_min_pct, opacity_min_pct, frames_per_spoke,
+        frame_duration_ms, frame_fade_pct, reverse, clockwise.
+        """
         spinner_kwargs = _extract_kwargs(kwargs, self._spinner_keys, self.DEFAULT_KWARGS)
         size = spinner_kwargs.setdefault('size', self.DEFAULT_SIZE)
         self.spinner = spinner = Spinner(**spinner_kwargs)
@@ -274,6 +308,9 @@ class SpinnerImage(Animation):
     def target_size(self, width: int, height: int) -> XY:
         # TODO: Add support for keeping aspect ratio
         return width, height
+
+
+# region Digital Clock
 
 
 class _ClockCycle:
@@ -317,6 +354,20 @@ class ClockImage(Animation):
         toggle_slim_on_click: Union[bool, str] = False,
         **kwargs,
     ):
+        """
+        Supported SevenSegmentDisplay params: width, bar, gap, corners, fg, bg, bar_pct, seconds.
+
+        :param slim: Whether the "digital" numbers should be slim or normal.
+        :param img_size: The desired full, outer size for the clock.
+        :param style: The style to use.  By default, this element does not respect the selected :class:`.Style`, and
+          uses a simple style that only defines that the background is black.  The default clock number color is ``#FF``
+          (red), and should be specified via the ``fg`` kwarg instead of via ``style``.  If a style defining a different
+          background color is provided, the ``bg`` kwarg should probably also be provided so that it is used when the
+          :class:`.SevenSegmentDisplay` is initialized.
+        :param toggle_slim_on_click: Whether a left-click callback should be registered to toggle between slim and
+          normal numbers in the clock.
+        :param kwargs: Additional keyword arguments to pass to :class:`.SevenSegmentDisplay` or :class:`Animation`.
+        """
         clock_kwargs = _extract_kwargs(kwargs, self._clock_keys, self.DEFAULT_KWARGS)
         self._slim = slim
         self.clock = clock = SevenSegmentDisplay(**clock_kwargs)
@@ -349,6 +400,9 @@ class ClockImage(Animation):
         return self.clock.calc_resize_width(width, height)[0]
 
 
+# endregion
+
+
 class _GuiImage:
     __slots__ = ('src_image', 'current', 'current_tk', 'src_size', 'size', 'path', 'src_hash', 'max_thumbnail_size')
     src_image: PILImage | None
@@ -356,7 +410,8 @@ class _GuiImage:
     current_tk: PhotoImage | None
 
     def __init__(self, image: ImageType, max_thumbnail_size: XY = (500, 500)):
-        self.path = _get_path(image, True)
+        self.max_thumbnail_size = max_thumbnail_size
+        self.path = get_image_path(image, True)
         image, self.src_hash = get_image_and_hash(image)
         # log.debug(f'Loaded image={image!r}')
         self.src_image = image
@@ -369,7 +424,9 @@ class _GuiImage:
         self.src_size = size
         self.size = size
 
-    def _normalize(self, width: OptInt, height: OptInt) -> XY:
+    # region Size Calculation
+
+    def _normalize_size(self, width: OptInt, height: OptInt) -> XY:
         if width is None:
             width = self.size[0]
         if height is None:
@@ -377,7 +434,7 @@ class _GuiImage:
         return width, height
 
     def target_size(self, width: OptInt, height: OptInt) -> XY:
-        width, height = self._normalize(width, height)
+        width, height = self._normalize_size(width, height)
         cur_width, cur_height = self.size
         if self.current is None or (cur_width == width and cur_height == height):
             return width, height
@@ -386,8 +443,12 @@ class _GuiImage:
         else:
             return calculate_resize(*self.src_size, width, height)
 
+    # endregion
+
+    # region Load & Resize Methods
+
     def as_size(self, width: OptInt, height: OptInt) -> ImageAndSize:
-        width, height = self._normalize(width, height)
+        width, height = self._normalize_size(width, height)
         if (current := self.current) is None:
             return None, width, height
 
@@ -423,6 +484,24 @@ class _GuiImage:
             return tk_image, dst_width, dst_height
 
     @classmethod
+    def _load_or_resize(cls, path: Path | None, src: PILImage, dst_size: XY) -> tuple[bool, PILImage, PhotoImage]:
+        if path:
+            try:
+                image = _load_thumbnail(path)
+                return True, image, PhotoImage(image)
+            except FileNotFoundError:
+                pass
+            except OSError as e:
+                log.debug(f'Error loading cached thumbnail from path={path.as_posix()}: {e}')
+
+        image = src.resize(dst_size, Resampling.LANCZOS)
+        return False, image, PhotoImage(image)
+
+    # endregion
+
+    # region Thumbnail Methods
+
+    @classmethod
     def _save_thumbnail(cls, image: PILImage, path: Path):
         if not (save_fmt := image.format):
             save_fmt = 'png' if image.mode == 'RGBA' else 'jpeg'
@@ -434,22 +513,20 @@ class _GuiImage:
         else:
             log.debug(f'Saved thumbnail to {path.as_posix()}')
 
-    @classmethod
-    def _load_or_resize(cls, path: Path | None, src: PILImage, dst_size: XY) -> tuple[bool, PILImage, PhotoImage]:
-        if path:
-            try:
-                image = _load_thumbnail(path)
-                return True, image, PhotoImage(image)
-            except FileNotFoundError:
-                pass
-            except OSError as e:
-                log.debug(f'Error loading cached thumbnail from path={path.as_posix()}: {e}')
-        image = src.resize(dst_size, Resampling.LANCZOS)
-        return False, image, PhotoImage(image)
-
     def get_thumbnail_path(self, width: OptInt, height: OptInt, dst_width: int, dst_height: int) -> Path | None:
-        if not (src_hash := self.src_hash) or (width and width < dst_width) or (height and height < dst_height):
+        max_width, max_height = self.max_thumbnail_size
+        if (
+            not (src_hash := self.src_hash)                                         # Image is None
+            or ((width and width > max_width) or (height and height > max_height))  # Too large to save
+            or ((width and width < dst_width) or (height and height < dst_height))  # Smaller than target size
+            or (width and height and width == dst_width and height == dst_height)   # Already at the target size
+        ):
             return None
+
+        # if (width and width > max_width) or (height and height > max_height):
+        #     return None
+        # elif not (src_hash := self.src_hash) or (width and width < dst_width) or (height and height < dst_height):
+        #     return None
         return self._get_thumbnail_dir().joinpath(f'{src_hash}_{width}x{height}_{dst_width}x{dst_height}.thumb')
 
     @classmethod
@@ -459,6 +536,8 @@ class _GuiImage:
         except AttributeError:
             cls._thumbnail_dir = thumbnail_dir = get_user_temp_dir('tk_gui_thumbnails')
             return thumbnail_dir
+
+    # endregion
 
 
 @lru_cache(20)
@@ -481,7 +560,7 @@ def normalize_image_cycle(image: AnimatedType, size: XY = None, last_frame_num: 
             frame_cycle.last_time -= frame_cycle.SECOND
     else:
         try:
-            path = _get_path(image)
+            path = get_image_path(image)
         except ValueError:
             image = as_image(image)
             frame_cycle = FrameCycle(tuple(FrameIterator(image)), PhotoImage)
@@ -514,18 +593,6 @@ def normalize_image_cycle(image: AnimatedType, size: XY = None, last_frame_num: 
     return frame_cycle
 
 
-def _get_path(image: ImageType, no_path_ok: bool = False) -> Path | None:
-    if isinstance(image, Path):
-        return image
-    elif isinstance(image, str):
-        return Path(image).expanduser()
-    elif path := getattr(image, 'filename', None) or getattr(getattr(image, 'fp', None), 'name', None):
-        return Path(path)
-    if no_path_ok:
-        return None
-    raise ValueError(f'Unexpected image type for {image=}')
-
-
 def get_size(image: Union[AnimatedType, SevenSegmentDisplay]) -> XY:
     if isinstance(image, Spinner):
         return image.size
@@ -537,7 +604,8 @@ def get_size(image: Union[AnimatedType, SevenSegmentDisplay]) -> XY:
 
 
 def _extract_kwargs(kwargs: dict[str, Any], keys: set[str], defaults: dict[str, Any]) -> dict[str, Any]:
-    extracted = {key: kwargs.pop(key) for key in keys if key in kwargs}
+    pop = kwargs.pop
+    extracted = {key: pop(key) for key in keys.intersection(kwargs)}
     for key, val in defaults.items():
         extracted.setdefault(key, val)
 

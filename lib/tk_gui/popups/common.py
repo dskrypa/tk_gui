@@ -10,7 +10,7 @@ import logging
 from typing import TYPE_CHECKING, Optional
 
 from ..elements.buttons import OK
-from ..images import image_path
+from ..images.utils import icon_path
 from .base import BasicPopup
 from .basic_prompts import BoolPopup, TextPromptPopup, LoginPromptPopup, PasswordPromptPopup
 
@@ -34,7 +34,7 @@ def popup_error(text: str, title: str = 'Error', bind_esc: Bool = True, side: Tk
 
 
 def popup_warning(text: str, title: str = 'Warning', bind_esc: Bool = True, side: TkSide = 'right', **kwargs) -> None:
-    img_path = image_path('exclamation-triangle-yellow.png')
+    img_path = icon_path('exclamation-triangle-yellow.png')
     BasicPopup(text, title=title, bind_esc=bind_esc, image=img_path, button=OK(side=side), **kwargs).run()
 
 

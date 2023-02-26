@@ -46,7 +46,7 @@ class GuiPopupTest(Command):
 
     @action
     def spinner(self):
-        SpinnerPopup(img_size=(400, 400)).run()
+        SpinnerPopup(img_size=(400, 400), bind_esc=True).run()
 
     @action
     def gif(self):
