@@ -7,13 +7,16 @@ Tkinter GUI image popups
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Optional, Union
+from concurrent.futures import Future
+from threading import Thread
+from typing import TYPE_CHECKING, Optional, Union, Callable, TypeVar, ParamSpec
 
 from PIL.Image import MIME
 
 from tk_gui.caching import cached_property
 from tk_gui.elements.images import AnimatedType, Image, Animation, ClockImage, SpinnerImage, get_size
 from tk_gui.event_handling import event_handler
+from tk_gui.event_handling.futures import run_func_in_future
 from tk_gui.positioning import positioner
 from tk_gui.images import as_image
 from .base import Popup
@@ -26,6 +29,9 @@ __all__ = ['ImagePopup', 'AnimatedPopup', 'SpinnerPopup', 'ClockPopup']
 log = logging.getLogger(__name__)
 
 _NotSet = object()
+
+P = ParamSpec('P')
+T = TypeVar('T')
 
 
 class ImagePopup(Popup):
@@ -139,6 +145,29 @@ class AnimatedPopup(ImagePopup):
 
     def stop_animation(self, event: Event = None):
         self.gui_image.stop()
+
+    def run_task_in_thread(self, func: Callable[P, T], args: P.args = (), kwargs: P.kwargs = None) -> T:
+        """
+        Primarily intended to be used with spinner animations.  Calls :meth:`.run_async` to start the animation, then
+        starts a Thread with the function as the target.  Once the function is complete, the animation stops, and the
+        value returned by the function is returned.  If an exception was raised by the function, then it will be raised
+        after the animation has been stopped.
+
+        :param func: The function to call in a thread.
+        :param args: Positional arguments to pass to that function.
+        :param kwargs: Keyword arguments to pass to that function.
+        :return: The return value from that function.
+        """
+        self.run_async()
+        future = Future()
+        func_thread = Thread(target=run_func_in_future, args=(future, func, args, kwargs), daemon=True)
+        func_thread.start()
+        # log.debug(f'Started thread for {func=}', extra={'color': (0, 13)})
+        func_thread.join()
+        # log.debug(f'Finished thread for {func=}', extra={'color': (0, 11)})
+        self.stop()
+        # log.debug(f'Stopped spinner for {func=}', extra={'color': (0, 10)})
+        return future.result()
 
 
 class SpinnerPopup(AnimatedPopup):

@@ -311,7 +311,7 @@ class Window(BindMixin, RowContainer):
 
     def interrupt(self, event: Event = None, element: ElementBase = None):
         self._last_interrupt = Interrupt(event, element)
-        # log.debug(f'Interrupting {self} due to {event=}')
+        # log.debug(f'Interrupting {self} due to {event=}', extra={'color': (0, 9)})
         # try:
         self._root.quit()  # exit the TK main loop, but leave the window open
         # except AttributeError:  # May occur when closing windows out of order

@@ -8,29 +8,27 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from concurrent.futures import Future
-from queue import Queue
 from threading import current_thread, main_thread
 from typing import TYPE_CHECKING, Union, Collection, Mapping, Callable, Any
 
 from tk_gui.caching import cached_property
-from ..elements import Button, Text, Image, Multiline
-from ..event_handling import HandlesEvents, BindMap
-from ..positioning import positioner
-from ..styles import Style, StyleSpec
-from ..utils import max_line_len
-from ..window import Window
+from tk_gui.elements import Button, Text, Image, Multiline
+from tk_gui.event_handling import HandlesEvents, BindMap
+from tk_gui.event_handling.futures import TkFuture
+from tk_gui.positioning import positioner
+from tk_gui.styles import Style, StyleSpec
+from tk_gui.utils import max_line_len
+from tk_gui.window import Window
 
 if TYPE_CHECKING:
     from tkinter import Event
     from screeninfo import Monitor
-    from ..typing import XY, Layout, Bool, ImageType, Key
+    from tk_gui.typing import XY, Layout, Bool, ImageType, Key
 
-__all__ = ['Popup', 'POPUP_QUEUE', 'BasicPopup']
+__all__ = ['Popup', 'BasicPopup']
 log = logging.getLogger(__name__)
 
 _NotSet = object()
-POPUP_QUEUE = Queue()
 
 
 class BasePopup(ABC):
@@ -66,6 +64,9 @@ class BasePopup(ABC):
 
         return callback
 
+    def __repr__(self) -> str:
+        return f'<{self.__class__.__name__}[title={self.title!r}]>'
+
     @abstractmethod
     def _run(self) -> dict[Key, Any]:
         raise NotImplementedError
@@ -79,10 +80,12 @@ class BasePopup(ABC):
     def run(self):
         if current_thread() == main_thread():
             result = self._run()
+        elif not (parent := self.parent):
+            raise RuntimeError(f'Unable to run {self!r} with no parent Window')
         else:
-            future = Future()
-            POPUP_QUEUE.put((future, self._run, (), {}))
-            result = future.result()
+            log.debug(f'Enqueueing threaded popup={self!r}')
+            result = TkFuture.submit(parent._root, self._run).result()
+            log.debug(f'Got threaded popup={self!r} {result=}')
 
         if self.return_focus and (parent := self.parent):
             # log.debug(f'Returning focus to {parent=}')
@@ -131,6 +134,16 @@ class Popup(BasePopup, HandlesEvents):
         with self.window(take_focus=True) as window:
             window.run()
             return window.results
+
+    def run_async(self) -> TkFuture[Window]:
+        window = self.window(take_focus=True)
+        tk_future = TkFuture.submit(window._root, window.run)
+        tk_future.add_done_callback(lambda *a: window.close())
+        return tk_future
+
+    def stop(self, event: Event = None) -> dict[Key, Any]:
+        self.window.interrupt(event)
+        return self.window.results
 
 
 class BasicPopup(Popup):
