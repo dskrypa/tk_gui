@@ -522,8 +522,12 @@ class Window(BindMixin, RowContainer):
             x, y = self.position
         if not (monitor := positioner.get_monitor(x, y)):
             return
-        elif other:
+        try:
             par_w, par_h = other._outer_size()
+        except AttributeError:  # Either other is None, or other has been closed already
+            x = monitor.x + (monitor.width - win_w) // 2
+            y = monitor.y + (monitor.height - win_h) // 2
+        else:
             x += (par_w - win_w) // 2
             y += (par_h - win_h) // 2
             # If being centered on the window places it in a bad position, center on the monitor instead
@@ -534,9 +538,6 @@ class Window(BindMixin, RowContainer):
                 x = x_min + (monitor.width - win_w) // 2
             if y < y_min or (y + win_h) > y_max:
                 y = y_min + (monitor.height - win_h) // 2
-        else:
-            x = monitor.x + (monitor.width - win_w) // 2
-            y = monitor.y + (monitor.height - win_h) // 2
 
         self.position = x, y
 

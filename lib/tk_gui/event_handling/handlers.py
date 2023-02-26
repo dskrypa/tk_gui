@@ -140,12 +140,12 @@ class HandlesEventsMeta(ABCMeta, type):
         return cls
 
     def event_handler_binds(cls: HandlesEventsMeta, he_obj) -> BindMap:
-        return cls._get_bind_map(he_obj, '_event_handlers_')
+        return cls.__get_bind_map(he_obj, '_event_handlers_')
 
     def button_handler_binds(cls: HandlesEventsMeta, he_obj) -> BindMap:
-        return cls._get_bind_map(he_obj, '_button_handlers_')
+        return cls.__get_bind_map(he_obj, '_button_handlers_')
 
-    def _get_bind_map(cls: HandlesEventsMeta, he_obj, attr_name: str) -> BindMap:
+    def __get_bind_map(cls: HandlesEventsMeta, he_obj, attr_name: str) -> BindMap:
         bind_map = BindMap()
         for handler in getattr(cls, attr_name):  # type: EventHandler | ButtonHandler
             cb = partial(handler.handler, he_obj) if handler.method else handler.handler

@@ -7,17 +7,17 @@ Base View class
 from __future__ import annotations
 
 import logging
+from abc import ABC
 from time import monotonic
-from typing import TYPE_CHECKING, Any, Union, Optional, Type, Sequence, Mapping
+from typing import TYPE_CHECKING, Any, Optional, Type, Sequence, Mapping
 
-from tk_gui.caching import cached_property
 from tk_gui.enums import CallbackAction
-from ..event_handling import HandlesEvents, event_handler, BindMap
-from ..window import Window
+from tk_gui.event_handling import event_handler
+from .base import WindowInitializer
 
 if TYPE_CHECKING:
     from tkinter import Event
-    from ..typing import Layout, Key
+    from ..typing import Key
 
 __all__ = ['View', 'ViewSpec']
 log = logging.getLogger(__name__)
@@ -25,77 +25,15 @@ log = logging.getLogger(__name__)
 ViewSpec = tuple[Type['View'], Sequence[Any], Mapping[str, Any]]
 
 
-class View(HandlesEvents):
+class View(WindowInitializer, ABC):
     __next: Optional[ViewSpec] = None
-    window_kwargs: Optional[dict[str, Any]] = None
-    parent: Union[View, Window] = None
-    title: str = None
+    default_window_kwargs: Optional[dict[str, Any]] = None
 
-    def __init_subclass__(cls, title: str = None, **kwargs):
-        super().__init_subclass__(**kwargs)
-        if title:
-            cls.title = title
-
-    def __init__(self, parent: Union[View, Window] = None, *, title: str = None):
-        if parent is not None:
-            self.parent = parent
-        if title is not None:
-            self.title = title
-
-    def __repr__(self) -> str:
-        return f'<{self.__class__.__name__}[{self.title}][handlers: {len(self._event_handlers_)}]>'
-
-    # region Layout / Window Creation Methods
-
-    def get_pre_window_layout(self) -> Layout:  # noqa
-        """
-        Intended to be overridden by subclasses to provide their layouts.
-
-        Called by :meth:`.init_window` before the :class:`.Window` is initialized.
-        """
-        return []
-
-    def get_post_window_layout(self) -> Layout:  # noqa
-        """
-        Intended to be overridden by subclasses to provide their layouts.
-
-        Called by :meth:`.finalize_window` after the :class:`.Window` is initialized.  May be used for elements that
-        need to obtain some information from the window before they can be initialized/rendered properly.
-        """
-        return []
-
-    def init_window(self) -> Window:
-        if (window_kwargs := self.window_kwargs) is None:
-            window_kwargs = {}
-        window_kwargs = window_kwargs.copy()  # Prevent mutating a shared dict stored on a View subclass
-        if binds := BindMap.pop_and_normalize(window_kwargs) | self.event_handler_binds():
-            window_kwargs['binds'] = binds
-        return Window(self.get_pre_window_layout(), title=self.title, **window_kwargs)
-
-    @cached_property
-    def window(self) -> Window:
-        return self.init_window()
-
-    def finalize_window(self) -> Window:
-        window = self.window
-        if layout := self.get_post_window_layout():
-            window.add_rows(layout, pack=window.was_shown)
-            try:
-                window._update_idle_tasks()
-            except AttributeError:  # There was no init layout, so .show() was not called in Window.__init__
-                window.show()
-            else:                   # The scroll region only needs to be updated if the window was already shown
-                try:
-                    window.update_scroll_region()
-                except TypeError:  # It was not scrollable
-                    pass
-        if parent := self.parent:
-            if isinstance(parent, View):
-                parent = parent.window
-            window.move_to_center(parent)
-        return window
-
-    # endregion
+    def __init__(self, *args, **kwargs):
+        if default_kwargs := self.default_window_kwargs:
+            for key, value in default_kwargs.items():
+                kwargs.setdefault(key, value)
+        super().__init__(*args, **kwargs)
 
     # region Next View Methods
 
@@ -134,20 +72,9 @@ class View(HandlesEvents):
     # region Run Methods
 
     def run(self) -> dict[Key, Any]:
-        start = monotonic()
-        window = self.finalize_window()
-        elapsed = monotonic() - start
-        log.debug(f'Rendered layout for {self.__class__.__name__} in seconds={elapsed:,.3f}')
-        with window(take_focus=True):
+        with self.finalize_window()(take_focus=True) as window:
             window.run()
             return self.get_results()
-
-    def get_results(self):
-        """
-        Called by :meth:`.run` to provide the results of running this view.  May be overridden by subclasses to handle
-        custom finalization / form submission logic.
-        """
-        return self.window.results
 
     @classmethod
     def run_all(cls, view: View = None, *args, **kwargs) -> Optional[dict[Key, Any]]:
