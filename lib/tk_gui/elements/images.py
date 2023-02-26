@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Optional, Any, Union
 from PIL.Image import Image as PILImage, Resampling, open as open_image
 from PIL.ImageSequence import Iterator as FrameIterator
 from PIL.ImageTk import PhotoImage
+from PIL.JpegImagePlugin import RAWMODE
 
 from ..enums import Anchor
 from ..images import SevenSegmentDisplay, calculate_resize, as_image
@@ -505,6 +506,8 @@ class _GuiImage:
     def _save_thumbnail(cls, image: PILImage, path: Path):
         if not (save_fmt := image.format):
             save_fmt = 'png' if image.mode == 'RGBA' else 'jpeg'
+        if save_fmt == 'jpeg' and image.mode not in RAWMODE:
+            image = image.convert('RGB')
         try:
             with path.open('wb') as f:
                 image.save(f, save_fmt)
