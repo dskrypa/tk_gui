@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Optional, Union
 
 from PIL.Image import MIME
 
+from tk_gui.caching import cached_property
 from tk_gui.elements.images import AnimatedType, Image, Animation, ClockImage, SpinnerImage, get_size
 from tk_gui.event_handling import event_handler
 from tk_gui.positioning import positioner
@@ -24,12 +25,14 @@ if TYPE_CHECKING:
 __all__ = ['ImagePopup', 'AnimatedPopup', 'SpinnerPopup', 'ClockPopup']
 log = logging.getLogger(__name__)
 
+_NotSet = object()
+
 
 class ImagePopup(Popup):
     _empty: bool = True
-    orig_size: XY
+    _gui_image: Image = _NotSet
     _last_size: XY
-    gui_image: Image
+    orig_size: XY
 
     def __init__(self, image: Union[ImageType, AnimatedType], title: str = None, **kwargs):
         kwargs.setdefault('margins', (0, 0))
@@ -37,29 +40,12 @@ class ImagePopup(Popup):
         kwargs.setdefault('keep_on_top', False)
         kwargs.setdefault('can_minimize', True)
         super().__init__(title=title or 'Image', **kwargs)
-        self._set_image(image)
+        if self.gui_image is _NotSet:
+            # This will only happen for non-cached properties, but it will also (intentionally) force subclasses that
+            # usa a cached_property to populate the value immediately.
+            self.gui_image = image
 
-    def get_layout(self) -> Layout:
-        return [[self.gui_image]]
-
-    def __repr__(self) -> str:
-        return f'<{self.__class__.__name__}[title={self.title!r}, orig={self.orig_size}, empty: {self._empty}]>'
-
-    def _set_image(self, image: ImageType):
-        image = as_image(image)
-        self._empty = image is None
-        self.orig_size = image.size if image else (0, 0)
-        self._last_size = init_size = self._init_size()
-        self.gui_image = Image(image, size=init_size, pad=(2, 2))
-        if image:
-            log.debug(f'{self}: Displaying {image=} with {image.format=} mime={MIME.get(image.format)!r}')
-
-    def _init_size(self) -> XY:
-        width, height = self.orig_size
-        if parent := self.parent:
-            if monitor := positioner.get_monitor(*parent.position):
-                return min(monitor.width - 70, width or 0), min(monitor.height - 70, height or 0)
-        return width, height
+    # region Title
 
     @property
     def title(self) -> str:
@@ -74,6 +60,35 @@ class ImagePopup(Popup):
     @title.setter
     def title(self, value: str):
         self._title = value
+
+    # endregion
+
+    def __repr__(self) -> str:
+        return f'<{self.__class__.__name__}[title={self.title!r}, orig={self.orig_size}, empty: {self._empty}]>'
+
+    def get_layout(self) -> Layout:
+        return [[self.gui_image]]
+
+    @property
+    def gui_image(self) -> Image:
+        return self._gui_image
+
+    @gui_image.setter
+    def gui_image(self, value: ImageType):
+        image = as_image(value)
+        self._empty = image is None
+        self.orig_size = image.size if image else (0, 0)
+        self._last_size = init_size = self._init_size()
+        self._gui_image = Image(value, size=init_size, pad=(2, 2))
+        if image:
+            log.debug(f'{self}: Displaying {image=} with {image.format=} mime={MIME.get(image.format)!r}')
+
+    def _init_size(self) -> XY:
+        width, height = self.orig_size
+        if parent := self.parent:
+            if monitor := positioner.get_monitor(*parent.position):
+                return min(monitor.width - 70, width or 0), min(monitor.height - 70, height or 0)
+        return width, height
 
     def _get_new_size(self, new_w: int, new_h: int) -> Optional[XY]:
         image = self.gui_image
@@ -105,16 +120,29 @@ class ImagePopup(Popup):
 
 
 class AnimatedPopup(ImagePopup):
-    def _set_image(self, image: AnimatedType):
+    _gui_image: Animation
+
+    @property
+    def gui_image(self) -> Animation:
+        return self._gui_image
+
+    @gui_image.setter
+    def gui_image(self, value: AnimatedType):
         # log.debug(f'_set_image: {image=}')
-        self.orig_size = get_size(image) if image else (0, 0)
+        self.orig_size = get_size(value) if value else (0, 0)
         self._last_size = init_size = self._init_size()
-        self.gui_image = animation = Animation(image, size=init_size, pad=(2, 2))
+        self._gui_image = animation = Animation(value, size=init_size, pad=(2, 2))
         self._empty = animation.size == (0, 0)
+
+    def play_animation(self, event: Event = None):
+        self.gui_image.play()
+
+    def stop_animation(self, event: Event = None):
+        self.gui_image.stop()
 
 
 class SpinnerPopup(AnimatedPopup):
-    gui_image: SpinnerImage
+    _empty = False
 
     def __init__(self, *args, img_size: XY = None, **kwargs):
         self._img_size = img_size
@@ -125,26 +153,29 @@ class SpinnerPopup(AnimatedPopup):
         # kwargs.setdefault('alpha_channel', 0.8)  # This would make it semi-transparent; transparent_color didn't work
         super().__init__(None, *args, **kwargs)
 
-    def _set_image(self, image: None):
-        self._empty = False
+    @cached_property
+    def gui_image(self) -> SpinnerImage:
         self.orig_size = self._img_size or SpinnerImage.DEFAULT_SIZE
         self._last_size = init_size = self._init_size()
-        self.gui_image = SpinnerImage(size=init_size, pad=(2, 2))
+        return SpinnerImage(size=init_size, pad=(2, 2))
 
 
 class ClockPopup(AnimatedPopup):
+    _empty = False
+
     def __init__(self, *args, img_size: XY = None, toggle_slim_on_click: bool = False, **kwargs):
         self._img_size = img_size
         self._toggle_slim_on_click = toggle_slim_on_click
         super().__init__(None, *args, **kwargs)
 
-    def _set_image(self, image: None):
-        self._empty = False
+    @cached_property
+    def gui_image(self) -> ClockImage:
         kwargs = {'toggle_slim_on_click': self._toggle_slim_on_click, 'pad': (2, 2)}
         if img_size := self._img_size:
             self.orig_size = img_size
             self._last_size = init_size = self._init_size()
-            self.gui_image = ClockImage(img_size=init_size, **kwargs)
+            return ClockImage(img_size=init_size, **kwargs)
         else:
-            self.gui_image = ClockImage(**kwargs)
-            self.orig_size = self._last_size = self.gui_image.size
+            gui_image = ClockImage(**kwargs)
+            self.orig_size = self._last_size = gui_image.size
+            return gui_image
