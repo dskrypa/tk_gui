@@ -317,6 +317,15 @@ class Window(BindMixin, RowContainer):
         # except AttributeError:  # May occur when closing windows out of order
         #     pass
 
+    def update(self):
+        try:
+            root = self._root
+        except AttributeError:
+            self.show()
+            root = self._root
+
+        root.update()
+
     def read(self, timeout: int) -> tuple[Optional[Key], dict[Key, Any], Optional[Event]]:
         self.run(timeout)
         interrupt = self._last_interrupt

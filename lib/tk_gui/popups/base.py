@@ -56,6 +56,7 @@ class PopupMixin(ABC):
         elif not (parent := self.parent):
             raise RuntimeError(f'Unable to run {self!r} with no parent Window')
         else:
+            # TODO: Does this even work?
             log.debug(f'Enqueueing threaded popup={self!r}')
             result = TkFuture.submit(parent._root, self._run).result()
             log.debug(f'Got threaded popup={self!r} {result=}')
@@ -134,15 +135,12 @@ class Popup(PopupMixin, WindowInitializer):
             window.run()
             return self.get_results()
 
-    def run_async(self) -> TkFuture[Window]:
-        window = self.finalize_window()(take_focus=True)
-        tk_future = TkFuture.submit(window._root, window.run)
-        tk_future.add_done_callback(lambda *a: window.close())
-        return tk_future
+    def __enter__(self) -> Popup:
+        self.finalize_window()(take_focus=True)
+        return self
 
-    def stop(self, event: Event = None) -> dict[Key, Any]:
-        self.window.interrupt(event)
-        return self.get_results()
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.window.close()
 
 
 class BasicPopup(Popup):

@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import logging
+import time
 
 from cli_command_parser import Command, Action, Counter, Option, main
 
@@ -47,6 +48,11 @@ class GuiPopupTest(Command):
     @action
     def spinner(self):
         SpinnerPopup(img_size=(400, 400), bind_esc=True).run()
+
+    @action
+    def spinner_thread(self):
+        spinner = SpinnerPopup(img_size=(400, 400), bind_esc=True)
+        spinner.run_task_in_thread(time.sleep, (10,))
 
     @action
     def gif(self):

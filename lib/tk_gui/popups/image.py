@@ -7,7 +7,7 @@ Tkinter GUI image popups
 from __future__ import annotations
 
 import logging
-from concurrent.futures import Future
+from concurrent.futures import Future, TimeoutError
 from threading import Thread
 from typing import TYPE_CHECKING, Optional, Union, Callable, TypeVar, ParamSpec
 
@@ -183,27 +183,25 @@ class AnimatedPopup(ImagePopup):
 
     def run_task_in_thread(self, func: Callable[P, T], args: P.args = (), kwargs: P.kwargs = None) -> T:
         """
-        Primarily intended to be used with spinner animations.  Calls :meth:`.run_async` to start the animation, then
-        starts a Thread with the function as the target.  Once the function is complete, the animation stops, and the
-        value returned by the function is returned.  If an exception was raised by the function, then it will be raised
-        after the animation has been stopped.
+        Primarily intended to be used with spinner animations.  Starts a Thread with the function as the target.  Once
+        the function is complete, the animation stops, and the value returned by the function is returned.  If an
+        exception was raised by the function, then it will be raised after the animation has been stopped.
 
         :param func: The function to call in a thread.
         :param args: Positional arguments to pass to that function.
         :param kwargs: Keyword arguments to pass to that function.
         :return: The return value from that function.
         """
-        tk_future = self.run_async()
         future = Future()
         func_thread = Thread(target=run_func_in_future, args=(future, func, args, kwargs), daemon=True)
-        func_thread.start()
-        # log.debug(f'Started thread for {func=}', extra={'color': (0, 13)})
-        func_thread.join()
-        # log.debug(f'Finished thread for {func=}', extra={'color': (0, 11)})
-        self.stop()
-        # log.debug(f'Stopped spinner for {func=}', extra={'color': (0, 10)})
-        tk_future.cancel()  # In case the function finished before the animation could be displayed
-        return future.result()
+        with self:
+            window = self.window
+            func_thread.start()
+            while True:
+                try:
+                    return future.result(0.05)
+                except TimeoutError:
+                    window.update()
 
 
 class SpinnerPopup(AnimatedPopup):
