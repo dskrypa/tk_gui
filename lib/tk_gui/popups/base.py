@@ -22,7 +22,7 @@ from tk_gui.window import Window
 if TYPE_CHECKING:
     from tkinter import Event
     from tk_gui.event_handling import BindMap
-    from tk_gui.typing import XY, Layout, Bool, ImageType, Key
+    from tk_gui.typing import XY, Layout, Bool, ImageType
 
 __all__ = ['Popup', 'BasicPopup', 'AnyPopup']
 log = logging.getLogger(__name__)
@@ -146,7 +146,7 @@ class Popup(PopupMixin, WindowInitializer):
 class BasicPopup(Popup):
     def __init__(
         self,
-        text: str,
+        text: Any,
         *,
         button: Union[str, Button] = None,
         buttons: Union[Mapping[str, str], Collection[str], Collection[Button]] = None,
@@ -162,6 +162,7 @@ class BasicPopup(Popup):
         elif not buttons and not button:
             button = 'OK'
         super().__init__(**kwargs)
+        text = str(text)
         self.text = text
         self.buttons = (button,) if button else buttons
         self.multiline = '\n' in text if multiline is None else multiline

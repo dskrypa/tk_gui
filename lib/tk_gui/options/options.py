@@ -139,17 +139,19 @@ class InputOption(Option, opt_type='input'):
         label: str,
         default: Any = _NotSet,
         *,
+        input_cls: Type[Input] = Input,
         type: Callable = str,  # noqa
         disabled: bool = False,
         required: bool = False,
         **kwargs
     ):
         super().__init__(name, label, default, disabled=disabled, required=required, type=type, **kwargs)
+        self.input_cls = input_cls
 
     def as_elements(self, disable_all: bool, change_cb: TraceCallback = None) -> Iterator[Text | Input]:
         val = self.value
         yield self._label_element()
-        yield Input('' if val is _NotSet else val, **self.common_kwargs(disable_all, change_cb))
+        yield self.input_cls('' if val is _NotSet else val, **self.common_kwargs(disable_all, change_cb))
 
     def validate(self, value):
         if isinstance(value, str):

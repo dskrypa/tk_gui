@@ -8,10 +8,10 @@ from __future__ import annotations
 
 import logging
 import tkinter.constants as tkc
-from abc import ABC
+from abc import ABC, abstractmethod
 from functools import partial
 from tkinter import StringVar, Event, Entry, Label as TkLabel, Text as TkText, Frame as TkFrame
-from typing import TYPE_CHECKING, Optional, Union, Any, Callable
+from typing import TYPE_CHECKING, Optional, Union, Any, Callable, Generic, TypeVar
 
 from tk_gui.caching import cached_property
 from tk_gui.constants import LEFT_CLICK
@@ -30,11 +30,12 @@ if TYPE_CHECKING:
     from tk_gui.pseudo_elements import Row
     from tk_gui.typing import Bool, XY, BindTarget, TraceCallback, TkFill, HasFrame, TkContainer
 
-__all__ = ['Text', 'Link', 'Input', 'Multiline', 'Label']
+__all__ = ['Text', 'Link', 'Input', 'Multiline', 'Label', 'ValidatedInput', 'NumericInput', 'FloatInput', 'IntInput']
 log = logging.getLogger(__name__)
 
 _Anchor = Union[str, Anchor]
 _Justify = Union[str, Justify]
+T = TypeVar('T')
 
 
 class TextValueMixin(TraceCallbackMixin):
@@ -44,6 +45,7 @@ class TextValueMixin(TraceCallbackMixin):
     size: XY
     fill: TkFill
     expand: bool
+    strip: bool = False
     _value: str
     _move_cursor: bool = False
     _auto_size: bool = True
@@ -56,13 +58,17 @@ class TextValueMixin(TraceCallbackMixin):
     @property
     def value(self) -> str:
         try:
-            return self.string_var.get()
+            value = self.string_var.get()
         except AttributeError:  # The element has not been packed yet, so string_var is None
             return self._value
+        else:
+            return value.strip() if self.strip else value
 
     @value.setter
     def value(self, value: Any):
         value = str(value)
+        if self.strip:
+            value = value.strip()
         self._value = value
         try:
             self.string_var.set(value)
@@ -239,9 +245,11 @@ class Label(TextValueMixin, LinkableMixin, Element, base_style_layer='text'):
         anchor_info: _Anchor = None,
         link_bind: str = None,
         auto_size: Bool = True,
+        strip: Bool = False,
         change_cb: TraceCallback = None,
         **kwargs,
     ):
+        self.strip = strip
         self.value = value
         self.init_linkable(link, link_bind, kwargs.pop('tooltip', None))
         if justify is anchor_info is None:
@@ -303,9 +311,11 @@ class Text(TextValueMixin, LinkableMixin, Element):
         link_bind: str = None,
         auto_size: Bool = True,
         use_input_style: Bool = False,
+        strip: Bool = False,
         change_cb: TraceCallback = None,
         **kwargs,
     ):
+        self.strip = strip
         self.value = value
         self.init_linkable(link, link_bind, kwargs.pop('tooltip', None))
         super().__init__(**kwargs)
@@ -384,6 +394,9 @@ class InteractiveText(DisableableMixin, Interactive, ABC):
         self.apply_style()
 
 
+# region Input Elements
+
+
 class Input(TextValueMixin, LinkableMixin, InteractiveText, disabled_state='readonly', move_cursor=True):
     widget: Entry  # Default relief: sunken
     password_char: Optional[str] = None
@@ -398,8 +411,10 @@ class Input(TextValueMixin, LinkableMixin, InteractiveText, disabled_state='read
         justify: Union[_Justify, None] = Justify.LEFT,
         callback: BindTarget = None,                                # Key press callback
         change_cb: TraceCallback = None,                            # Value change callback
+        strip: Bool = False,
         **kwargs,
     ):
+        self.strip = strip
         self.value = value
         self.init_linkable(link, link_bind, kwargs.pop('tooltip', None))
         super().__init__(**kwargs)
@@ -458,6 +473,52 @@ class Input(TextValueMixin, LinkableMixin, InteractiveText, disabled_state='read
             self.apply_style()
 
     # endregion
+
+
+class ValidatedInput(Input, ABC):
+    def __init__(self, value: Any = '', **kwargs):
+        if kwargs.pop('change_cb', None) is not None:
+            raise TypeError(f"{self.__class__.__name__} doesn't support change_cb - use 'Input' with custom change_cbs")
+        super().__init__(value, change_cb=self._validate, **kwargs)
+
+    @abstractmethod
+    def is_valid(self, value: str) -> bool:
+        raise NotImplementedError
+
+    def _validate(self, var_name, unknown, action):
+        self.validated(self.is_valid(self.value))
+
+
+class NumericInput(ValidatedInput, Generic[T], ABC):
+    _num_func: Callable[[str], T] = None
+
+    def __init_subclass__(cls, num_func: Callable[[str], T] = None, **kwargs):
+        super().__init_subclass__(**kwargs)
+        # TODO: Make the value property return the result of calling num_func on the raw value
+        if num_func is not None:
+            cls._num_func = num_func
+
+    def __init__(self, value: Any = '', strip: Bool = True, **kwargs):
+        super().__init__(value, strip=strip, **kwargs)
+
+    def is_valid(self, value: str) -> bool:
+        try:
+            self._num_func(value)
+        except (TypeError, ValueError):
+            return False
+        else:
+            return True
+
+
+class FloatInput(NumericInput, num_func=float):
+    pass
+
+
+class IntInput(NumericInput, num_func=int):
+    pass
+
+
+# endregion
 
 
 class Multiline(InteractiveText, disabled_state='disabled'):

@@ -7,7 +7,7 @@ Tkinter GUI popups: common popups
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, Any
 
 from ..elements.buttons import OK
 from ..images.utils import icon_path
@@ -25,36 +25,36 @@ __all__ = [
 log = logging.getLogger(__name__)
 
 
-def popup_ok(text: str, title: str = None, bind_esc: Bool = True, side: TkSide = 'right', **kwargs) -> None:
+def popup_ok(text: Any, title: str = None, bind_esc: Bool = True, side: TkSide = 'right', **kwargs) -> None:
     BasicPopup(text, title=title, bind_esc=bind_esc, button=OK(side=side), **kwargs).run()
 
 
-def popup_error(text: str, title: str = 'Error', bind_esc: Bool = True, side: TkSide = 'right', **kwargs) -> None:
+def popup_error(text: Any, title: str = 'Error', bind_esc: Bool = True, side: TkSide = 'right', **kwargs) -> None:
     BasicPopup(text, title=title, bind_esc=bind_esc, button=OK(side=side), **kwargs).run()
 
 
-def popup_warning(text: str, title: str = 'Warning', bind_esc: Bool = True, side: TkSide = 'right', **kwargs) -> None:
+def popup_warning(text: Any, title: str = 'Warning', bind_esc: Bool = True, side: TkSide = 'right', **kwargs) -> None:
     img_path = icon_path('exclamation-triangle-yellow.png')
     BasicPopup(text, title=title, bind_esc=bind_esc, image=img_path, button=OK(side=side), **kwargs).run()
 
 
-def popup_yes_no(text: str, title: str = None, bind_esc: Bool = False, **kwargs) -> Optional[bool]:
+def popup_yes_no(text: Any, title: str = None, bind_esc: Bool = False, **kwargs) -> Optional[bool]:
     return BoolPopup(text, 'Yes', 'No', 'TF', title=title, bind_esc=bind_esc, **kwargs).run()
 
 
-def popup_no_yes(text: str, title: str = None, bind_esc: Bool = False, **kwargs) -> Optional[bool]:
+def popup_no_yes(text: Any, title: str = None, bind_esc: Bool = False, **kwargs) -> Optional[bool]:
     return BoolPopup(text, 'Yes', 'No', 'FT', title=title, bind_esc=bind_esc, **kwargs).run()
 
 
-def popup_ok_cancel(text: str, title: str = None, bind_esc: Bool = False, **kwargs) -> Optional[bool]:
+def popup_ok_cancel(text: Any, title: str = None, bind_esc: Bool = False, **kwargs) -> Optional[bool]:
     return BoolPopup(text, 'OK', 'Cancel', 'TF', title=title, bind_esc=bind_esc, **kwargs).run()
 
 
-def popup_cancel_ok(text: str, title: str = None, bind_esc: Bool = False, **kwargs) -> Optional[bool]:
+def popup_cancel_ok(text: Any, title: str = None, bind_esc: Bool = False, **kwargs) -> Optional[bool]:
     return BoolPopup(text, 'OK', 'Cancel', 'FT', title=title, bind_esc=bind_esc, **kwargs).run()
 
 
-def popup_input_invalid(text: str = None, title: str = 'Invalid Input', logger: logging.Logger = None, **kwargs):
+def popup_input_invalid(text: Any = None, title: str = 'Invalid Input', logger: logging.Logger = None, **kwargs):
     if logger is None:
         logger = log
     logger.debug(f'Received invalid input - {text}' if text else 'Received invalid input')
@@ -62,7 +62,7 @@ def popup_input_invalid(text: str = None, title: str = 'Invalid Input', logger: 
 
 
 def popup_get_text(
-    text: str,
+    text: Any,
     title: str = None,
     *,
     bind_esc: Bool = False,
@@ -78,7 +78,7 @@ def popup_get_text(
 
 
 def popup_login(
-    text: str,
+    text: Any,
     title: str = None,
     *,
     bind_esc: Bool = False,
@@ -94,7 +94,7 @@ def popup_login(
 
 
 def popup_get_password(
-    text: str,
+    text: Any,
     title: str = None,
     *,
     bind_esc: Bool = False,

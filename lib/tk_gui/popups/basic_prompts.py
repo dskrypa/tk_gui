@@ -7,7 +7,7 @@ Tkinter GUI popups: basic prompts
 from __future__ import annotations
 
 import logging
-from typing import Optional, Literal
+from typing import Optional, Literal, Any
 
 from ..elements import Button, Text, Input
 from .base import BasicPopup
@@ -19,7 +19,7 @@ log = logging.getLogger(__name__)
 class BoolPopup(BasicPopup):
     def __init__(
         self,
-        text: str,
+        text: Any,
         true: str = 'OK',
         false: str = 'Cancel',
         order: Literal['TF', 'FT'] = 'FT',
@@ -48,7 +48,7 @@ class BoolPopup(BasicPopup):
 class SubmitOrCancelPopup(BasicPopup):
     submit_key = 'submit'
 
-    def __init__(self, text: str, button_text: str = 'Submit', cancel_text: str = None, **kwargs):
+    def __init__(self, text: Any, button_text: str = 'Submit', cancel_text: str = None, **kwargs):
         submit = Button(button_text, key=self.submit_key, bind_enter=True, focus=False, side='right')
         if cancel_text:
             # The order here is counter-intuitive - Submit will be to the left of Cancel because when both have
@@ -80,7 +80,7 @@ class LoginPromptPopup(SubmitOrCancelPopup, title='Login'):
     pw_key = 'password'
 
     def __init__(
-        self, text: str, button_text: str = 'Submit', password_char: str = '\u2b24', cancel_text: str = None, **kwargs
+        self, text: Any, button_text: str = 'Submit', password_char: str = '\u2b24', cancel_text: str = None, **kwargs
     ):
         super().__init__(text, button_text=button_text, cancel_text=cancel_text, **kwargs)
         self.password_char = password_char
@@ -103,7 +103,7 @@ class PasswordPromptPopup(SubmitOrCancelPopup, title='Password'):
     pw_key = 'password'
 
     def __init__(
-        self, text: str, button_text: str = 'Submit', password_char: str = '\u2b24', cancel_text: str = None, **kwargs
+        self, text: Any, button_text: str = 'Submit', password_char: str = '\u2b24', cancel_text: str = None, **kwargs
     ):
         super().__init__(text, button_text=button_text, cancel_text=cancel_text, **kwargs)
         self.password_char = password_char
