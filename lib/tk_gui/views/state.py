@@ -130,7 +130,7 @@ class GuiState:
         except IndexError:
             return False
         if kwargs:
-            spec.kwargs.update(kwargs)
+            spec.update(**kwargs)
         self._enqueued.append(QueuedViewSpec(spec, forget_last, from_hist=True, hist_dir=~Direction(direction)))
         return True
 

@@ -5,7 +5,7 @@ ViewSpec contains the class and arguments necessary to initialize a View.
 from __future__ import annotations
 
 from inspect import Signature
-from typing import TYPE_CHECKING, TypeVar, ParamSpec, Callable, Iterator
+from typing import TYPE_CHECKING, TypeVar, ParamSpec, Callable, Iterator, Generic
 
 if TYPE_CHECKING:
     from .view import View  # noqa
@@ -17,7 +17,7 @@ P = ParamSpec('P', bound='View')
 ViewType = Callable[P, V]
 
 
-class ViewSpec:
+class ViewSpec(Generic[V, P]):
     __slots__ = ('view_cls', 'args', 'kwargs', '_sig')
     view_cls: ViewType
     args: P.args
@@ -45,7 +45,7 @@ class ViewSpec:
         sig = self.signature
         if key not in sig.parameters:
             raise KeyError(key)
-        bound = sig.bind(self.args, self.kwargs)
+        bound = sig.bind(*self.args, **self.kwargs)
         bound.apply_defaults()
         return bound.arguments[key]
 
@@ -64,3 +64,13 @@ class ViewSpec:
     @property
     def name(self) -> str:
         return self.view_cls.__name__
+
+    def update(self, **kwargs: P.kwargs):
+        if not kwargs:
+            return
+        if not self.args:
+            self.kwargs.update(kwargs)
+            return
+        bound = self.signature.bind_partial(*self.args)
+        self.args = ()
+        self.kwargs = bound.arguments | self.kwargs | kwargs

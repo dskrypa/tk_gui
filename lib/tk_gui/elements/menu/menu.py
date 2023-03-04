@@ -419,6 +419,7 @@ class MenuProperty(Generic[M]):
 
     def __init__(self, menu_cls: Type[M], clone: Bool = True):
         self.menu_cls = menu_cls.clone() if clone else menu_cls
+        # TODO: Refactor Menu callbacks to be more like button callbacks
 
     def __get__(self, instance, owner) -> MenuProperty | M:
         if instance is None:
