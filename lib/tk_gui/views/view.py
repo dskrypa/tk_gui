@@ -8,28 +8,29 @@ from __future__ import annotations
 
 import logging
 from abc import ABC
-from time import monotonic
-from typing import TYPE_CHECKING, Any, Optional, Type, Sequence, Mapping
+from typing import TYPE_CHECKING, Any, Optional, Union, Type, Sequence, Mapping, Literal
 
 from tk_gui.enums import CallbackAction
-from tk_gui.event_handling import event_handler
 from .base import WindowInitializer
+from .spec import ViewSpec
+from .state import GuiState, Direction, NoNextView
 
 if TYPE_CHECKING:
-    from tkinter import Event
     from ..typing import Key
 
-__all__ = ['View', 'ViewSpec']
+__all__ = ['View']
 log = logging.getLogger(__name__)
 
-ViewSpec = tuple[Type['View'], Sequence[Any], Mapping[str, Any]]
+RawViewSpec = tuple[Type['View'], Sequence[Any], Mapping[str, Any]]
+Dir = Union[Direction, Literal['back', 'forward', 'BACK', 'FORWARD', 0, 1]]
 
 
 class View(WindowInitializer, ABC):
-    __next: Optional[ViewSpec] = None
+    gui_state: GuiState
     default_window_kwargs: Optional[dict[str, Any]] = None
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, gui_state: GuiState = None, **kwargs):
+        self.gui_state = gui_state or GuiState.init(ViewSpec(self.__class__, args, kwargs.copy()))
         if default_kwargs := self.default_window_kwargs:
             for key, value in default_kwargs.items():
                 kwargs.setdefault(key, value)
@@ -37,35 +38,47 @@ class View(WindowInitializer, ABC):
 
     # region Next View Methods
 
-    def set_next_view(self, *args, view_cls: Type[View] = None, **kwargs) -> CallbackAction:
-        """
-        Set the next view that should be displayed.  From a Button callback, ``return self.set_next_view(...)`` can be
-        used to trigger the advancement to that view immediately.  If that behavior is not desired, then it can simply
-        be called without returning the value that is returned by this method.
+    @classmethod
+    def as_view_spec(cls, *args, **kwargs) -> ViewSpec:
+        return ViewSpec(cls, args, kwargs)
 
-        :param args: Positional arguments to use when initializing the next view
-        :param view_cls: The class for the next View that should be displayed (defaults to the current class)
-        :param kwargs: Keyword arguments to use when initializing the next view
-        :return: The ``CallbackAction.EXIT`` callback action
-        """
-        if view_cls is None:
-            view_cls = self.__class__
-        self.__next = (view_cls, args, kwargs)
+    def go_to_next_view(self, spec: ViewSpec, *, forget_last: bool = False) -> CallbackAction:
+        self.gui_state.enqueue_view(spec, forget_last)
         return CallbackAction.EXIT
 
-    def get_next_view_spec(self) -> ViewSpec | None:
-        return self.__next
+    def go_to_prev_view(self, **kwargs) -> CallbackAction | None:
+        """
+        :param kwargs: Keyword arguments to override previously used keyword args from the previous View's ViewSpec.
+        """
+        if self.gui_state.enqueue_hist_view(Direction.BACK, **kwargs):
+            return CallbackAction.EXIT
+        return None
+
+    def go_to_hist_view(self, direction: Dir, **kwargs) -> CallbackAction | None:
+        """
+        :param direction: The history direction from which a ViewSpec should be enqueued
+        :param kwargs: Keyword arguments to override previously used keyword args from the selected View's ViewSpec.
+        """
+        if self.gui_state.enqueue_hist_view(Direction(direction), **kwargs):
+            return CallbackAction.EXIT
+        return None
+
+    def get_next_view_spec(self) -> ViewSpec | RawViewSpec | None:
+        return self.gui_state.pop_next_view()
 
     def get_next_view(self) -> View | None:
         """
         If another view should be run after this one exits, this method should return that view.  By default, works
-        with :meth:`.set_next_view`.
+        with :meth:`.go_to_next_view`.
         """
         try:
             view_cls, args, kwargs = self.get_next_view_spec()
-        except TypeError:
+        except (TypeError, NoNextView):
             return None
-        return view_cls(*args, **kwargs)
+        if 'gui_state' in kwargs:  # Not using setdefault to avoid mutating the stored kwargs
+            return view_cls(*args, **kwargs)
+        else:
+            return view_cls(*args, gui_state=self.gui_state, **kwargs)
 
     # endregion
 
@@ -99,13 +112,3 @@ class View(WindowInitializer, ABC):
         return results
 
     # endregion
-
-
-class TestView(View, title='Test'):
-    @event_handler('<Control-Button-1>')
-    def handle_ctrl_left_click(self, event: Event):
-        print(f'ctrl + left click: {self=}, {event=}')
-
-    @event_handler('<Control-Button-3>')
-    def handle_ctrl_right_click(self, event: Event):
-        print(f'ctrl + right click: {self=}, {event=}')

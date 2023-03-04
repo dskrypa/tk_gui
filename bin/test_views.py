@@ -125,7 +125,7 @@ class DirChainView(View, title='Directory Chain Test View'):
     def pick_next_dir(self, event, key=None):
         init_dir = self.path.parent if self.path else None
         if path := pick_folder_popup(init_dir, 'Pick A Directory', parent=self.window):
-            return self.set_next_view(path)
+            return self.go_to_next_view(self.as_view_spec(path))
         return None
 
 
