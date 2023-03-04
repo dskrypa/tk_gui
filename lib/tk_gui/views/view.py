@@ -46,20 +46,24 @@ class View(WindowInitializer, ABC):
         self.gui_state.enqueue_view(spec, forget_last)
         return CallbackAction.EXIT
 
-    def go_to_prev_view(self, **kwargs) -> CallbackAction | None:
+    def go_to_prev_view(self, forget_last: bool = False, **kwargs) -> CallbackAction | None:
         """
+        :param forget_last: If True, then the ViewSpec for the View that the given ``spec`` follows will not be saved
+          in the ViewSpec history.  Typically used if the View needed to be reloaded in-place.
         :param kwargs: Keyword arguments to override previously used keyword args from the previous View's ViewSpec.
         """
-        if self.gui_state.enqueue_hist_view(Direction.BACK, **kwargs):
+        if self.gui_state.enqueue_hist_view(Direction.BACK, forget_last, **kwargs):
             return CallbackAction.EXIT
         return None
 
-    def go_to_hist_view(self, direction: Dir, **kwargs) -> CallbackAction | None:
+    def go_to_hist_view(self, direction: Dir, forget_last: bool = False, **kwargs) -> CallbackAction | None:
         """
         :param direction: The history direction from which a ViewSpec should be enqueued
+        :param forget_last: If True, then the ViewSpec for the View that the given ``spec`` follows will not be saved
+          in the ViewSpec history.  Typically used if the View needed to be reloaded in-place.
         :param kwargs: Keyword arguments to override previously used keyword args from the selected View's ViewSpec.
         """
-        if self.gui_state.enqueue_hist_view(Direction(direction), **kwargs):
+        if self.gui_state.enqueue_hist_view(Direction(direction), forget_last, **kwargs):
             return CallbackAction.EXIT
         return None
 

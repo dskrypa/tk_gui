@@ -124,21 +124,21 @@ class GuiState:
             self._enqueued.clear()
         self._enqueued.append(QueuedViewSpec(spec, forget_last))
 
-    def enqueue_hist_view(self, direction: Direction | int, **kwargs) -> bool:
+    def enqueue_hist_view(self, direction: Direction | int, forget_last: bool = False, **kwargs) -> bool:
         try:
             spec = self._history[direction][-1]
         except IndexError:
             return False
         if kwargs:
             spec.kwargs.update(kwargs)
-        self._enqueued.append(QueuedViewSpec(spec, False, True, ~Direction(direction)))
+        self._enqueued.append(QueuedViewSpec(spec, forget_last, from_hist=True, hist_dir=~Direction(direction)))
         return True
 
-    def enqueue_back_view(self, **kwargs) -> bool:
-        return self.enqueue_hist_view(Direction.BACK, **kwargs)
+    def enqueue_back_view(self, forget_last: bool = False, **kwargs) -> bool:
+        return self.enqueue_hist_view(Direction.BACK, forget_last, **kwargs)
 
-    def enqueue_forward_view(self, **kwargs) -> bool:
-        return self.enqueue_hist_view(Direction.FORWARD, **kwargs)
+    def enqueue_forward_view(self, forget_last: bool = False, **kwargs) -> bool:
+        return self.enqueue_hist_view(Direction.FORWARD, forget_last, **kwargs)
 
     # endregion
 
