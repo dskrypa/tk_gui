@@ -22,7 +22,7 @@ __all__ = ['View']
 log = logging.getLogger(__name__)
 
 RawViewSpec = tuple[Type['View'], Sequence[Any], Mapping[str, Any]]
-Dir = Union[Direction, Literal['back', 'forward', 'BACK', 'FORWARD', 0, 1]]
+Dir = Union[Direction, Literal['reverse', 'forward', 'REVERSE', 'FORWARD', 0, 1]]
 
 
 class View(WindowInitializer, ABC):
@@ -52,7 +52,7 @@ class View(WindowInitializer, ABC):
           in the ViewSpec history.  Typically used if the View needed to be reloaded in-place.
         :param kwargs: Keyword arguments to override previously used keyword args from the previous View's ViewSpec.
         """
-        if self.gui_state.enqueue_hist_view(Direction.BACK, forget_last, **kwargs):
+        if self.gui_state.enqueue_hist_view(Direction.REVERSE, forget_last, **kwargs):
             return CallbackAction.EXIT
         return None
 

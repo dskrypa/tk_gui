@@ -15,12 +15,12 @@ __all__ = ['GuiState', 'Direction']
 
 
 class Direction(IntEnum):
-    BACK = 0
+    REVERSE = 0
     FORWARD = 1
 
     def __invert__(self) -> Direction:
-        """``~Direction.BACK`` -> ``Direction.FORWARD``, and vice versa."""
-        return self.BACK if self == self.FORWARD else self.FORWARD
+        """``~Direction.REVERSE`` -> ``Direction.FORWARD``, and vice versa."""
+        return self.REVERSE if self == self.FORWARD else self.FORWARD
 
     @classmethod
     def _missing_(cls, value):
@@ -37,11 +37,11 @@ class History:
         self._data = (deque(maxlen=max_len), deque(maxlen=max_len))
 
     def __repr__(self) -> str:
-        back, forward = map(len, self._data)
-        return f'<{self.__class__.__name__}[{back=}, {forward}]>'
+        reverse, forward = map(len, self._data)
+        return f'<{self.__class__.__name__}[{reverse=}, {forward}]>'
 
     @property
-    def back(self) -> deque[ViewSpec]:
+    def reverse(self) -> deque[ViewSpec]:
         return self._data[0]
 
     @property
@@ -51,9 +51,9 @@ class History:
     def __getitem__(self, direction: Direction | int) -> deque[ViewSpec]:
         return self._data[direction]
 
-    def clear(self, back: bool = True, forward: bool = True):
-        if back:
-            self._data[Direction.BACK].clear()
+    def clear(self, reverse: bool = True, forward: bool = True):
+        if reverse:
+            self._data[Direction.REVERSE].clear()
         if forward:
             self._data[Direction.FORWARD].clear()
 
@@ -68,7 +68,7 @@ class QueuedViewSpec:
     __slots__ = ('spec', 'forget_last', 'from_hist', 'hist_dir')
 
     def __init__(
-        self, spec: ViewSpec, forget_last: bool, from_hist: bool = False, hist_dir: Direction = Direction.BACK
+        self, spec: ViewSpec, forget_last: bool, from_hist: bool = False, hist_dir: Direction = Direction.REVERSE
     ):
         self.spec = spec
         self.forget_last = forget_last
@@ -134,8 +134,8 @@ class GuiState:
         self._enqueued.append(QueuedViewSpec(spec, forget_last, from_hist=True, hist_dir=~Direction(direction)))
         return True
 
-    def enqueue_back_view(self, forget_last: bool = False, **kwargs) -> bool:
-        return self.enqueue_hist_view(Direction.BACK, forget_last, **kwargs)
+    def enqueue_reverse_view(self, forget_last: bool = False, **kwargs) -> bool:
+        return self.enqueue_hist_view(Direction.REVERSE, forget_last, **kwargs)
 
     def enqueue_forward_view(self, forget_last: bool = False, **kwargs) -> bool:
         return self.enqueue_hist_view(Direction.FORWARD, forget_last, **kwargs)
@@ -157,8 +157,8 @@ class GuiState:
             return None
 
     @property
-    def can_go_back(self) -> bool:
-        return bool(self._history[Direction.BACK])
+    def can_go_reverse(self) -> bool:
+        return bool(self._history[Direction.REVERSE])
 
     @property
     def can_go_forward(self) -> bool:
@@ -166,7 +166,7 @@ class GuiState:
 
     @property
     def prev_view_name(self) -> str | None:
-        if spec := self.peek_hist_view(Direction.BACK):
+        if spec := self.peek_hist_view(Direction.REVERSE):
             return spec.name
         return None
 
@@ -181,8 +181,8 @@ class GuiState:
     def clear(self):
         self._enqueued.clear()
 
-    def clear_history(self, back: bool = True, forward: bool = True):
-        self._history.clear(back, forward)
+    def clear_history(self, reverse: bool = True, forward: bool = True):
+        self._history.clear(reverse, forward)
 
 
 class NoNextView(Exception):
