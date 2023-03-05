@@ -364,6 +364,10 @@ class Element(BindMixin, ElementBase, ABC):
 
     # region Visibility Methods
 
+    @property
+    def is_visible(self) -> bool:
+        return self._visible
+
     def hide(self):
         widget = self.widget
         self._pack_settings = widget.pack_info()
