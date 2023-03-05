@@ -72,6 +72,7 @@ class AxisConfig(Generic[ScrollAmount]):
 
     def view_scroll_args(self, positive: bool) -> tuple[ScrollAmount, TkScrollWhat]:
         amount = self.amount if positive else -self.amount
+        # log.debug(f'Scrolling along axis={self.axis} {amount=} what={self.what.value}')
         return amount, self.what.value
 
     def arg_str(self, include_axis: Bool = False) -> str:

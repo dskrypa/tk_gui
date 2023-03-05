@@ -184,7 +184,7 @@ class ScrollableListbox(ScrollableWidget, Frame, inner_cls=Listbox):
 
 
 class ScrollableContainer(ScrollableBase, ABC):
-    _y_bind, _x_bind = ('<MouseWheel>', 'Shift-MouseWheel') if ON_WINDOWS else ('<4>', '<5>')
+    _y_bind, _x_bind = ('<MouseWheel>', '<Shift-MouseWheel>') if ON_WINDOWS else ('<4>', '<5>')
     canvas: Canvas
     inner_widget: TkContainer
     _last_scroll_region: tuple[int, int, int, int] = ()
@@ -248,10 +248,14 @@ class ScrollableContainer(ScrollableBase, ABC):
         canvas = self.canvas
         self.inner_widget = inner_widget = cls(canvas, **kwargs)
         canvas.create_window(0, 0, window=inner_widget, anchor='nw')
-        if self._y_config.scroll or self._x_config.scroll:
+        scroll_y, scroll_x = self._y_config.scroll, self._x_config.scroll
+        if scroll_y:
             canvas.bind_all(self._y_bind, _scroll_y, add='+')
+        if scroll_x:
+            # TODO: Both bind_all calls were always performed when either was configured to scroll - should they be?
             canvas.bind_all(self._x_bind, _scroll_x, add='+')
-            self.bind('<Configure>', self._maybe_update_scroll_region, add=True)  # noqa
+        if scroll_y or scroll_x:
+            self.bind('<Configure>', self._maybe_update_scroll_region, add=True)
 
     # endregion
 
