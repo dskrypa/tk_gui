@@ -44,9 +44,11 @@ E = TypeVar('E', bound=AnyEle)
 
 PathLike = Union['Path', str]
 OptInt = Optional[int]
+OptFloat = Optional[float]
 Bool = Union[bool, Any]
 XY = tuple[int, int]
 OptXY = tuple[OptInt, OptInt]
+OptXYF = tuple[OptFloat, OptFloat]
 SelectionPos = XY | tuple[XY, XY] | tuple[None, None] | tuple[str, str]
 Axis = Literal['x', 'y']
 Orientation = Literal['horizontal', 'vertical']
