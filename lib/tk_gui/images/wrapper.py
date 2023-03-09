@@ -182,13 +182,13 @@ class SourceImage(ImageWrapper):
 
     def as_size(
         self,
-        size: XY,
+        size: XY | None,
         keep_ratio: bool = True,
         resample: Resampling | None = Resampling.LANCZOS,
         use_cache: bool = False,
         **kwargs,
     ) -> ResizedImage:
-        if size == self.size:
+        if not size or size == self.size:
             return ResizedImage(self, self.pil_image)
 
         if not use_cache:

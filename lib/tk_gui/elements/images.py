@@ -7,30 +7,29 @@ Tkinter GUI images
 from __future__ import annotations
 
 import logging
+from abc import ABC
 from datetime import datetime, timedelta
-from functools import lru_cache
 from inspect import Signature
 from pathlib import Path
 from tkinter import Label, TclError, Event
 from typing import TYPE_CHECKING, Optional, Any, Union
 
-from PIL.Image import Image as PILImage, Resampling, open as open_image
+from PIL.Image import Image as PILImage, Resampling
 from PIL.ImageSequence import Iterator as FrameIterator
 from PIL.ImageTk import PhotoImage
-from PIL.JpegImagePlugin import RAWMODE
 
-from ..enums import Anchor
-from ..images import SevenSegmentDisplay, calculate_resize, as_image
-from ..images.cycle import FrameCycle, PhotoImageCycle
-from ..images.spinner import Spinner
-from ..images.utils import get_image_and_hash, get_image_path
-from ..styles import Style, StyleSpec
-from ..utils import get_user_temp_dir
+from tk_gui.enums import Anchor
+from tk_gui.images import SevenSegmentDisplay, calculate_resize, as_image
+from tk_gui.images.cycle import FrameCycle, PhotoImageCycle
+from tk_gui.images.spinner import Spinner
+from tk_gui.images.utils import get_image_path
+from tk_gui.images.wrapper import SourceImage
+from tk_gui.styles import Style, StyleSpec
 from .element import Element
 
 if TYPE_CHECKING:
-    from ..pseudo_elements import Row
-    from ..typing import XY, BindTarget, ImageType, Bool, OptInt, TkContainer, HasFrame
+    from tk_gui.pseudo_elements import Row
+    from tk_gui.typing import XY, BindTarget, ImageType, Bool, TkContainer, HasFrame
 
 __all__ = ['Image', 'Animation', 'SpinnerImage', 'ClockImage', 'get_size']
 log = logging.getLogger(__name__)
@@ -41,7 +40,7 @@ ImageAndSize = tuple[_Image, int, int]
 ImageCycle = Union[FrameCycle, '_ClockCycle']
 
 
-class Image(Element, base_style_layer='image'):
+class BaseImage(Element, ABC, base_style_layer='image'):
     _callback: BindTarget = None
     widget: Label = None
     animated: bool = False
@@ -53,50 +52,19 @@ class Image(Element, base_style_layer='image'):
         if animated is not None:
             cls.animated = animated
 
-    def __init__(
-        self,
-        image: ImageType = None,
-        *,
-        callback: BindTarget = None,
-        popup: Bool = None,
-        popup_title: str = None,
-        anchor_image: Union[str, Anchor] = None,
-        **kwargs,
-    ):
+    def __init__(self, *, callback: BindTarget = None, anchor_image: Union[str, Anchor] = None, **kwargs):
         """
         :param image: The image to display.
         :param callback: Callback action to perform when the image is clicked (overrides left_click_cb).
-        :param popup: True to open a popup with the image on left click (cannot be specified with ``callback``).
-        :param popup_title: The title to use for the popup (defaults to the name of the image file).
         :param kwargs: Additional keyword arguments to pass to :class:`.Element`.
         """
-        if (cb_provided := callback is not None) or popup:
+        if cb_provided := callback is not None:
             kwargs['bind_clicks'] = True
         super().__init__(**kwargs)
-        self.image = image
-        if popup:
-            if cb_provided:
-                raise TypeError(f"Only one of 'popup' xor 'callback' may be provided for {self.__class__.__name__}")
-            self._callback = self._handle_open_popup
-            self.popup_title = popup_title
-        elif cb_provided:
+        if cb_provided:
             self._callback = callback
         if anchor_image:
             self.anchor_image = Anchor(anchor_image)
-
-    # region Image Data
-
-    @property
-    def image(self) -> Optional[_GuiImage]:
-        return self._image
-
-    @image.setter
-    def image(self, data: ImageType):
-        self._image = _GuiImage(data)
-        if self.widget is not None:
-            self.resize(*self.size)
-
-    # endregion
 
     # region Style
 
@@ -116,16 +84,6 @@ class Image(Element, base_style_layer='image'):
 
     def grid_into(self, parent: HasFrame, row: int, column: int, **kwargs):
         raise RuntimeError('Grid is not currently supported for images')
-
-    def pack_into(self, row: Row):
-        try:
-            width, height = self.size
-        except TypeError:
-            width, height = None, None
-
-        # TODO: Right-click menu: save as
-        image, width, height = self._image.as_size(width, height)
-        self._pack_into(row, image, width, height)
 
     def _pack_into(self, row: Row, image: _Image, width: int, height: int):
         # log.debug(f'Packing {image=} into row with {width=}, {height=}')
@@ -149,30 +107,91 @@ class Image(Element, base_style_layer='image'):
     def _re_pack(self, image: _Image, width: int, height: int):
         # log.debug(f'_re_pack: {width=}, {height=}, {self}')
         self.size = (width, height)
-        widget = self.widget
+        widget: Label = self.widget
         widget.configure(image=image, width=width, height=height, anchor=self.anchor_image.value)
-
         widget.image = image
         widget.pack(**self.pad_kw)
 
     # endregion
 
+
+class Image(BaseImage):
+    _src_image: SourceImage = None
+    _resize_kwargs: dict[str, bool | Resampling | None]
+
+    def __init__(
+        self,
+        image: ImageType = None,
+        *,
+        callback: BindTarget = None,
+        popup: Bool = None,
+        popup_title: str = None,
+        anchor_image: Union[str, Anchor] = None,
+        use_cache: bool = False,
+        keep_ratio: bool = True,
+        resample: Resampling | None = Resampling.LANCZOS,
+        **kwargs,
+    ):
+        """
+        :param image: The image to display.
+        :param callback: Callback action to perform when the image is clicked (overrides left_click_cb).
+        :param popup: True to open a popup with the image on left click (cannot be specified with ``callback``).
+        :param popup_title: The title to use for the popup (defaults to the name of the image file).
+        :param kwargs: Additional keyword arguments to pass to :class:`.Element`.
+        """
+        if (cb_provided := callback is not None) or popup:
+            kwargs['bind_clicks'] = True
+        Element.__init__(self, **kwargs)
+        self._resize_kwargs = {'use_cache': use_cache, 'keep_ratio': keep_ratio, 'resample': resample}
+        self.image = image
+        if popup:
+            if cb_provided:
+                raise TypeError(f"Only one of 'popup' xor 'callback' may be provided for {self.__class__.__name__}")
+            self._callback = self._handle_open_popup
+            self.popup_title = popup_title
+        elif cb_provided:
+            self._callback = callback
+        if anchor_image:
+            self.anchor_image = Anchor(anchor_image)
+
+    # region Image Data
+
+    @property
+    def image(self) -> Optional[SourceImage]:
+        return self._src_image
+
+    @image.setter
+    def image(self, data: ImageType):
+        self._src_image = SourceImage(data)
+        if self.widget is not None:
+            self.resize(*self.size)
+
+    # endregion
+
+    # region Widget Init & Packing
+
+    def pack_into(self, row: Row):
+        resized = self._src_image.as_size(self.size, **self._resize_kwargs)
+        self._pack_into(row, resized.as_tk_image(), *resized.size)
+
+    # endregion
+
     def target_size(self, width: int, height: int) -> XY:
-        return self._image.target_size(width, height)
+        return self._src_image.target_size((width, height), keep_ratio=self._resize_kwargs['keep_ratio'])
 
     def resize(self, width: int, height: int):
-        image, width, height = self._image.as_size(width, height)
-        self._re_pack(image, width, height)
+        resized = self._src_image.as_size((width, height), **self._resize_kwargs)
+        self._re_pack(resized.as_tk_image(), *resized.size)
 
     def _handle_open_popup(self, event: Event = None):
         from ..popups.image import ImagePopup
 
-        img = self._image
-        title = self.popup_title or (img.path.name if img.path else None)
-        ImagePopup(img.src_image, title, parent=self.window).run()
+        src_image = self._src_image
+        title = self.popup_title or (src_image.path.name if src_image.path else None)
+        ImagePopup(src_image.pil_image, title, parent=self.window).run()
 
 
-class Animation(Image, animated=True):
+class Animation(BaseImage, animated=True):
     image_cycle: FrameCycle
 
     def __init__(
@@ -402,156 +421,6 @@ class ClockImage(Animation):
 
 
 # endregion
-
-
-class _GuiImage:
-    __slots__ = ('src_image', 'current', 'current_tk', 'src_size', 'size', 'path', 'src_hash', 'max_thumbnail_size')
-    src_image: PILImage | None
-    current: PILImage | None
-    current_tk: PhotoImage | None
-
-    def __init__(self, image: ImageType, max_thumbnail_size: XY = (500, 500)):
-        self.max_thumbnail_size = max_thumbnail_size
-        self.path = get_image_path(image, True)
-        image, self.src_hash = get_image_and_hash(image)
-        # log.debug(f'Loaded image={image!r}')
-        self.src_image = image
-        self.current = image
-        self.current_tk = None
-        try:
-            size = image.size
-        except AttributeError:  # image is None
-            size = (0, 0)
-        self.src_size = size
-        self.size = size
-
-    # region Size Calculation
-
-    def _normalize_size(self, width: OptInt, height: OptInt) -> XY:
-        if width is None:
-            width = self.size[0]
-        if height is None:
-            height = self.size[1]
-        return width, height
-
-    def target_size(self, width: OptInt, height: OptInt) -> XY:
-        width, height = self._normalize_size(width, height)
-        cur_width, cur_height = self.size
-        if self.current is None or (cur_width == width and cur_height == height):
-            return width, height
-        # elif cur_width >= width and cur_height >= height:
-        #     return calculate_resize(cur_width, cur_height, width, height)
-        else:
-            return calculate_resize(*self.src_size, width, height)
-
-    # endregion
-
-    # region Load & Resize Methods
-
-    def as_size(self, width: OptInt, height: OptInt) -> ImageAndSize:
-        width, height = self._normalize_size(width, height)
-        if (current := self.current) is None:
-            return None, width, height
-
-        cur_width, cur_height = self.size
-        if cur_width == width and cur_height == height:
-            if not (current_tk := self.current_tk):
-                self.current_tk = current_tk = PhotoImage(current)
-            return current_tk, width, height
-        elif cur_width >= width and cur_height >= height:
-            src = current
-            dst_width, dst_height = calculate_resize(cur_width, cur_height, width, height)
-        else:
-            src = self.src_image
-            dst_width, dst_height = calculate_resize(*self.src_size, width, height)
-
-        return self._as_size(src, width, height, dst_width, dst_height)
-
-    def _as_size(self, src: PILImage, width: OptInt, height: OptInt, dst_width: int, dst_height: int) -> ImageAndSize:
-        thumbnail_path = self.get_thumbnail_path(width, height, dst_width, dst_height)
-        dst_size = (dst_width, dst_height)
-        last_tk = self.current_tk
-        try:
-            used_cache, image, tk_image = self._load_or_resize(thumbnail_path, src, dst_size)
-            self.current = image
-            self.current_tk = tk_image
-        except OSError as e:
-            log.warning(f'Error resizing image={src}: {e}')
-            return src, width, height
-        else:
-            self.size = dst_size
-            if thumbnail_path and not used_cache and not last_tk:  # Only save initial thumbnails, not misc resizes
-                self._save_thumbnail(image, thumbnail_path)
-            return tk_image, dst_width, dst_height
-
-    @classmethod
-    def _load_or_resize(cls, path: Path | None, src: PILImage, dst_size: XY) -> tuple[bool, PILImage, PhotoImage]:
-        if path:
-            try:
-                image = _load_thumbnail(path)
-                return True, image, PhotoImage(image)
-            except FileNotFoundError:
-                pass
-            except OSError as e:
-                log.debug(f'Error loading cached thumbnail from path={path.as_posix()}: {e}')
-
-        if src.mode == 'P':
-            # In this case, Image.resize ignores the resample arg and uses Resampling.NEAREST, so convert to RGB first
-            image = src.convert('RGB').resize(dst_size, Resampling.LANCZOS)
-        else:
-            image = src.resize(dst_size, Resampling.LANCZOS)
-        return False, image, PhotoImage(image)
-
-    # endregion
-
-    # region Thumbnail Methods
-
-    @classmethod
-    def _save_thumbnail(cls, image: PILImage, path: Path):
-        if not (save_fmt := image.format):
-            save_fmt = 'png' if image.mode == 'RGBA' else 'jpeg'
-        if save_fmt == 'jpeg' and image.mode not in RAWMODE:
-            image = image.convert('RGB')
-        try:
-            with path.open('wb') as f:
-                image.save(f, save_fmt)
-        except OSError as e:
-            log.debug(f'Error saving thumbnail to path={path.as_posix()}: {e}')
-        else:
-            log.debug(f'Saved thumbnail to {path.as_posix()}')
-
-    def get_thumbnail_path(self, width: OptInt, height: OptInt, dst_width: int, dst_height: int) -> Path | None:
-        max_width, max_height = self.max_thumbnail_size
-        if (
-            not (src_hash := self.src_hash)                                         # Image is None
-            or ((width and width > max_width) or (height and height > max_height))  # Too large to save
-            or ((width and width < dst_width) or (height and height < dst_height))  # Smaller than target size
-            or (width and height and width == dst_width and height == dst_height)   # Already at the target size
-        ):
-            return None
-
-        # if (width and width > max_width) or (height and height > max_height):
-        #     return None
-        # elif not (src_hash := self.src_hash) or (width and width < dst_width) or (height and height < dst_height):
-        #     return None
-        return self._get_thumbnail_dir().joinpath(f'{src_hash}_{width}x{height}_{dst_width}x{dst_height}.thumb')
-
-    @classmethod
-    def _get_thumbnail_dir(cls) -> Path:
-        try:
-            return cls._thumbnail_dir  # noqa
-        except AttributeError:
-            cls._thumbnail_dir = thumbnail_dir = get_user_temp_dir('tk_gui_thumbnails')
-            return thumbnail_dir
-
-    # endregion
-
-
-@lru_cache(20)
-def _load_thumbnail(path: Path) -> PILImage:
-    image = open_image(path)
-    log.log(9, f'Loaded thumbnail from {path.as_posix()}')
-    return image
 
 
 def normalize_image_cycle(image: AnimatedType, size: XY = None, last_frame_num: int = 0) -> ImageCycle:
