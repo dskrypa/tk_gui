@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Callable
 
 from cachetools import LRUCache
-from PIL.Image import Resampling, Image as PILImage, open as open_image
+from PIL.Image import Resampling, MIME, Image as PILImage, open as open_image
 from PIL.ImageTk import PhotoImage
 from PIL.JpegImagePlugin import RAWMODE
 
@@ -34,6 +34,20 @@ class ImageWrapper(ABC):
     @abstractmethod
     def pil_image(self) -> PILImage | None:
         raise NotImplementedError
+
+    @property
+    def name(self) -> str | None:
+        return None
+
+    def __repr__(self) -> str:
+        width, height = self.size
+        ar_x, ar_y = self.aspect_ratio.as_integer_ratio()
+        name, mode, mime = self.name, self.pil_image.mode, self.mime_type
+        if (size_pct := self.size_percent) != 1:
+            size_str = f'size={width}x{height} ({size_pct:.2%})'
+        else:
+            size_str = f'size={width}x{height}'
+        return f'<{self.__class__.__name__}[{name!r}, {size_str}, ratio={ar_x}:{ar_y}, {mode=}, {mime=}]>'
 
     # region Size
 
@@ -88,6 +102,20 @@ class ImageWrapper(ABC):
             elif dst_h is None:
                 return floor(dst_w), src_h
 
+    @cached_property
+    def size_percent(self) -> float:
+        return (self.width_percent + self.height_percent) / 2
+
+    @property
+    @abstractmethod
+    def width_percent(self) -> float:
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
+    def height_percent(self) -> float:
+        raise NotImplementedError
+
     # endregion
 
     # region Format
@@ -107,6 +135,10 @@ class ImageWrapper(ABC):
         if target_format == 'jpeg' and image.mode not in RAWMODE:
             image = image.convert('RGB')
         return image, target_format
+
+    @cached_property
+    def mime_type(self) -> str | None:
+        return MIME.get(self.format)
 
     # endregion
 
@@ -141,8 +173,26 @@ class ImageWrapper(ABC):
 
 
 class SourceImage(ImageWrapper):
+    width_percent = height_percent = 1
+
     def __init__(self, image: ImageType):
         self._original = image
+
+    @classmethod
+    def from_image(cls, image: ImageType | ImageWrapper) -> SourceImage:
+        if isinstance(image, ResizedImage):
+            return image.source
+        elif isinstance(image, SourceImage):
+            return image
+        else:
+            return cls(image)
+
+    @cached_property
+    def name(self) -> str | None:
+        try:
+            return self.path.name
+        except AttributeError:
+            return None
 
     @cached_property
     def path(self) -> Path | None:
@@ -211,6 +261,18 @@ class ResizedImage(ImageWrapper):
         self.source = source
         self.pil_image = image
         self.cache_path = cache_path
+
+    @cached_property
+    def name(self) -> str | None:
+        return self.source.name
+
+    @cached_property
+    def width_percent(self) -> float:
+        return self.size[0] / self.source.size[1]
+
+    @cached_property
+    def height_percent(self) -> float:
+        return self.size[1] / self.source.size[1]
 
 
 class ImageCache:

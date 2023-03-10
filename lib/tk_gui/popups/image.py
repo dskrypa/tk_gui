@@ -18,13 +18,13 @@ from tk_gui.elements import Text
 from tk_gui.elements.images import AnimatedType, Image, Animation, ClockImage, SpinnerImage, get_size
 from tk_gui.event_handling import event_handler
 from tk_gui.event_handling.futures import run_func_in_future
-from tk_gui.positioning import positioner
 from tk_gui.images import as_image
+from tk_gui.images.wrapper import ImageWrapper, SourceImage
 from .base import Popup
 
 if TYPE_CHECKING:
     from tkinter import Event
-    from ..typing import XY, Layout, ImageType
+    from tk_gui.typing import XY, Layout, ImageType
 
 __all__ = ['ImagePopup', 'AnimatedPopup', 'SpinnerPopup', 'ClockPopup']
 log = logging.getLogger(__name__)
@@ -33,6 +33,87 @@ _NotSet = object()
 
 P = ParamSpec('P')
 T = TypeVar('T')
+
+
+class NewImagePopup(Popup):
+    _last_size: XY = None
+    src_image: SourceImage
+    text: str = None
+    text_above_img: bool = True
+
+    def __init__(
+        self,
+        image: ImageType | ImageWrapper,
+        title: str = None,
+        *,
+        text: str = None,
+        text_above_img: bool = True,
+        **kwargs,
+    ):
+        kwargs.setdefault('margins', (0, 0))
+        kwargs.setdefault('bind_esc', True)
+        kwargs.setdefault('keep_on_top', False)
+        kwargs.setdefault('can_minimize', True)
+        super().__init__(title=title or 'Image', **kwargs)
+        if text:
+            self.text = text
+            self.text_above_img = text_above_img
+        self.src_image = SourceImage.from_image(image)
+        self.image = self.src_image
+
+    # region Title
+
+    @property
+    def title(self) -> str:
+        img_w, img_h = self.image.size
+        return f'{self._title} ({img_w}x{img_h}, {self.image.size_percent:.0%})'
+
+    @title.setter
+    def title(self, value: str):
+        self._title = value
+
+    # endregion
+
+    def __repr__(self) -> str:
+        title, src_image = self._title, self.src_image
+        return f'<{self.__class__.__name__}[{title=}, {src_image=}]>'
+
+    def get_pre_window_layout(self) -> Layout:
+        image_row = [self.gui_image]
+        if text := self.text:
+            text_row = [Text(text, side='t')]
+            return [text_row, image_row] if self.text_above_img else [image_row, text_row]
+        return [image_row]
+
+    @cached_property
+    def gui_image(self) -> Image:
+        init_size = self._init_size()
+        src = self.src_image
+        if src.pil_image:
+            log.debug(f'{self}: Using {init_size=} to display image={src!r} with {src.format=} mime={src.mime_type!r}')
+        return Image(src, size=init_size, pad=(2, 2))
+
+    def _init_size(self) -> XY:
+        # TODO: Need to fix init position (currently too low)
+        src_w, src_h = self.src_image.size
+        if monitor := self.get_monitor():
+            mon_w, mon_h = monitor.width, monitor.height
+            log.debug(f'_init_size: monitor size={(mon_w, mon_h)}')
+            return min(mon_w - 70, src_w), min(mon_h - 70, src_h)
+        return src_w, src_h
+
+    @event_handler('SIZE_CHANGED')
+    def handle_size_changed(self, event: Event, size: XY):
+        if not self.src_image.pil_image or self._last_size == size:
+            # log.debug(f'Ignoring config {event=} {size=} for {self}')
+            return
+        self._last_size = size
+        if new_size := _get_new_size(self.gui_image, *size):
+            # log.debug(f'Handling config {event=} {size=} for {self}')
+            self.image = self.gui_image.resize(*new_size)
+            self.window.set_title(self.title)
+        # else:
+        #     log.debug(f'No change necessary for config {event=} {size=} for {self}')
 
 
 class ImagePopup(Popup):
@@ -115,10 +196,9 @@ class ImagePopup(Popup):
 
     def _init_size(self) -> XY:
         width, height = self.orig_size
-        if parent := self.parent:
-            if monitor := positioner.get_monitor(*parent.position):
-                log.debug(f'_init_size: monitor size={(monitor.width, monitor.height)}')
-                return min(monitor.width - 70, width or 0), min(monitor.height - 70, height or 0)
+        if monitor := self.get_monitor():
+            log.debug(f'_init_size: monitor size={(monitor.width, monitor.height)}')
+            return min(monitor.width - 70, width or 0), min(monitor.height - 70, height or 0)
         return width, height
 
     def _get_new_size(self, new_w: int, new_h: int) -> Optional[XY]:
@@ -152,8 +232,8 @@ class ImagePopup(Popup):
 
 
 def _get_new_size(image: Image, new_w: int, new_h: int) -> XY | None:
-    px, py = image.pad
-    new_size = (new_w - px * 2 - 2, new_h - py * 2 - 2)
+    pad_x, pad_y = image.pad
+    new_size = (new_w - pad_x * 2 - 2, new_h - pad_y * 2 - 2)
     new_img = image.target_size(*new_size)
     if new_img != image.size:
         return new_size

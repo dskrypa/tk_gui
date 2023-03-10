@@ -23,7 +23,7 @@ from tk_gui.images import SevenSegmentDisplay, calculate_resize, as_image
 from tk_gui.images.cycle import FrameCycle, PhotoImageCycle
 from tk_gui.images.spinner import Spinner
 from tk_gui.images.utils import get_image_path
-from tk_gui.images.wrapper import SourceImage
+from tk_gui.images.wrapper import ImageWrapper, SourceImage, ResizedImage
 from tk_gui.styles import Style, StyleSpec
 from .element import Element
 
@@ -121,7 +121,7 @@ class Image(BaseImage):
 
     def __init__(
         self,
-        image: ImageType = None,
+        image: ImageType | ImageWrapper = None,
         *,
         callback: BindTarget = None,
         popup: Bool = None,
@@ -161,8 +161,8 @@ class Image(BaseImage):
         return self._src_image
 
     @image.setter
-    def image(self, data: ImageType):
-        self._src_image = SourceImage(data)
+    def image(self, data: ImageType | ImageWrapper):
+        self._src_image = SourceImage.from_image(data)
         if self.widget is not None:
             self.resize(*self.size)
 
@@ -179,16 +179,19 @@ class Image(BaseImage):
     def target_size(self, width: int, height: int) -> XY:
         return self._src_image.target_size((width, height), keep_ratio=self._resize_kwargs['keep_ratio'])
 
-    def resize(self, width: int, height: int):
+    def resize(self, width: int, height: int) -> ResizedImage:
         resized = self._src_image.as_size((width, height), **self._resize_kwargs)
         self._re_pack(resized.as_tk_image(), *resized.size)
+        return resized
 
     def _handle_open_popup(self, event: Event = None):
-        from ..popups.image import ImagePopup
+        # from ..popups.image import ImagePopup
+        from tk_gui.popups.image import NewImagePopup
 
         src_image = self._src_image
         title = self.popup_title or (src_image.path.name if src_image.path else None)
-        ImagePopup(src_image.pil_image, title, parent=self.window).run()
+        # ImagePopup(src_image.pil_image, title, parent=self.window).run()
+        NewImagePopup(src_image, title, parent=self.window).run()
 
 
 class Animation(BaseImage, animated=True):
