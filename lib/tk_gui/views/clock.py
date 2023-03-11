@@ -29,7 +29,7 @@ class ClockView(View):
         self._last_size = img_size
         self._toggle_slim_on_click = '<Button-2>'
         self._clock_kwargs = {'fg': fg, 'bg': bg, 'seconds': seconds}
-        self.window_kwargs = {
+        kwargs |= {
             'config_name': self.__class__.__name__,
             'exit_on_esc': True,
             'grab_anywhere': True,

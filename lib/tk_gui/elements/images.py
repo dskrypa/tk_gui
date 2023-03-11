@@ -7,7 +7,7 @@ Tkinter GUI images
 from __future__ import annotations
 
 import logging
-from abc import ABC
+from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
 from inspect import Signature
 from pathlib import Path
@@ -65,6 +65,10 @@ class BaseImage(Element, ABC, base_style_layer='image'):
             self._callback = callback
         if anchor_image:
             self.anchor_image = Anchor(anchor_image)
+
+    @abstractmethod
+    def target_size(self, width: int, height: int) -> XY:
+        raise NotImplementedError
 
     # region Style
 
@@ -185,13 +189,11 @@ class Image(BaseImage):
         return resized
 
     def _handle_open_popup(self, event: Event = None):
-        # from ..popups.image import ImagePopup
-        from tk_gui.popups.image import NewImagePopup
+        from tk_gui.popups.image import ImagePopup
 
         src_image = self._src_image
         title = self.popup_title or (src_image.path.name if src_image.path else None)
-        # ImagePopup(src_image.pil_image, title, parent=self.window).run()
-        NewImagePopup(src_image, title, parent=self.window).run()
+        ImagePopup(src_image, title, parent=self.window).run()
 
 
 class Animation(BaseImage, animated=True):
@@ -246,7 +248,10 @@ class Animation(BaseImage, animated=True):
         try:
             width, height = size = image.size
         except AttributeError:
-            width, height = size = image.width, image.height
+            try:
+                width, height = size = image.width, image.height
+            except AttributeError:  # TODO: Improve this...
+                return
 
         # self.size = size
         frame, delay = next(image_cycle)

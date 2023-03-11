@@ -11,14 +11,11 @@ from concurrent.futures import Future, TimeoutError
 from threading import Thread
 from typing import TYPE_CHECKING, Optional, Union, Callable, TypeVar, ParamSpec
 
-from PIL.Image import MIME
-
 from tk_gui.caching import cached_property
 from tk_gui.elements import Text
-from tk_gui.elements.images import AnimatedType, Image, Animation, ClockImage, SpinnerImage, get_size
+from tk_gui.elements.images import AnimatedType, Image, BaseImage, Animation, ClockImage, SpinnerImage, get_size
 from tk_gui.event_handling import event_handler
 from tk_gui.event_handling.futures import run_func_in_future
-from tk_gui.images import as_image
 from tk_gui.images.wrapper import ImageWrapper, SourceImage
 from .base import Popup
 
@@ -35,7 +32,7 @@ P = ParamSpec('P')
 T = TypeVar('T')
 
 
-class NewImagePopup(Popup):
+class ImagePopup(Popup):
     _last_size: XY = None
     src_image: SourceImage
     text: str = None
@@ -58,6 +55,7 @@ class NewImagePopup(Popup):
         if text:
             self.text = text
             self.text_above_img = text_above_img
+        # TODO: Init may be setting smaller images a few % larger than 100% unnecessarily?
         self.src_image = SourceImage.from_image(image)
         self.image = self.src_image
 
@@ -117,13 +115,22 @@ class NewImagePopup(Popup):
         #     log.debug(f'No change necessary for config {event=} {size=} for {self}')
 
 
-class ImagePopup(Popup):
-    _empty: bool = True
-    _gui_image: Image = _NotSet
+def _get_new_size(image: BaseImage, new_w: int, new_h: int) -> XY | None:
+    pad_x, pad_y = image.pad
+    new_size = (new_w - pad_x * 2 - 2, new_h - pad_y * 2 - 2)
+    new_img = image.target_size(*new_size)
+    if new_img != image.size:
+        return new_size
+    return None
+
+
+class AnimatedPopup(Popup):
+    _gui_image: Animation = _NotSet
     _last_size: XY
+    orig_size: XY
+    _empty: bool = True
     text: str = None
     text_above_img: bool = True
-    orig_size: XY
 
     def __init__(
         self,
@@ -147,6 +154,9 @@ class ImagePopup(Popup):
             self.text = text
             self.text_above_img = text_above_img
 
+    def __repr__(self) -> str:
+        return f'<{self.__class__.__name__}[title={self.title!r}, orig={self.orig_size}, empty: {self._empty}]>'
+
     # region Title
 
     @property
@@ -165,9 +175,6 @@ class ImagePopup(Popup):
 
     # endregion
 
-    def __repr__(self) -> str:
-        return f'<{self.__class__.__name__}[title={self.title!r}, orig={self.orig_size}, empty: {self._empty}]>'
-
     def get_pre_window_layout(self) -> Layout:
         image_row = [self.gui_image]
         if text := self.text:
@@ -176,31 +183,24 @@ class ImagePopup(Popup):
         return [image_row]
 
     @property
-    def gui_image(self) -> Image:
+    def gui_image(self) -> Animation:
         return self._gui_image
 
     @gui_image.setter
-    def gui_image(self, value: ImageType):
-        image = as_image(value)
-        self._empty = image is None
-        self.orig_size = image.size if image else (0, 0)
+    def gui_image(self, value: AnimatedType):
+        # log.debug(f'_set_image: {image=}')
+        self.orig_size = get_size(value) if value else (0, 0)
         self._last_size = init_size = self._init_size()
-        self._gui_image = gui_image = Image(value, size=init_size, pad=(2, 2))
-        if new_size := _get_new_size(gui_image, *init_size):
-            # TODO: init size still needs work - may need to account for title bar size?
-            gui_image.size = new_size
-        if image:
-            log.debug(
-                f'{self}: Using {init_size=}, {new_size=} to display {image=}'
-                f' with {image.format=} mime={MIME.get(image.format)!r}'
-            )
+        self._gui_image = animation = Animation(value, size=init_size, pad=(2, 2))
+        self._empty = animation.size == (0, 0)
 
     def _init_size(self) -> XY:
-        width, height = self.orig_size
+        src_w, src_h = self.orig_size
         if monitor := self.get_monitor():
-            log.debug(f'_init_size: monitor size={(monitor.width, monitor.height)}')
-            return min(monitor.width - 70, width or 0), min(monitor.height - 70, height or 0)
-        return width, height
+            mon_w, mon_h = monitor.work_area.size
+            log.debug(f'_init_size: monitor size={(mon_w, mon_h)}')
+            return min(mon_w - 60, src_w), min(mon_h - 60, src_h)
+        return src_w, src_h
 
     def _get_new_size(self, new_w: int, new_h: int) -> Optional[XY]:
         # image = self.gui_image
@@ -230,31 +230,6 @@ class ImagePopup(Popup):
             self._last_size = size
             self.gui_image.resize(*new_size)
             self.window.set_title(self.title)
-
-
-def _get_new_size(image: Image, new_w: int, new_h: int) -> XY | None:
-    pad_x, pad_y = image.pad
-    new_size = (new_w - pad_x * 2 - 2, new_h - pad_y * 2 - 2)
-    new_img = image.target_size(*new_size)
-    if new_img != image.size:
-        return new_size
-    return None
-
-
-class AnimatedPopup(ImagePopup):
-    _gui_image: Animation
-
-    @property
-    def gui_image(self) -> Animation:
-        return self._gui_image
-
-    @gui_image.setter
-    def gui_image(self, value: AnimatedType):
-        # log.debug(f'_set_image: {image=}')
-        self.orig_size = get_size(value) if value else (0, 0)
-        self._last_size = init_size = self._init_size()
-        self._gui_image = animation = Animation(value, size=init_size, pad=(2, 2))
-        self._empty = animation.size == (0, 0)
 
     def play_animation(self, event: Event = None):
         self.gui_image.play()
@@ -310,6 +285,7 @@ class ClockPopup(AnimatedPopup):
     def __init__(self, *args, img_size: XY = None, toggle_slim_on_click: bool = False, **kwargs):
         self._img_size = img_size
         self._toggle_slim_on_click = toggle_slim_on_click
+        kwargs.setdefault('style', {'bg': '#000000'})
         super().__init__(None, *args, **kwargs)
 
     @cached_property

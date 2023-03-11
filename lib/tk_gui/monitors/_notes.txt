@@ -1,2 +1,0 @@
-TODO:
-https://stackoverflow.com/questions/1380784/how-to-get-list-opened-windows-in-pygtk-or-gtk-in-ubuntu
