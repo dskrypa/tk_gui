@@ -8,12 +8,11 @@ from __future__ import annotations
 
 import logging
 import tkinter as tk
-from functools import partial
 from os import environ
 from time import monotonic
 from tkinter import Tk, Toplevel, PhotoImage, TclError, Event, CallWrapper, Frame, BaseWidget
 from tkinter.ttk import Sizegrip, Scrollbar, Treeview
-from typing import TYPE_CHECKING, Optional, Union, Type, Any, Iterable, Callable, Iterator, overload
+from typing import TYPE_CHECKING, Optional, Union, Any, Iterable, Callable, Iterator, overload
 from weakref import finalize, WeakSet
 
 from PIL import ImageGrab
@@ -22,7 +21,9 @@ from .assets import PYTHON_LOGO
 from .config import WindowConfig, WindowConfigProperty
 from .elements.menu import Menu
 from .enums import BindTargets, Anchor, Justify, Side, BindEvent, CallbackAction
-from .event_handling import BindMixin, BindMapping, BindMap, BindManager, delayed_event_handler
+from .event_handling import BindMixin, BindMapping, BindMap, BindManager
+from .event_handling.decorators import delayed_event_handler, _tk_event_handler
+from .event_handling.utils import MotionTracker, Interrupt
 from .exceptions import DuplicateKeyError
 from .positioning import positioner, Monitor
 from .pseudo_elements.row_container import RowContainer
@@ -49,72 +50,6 @@ _INIT_OVERRIDE_KEYS = frozenset({
     'is_popup', 'resizable', 'keep_on_top', 'can_minimize', 'transparent_color', 'alpha_channel', 'no_title_bar',
     'modal', 'scaling', 'margins', 'icon',
 })
-
-# region Event Handling Helpers
-
-
-def _tk_event_handler(tk_event: Union[str, BindEvent], always_bind: bool = False):
-    return partial(_TkEventHandler, tk_event, always_bind)
-
-
-class _TkEventHandler:
-    __slots__ = ('tk_event', 'func', 'always_bind')
-
-    def __init__(self, tk_event: Union[str, BindEvent], always_bind: bool, func: BindCallback):
-        self.tk_event = tk_event
-        self.always_bind = always_bind
-        self.func = func
-
-    def __set_name__(self, owner: Type[Window], name: str):
-        bind_event = self.tk_event
-        try:
-            event = bind_event.event
-        except AttributeError:
-            event = bind_event
-        owner._tk_event_handlers[event] = name
-        if self.always_bind:
-            owner._always_bind_events.add(bind_event)
-        setattr(owner, name, self.func)  # replace wrapper with the original function
-        try:
-            self.func.__set_name__(owner, name)  # noqa
-        except AttributeError:
-            pass
-
-
-class Interrupt:
-    __slots__ = ('time', 'event', 'element')
-
-    def __init__(self, event: Event = None, element: Union[ElementBase, Element] = None, time: float = None):
-        self.time = monotonic() if time is None else time
-        self.event = event
-        self.element = element
-
-    def __repr__(self) -> str:
-        return f'<{self.__class__.__name__}@{self.time}[event={self.event!r}, element={self.element}]>'
-
-
-class MotionTracker:
-    __slots__ = ('start_pos', 'mouse_pos')
-
-    def __init__(self, start_pos: XY, event: Event):
-        self.start_pos = start_pos
-        self.mouse_pos = self._mouse_position(event)
-
-    @classmethod
-    def _mouse_position(cls, event: Event) -> XY:
-        widget: BaseWidget = event.widget
-        x = event.x + widget.winfo_rootx()
-        y = event.y + widget.winfo_rooty()
-        return x, y
-
-    def new_position(self, event: Event) -> XY:
-        src_x, src_y = self.start_pos
-        old_x, old_y = self.mouse_pos
-        new_x, new_y = self._mouse_position(event)
-        return src_x + (new_x - old_x), src_y + (new_y - old_y)
-
-
-# endregion
 
 
 class Window(BindMixin, RowContainer):

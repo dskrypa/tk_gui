@@ -6,11 +6,13 @@ from __future__ import annotations
 
 import logging
 from functools import partial
-from typing import TYPE_CHECKING, Any, Callable, Type, TypeVar
+from typing import TYPE_CHECKING, Any, Callable, Union, Type, TypeVar
 
 if TYPE_CHECKING:
     from tkinter import Event, BaseWidget
+    from tk_gui.enums import BindEvent
     from tk_gui.typing import BindCallback
+    from tk_gui.window import Window
 
 __all__ = ['delayed_event_handler']
 log = logging.getLogger(__name__)
@@ -70,3 +72,31 @@ def delayed_event_handler(
         return DelayedEventHandler(method, widget_attr, delay_ms)
 
     return _delayed_event_handler
+
+
+def _tk_event_handler(tk_event: Union[str, BindEvent], always_bind: bool = False):
+    return partial(_TkEventHandler, tk_event, always_bind)
+
+
+class _TkEventHandler:
+    __slots__ = ('tk_event', 'func', 'always_bind')
+
+    def __init__(self, tk_event: Union[str, BindEvent], always_bind: bool, func: BindCallback):
+        self.tk_event = tk_event
+        self.always_bind = always_bind
+        self.func = func
+
+    def __set_name__(self, owner: Type[Window], name: str):
+        bind_event = self.tk_event
+        try:
+            event = bind_event.event
+        except AttributeError:
+            event = bind_event
+        owner._tk_event_handlers[event] = name
+        if self.always_bind:
+            owner._always_bind_events.add(bind_event)
+        setattr(owner, name, self.func)  # replace wrapper with the original function
+        try:
+            self.func.__set_name__(owner, name)  # noqa
+        except AttributeError:
+            pass

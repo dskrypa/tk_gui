@@ -19,16 +19,51 @@ from __future__ import annotations
 
 import logging
 from functools import partial
+from time import monotonic
 from tkinter import TclError, BaseWidget, Misc, Event
-from typing import TYPE_CHECKING, Mapping, Any
+from typing import TYPE_CHECKING, Mapping, Any, Union
 
 from tk_gui.widgets.utils import unbind, log_event_widget_data, get_widget_ancestor
 
 if TYPE_CHECKING:
-    from tk_gui.typing import Color, SupportsBind, Bool
+    from tk_gui.elements.element import ElementBase, Element
+    from tk_gui.typing import Color, SupportsBind, Bool, XY
 
-__all__ = ['ClickHighlighter']
+__all__ = ['ClickHighlighter', 'Interrupt', 'MotionTracker']
 log = logging.getLogger(__name__)
+
+
+class Interrupt:
+    __slots__ = ('time', 'event', 'element')
+
+    def __init__(self, event: Event = None, element: Union[ElementBase, Element] = None, time: float = None):
+        self.time = monotonic() if time is None else time
+        self.event = event
+        self.element = element
+
+    def __repr__(self) -> str:
+        return f'<{self.__class__.__name__}@{self.time}[event={self.event!r}, element={self.element}]>'
+
+
+class MotionTracker:
+    __slots__ = ('start_pos', 'mouse_pos')
+
+    def __init__(self, start_pos: XY, event: Event):
+        self.start_pos = start_pos
+        self.mouse_pos = self._mouse_position(event)
+
+    @classmethod
+    def _mouse_position(cls, event: Event) -> XY:
+        widget: BaseWidget = event.widget
+        x = event.x + widget.winfo_rootx()
+        y = event.y + widget.winfo_rooty()
+        return x, y
+
+    def new_position(self, event: Event) -> XY:
+        src_x, src_y = self.start_pos
+        old_x, old_y = self.mouse_pos
+        new_x, new_y = self._mouse_position(event)
+        return src_x + (new_x - old_x), src_y + (new_y - old_y)
 
 
 class ClickHighlighter:
