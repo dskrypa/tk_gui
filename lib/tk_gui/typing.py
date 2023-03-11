@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
 # fmt: off
 __all__ = [
-    'Bool', 'XY', 'Key', 'HasParent', 'HasValue', 'Layout', 'Axis', 'Orientation', 'PathLike', 'OptInt',
+    'Bool', 'XY', 'HasSize', 'Key', 'HasParent', 'HasValue', 'Layout', 'Axis', 'Orientation', 'PathLike', 'OptInt',
     'BindCallback', 'EventCallback', 'TraceCallback', 'BindTarget', 'Bindable', 'ProvidesEventCallback',
     'TkFill', 'TkSide', 'TkJustify',
     'TkContainer', 'HasFrame', 'FrameLike',
@@ -107,6 +107,16 @@ class HasValue(Protocol[T_co]):
     @property
     @abstractmethod
     def value(self) -> T_co:
+        pass
+
+
+@runtime_checkable
+class HasSize(Protocol):
+    __slots__ = ()
+
+    @property
+    @abstractmethod
+    def size(self) -> XY:
         pass
 
 

@@ -11,7 +11,6 @@ from typing import TYPE_CHECKING
 from tk_gui.caching import cached_property
 from tk_gui.elements.images import ClockImage
 from tk_gui.event_handling import event_handler
-from tk_gui.positioning import positioner
 from tk_gui.styles import Style
 from .view import View
 
@@ -49,9 +48,10 @@ class ClockView(View):
     def gui_image(self) -> ClockImage:
         kwargs = {'toggle_slim_on_click': self._toggle_slim_on_click, 'pad': (2, 2), **self._clock_kwargs}
         if img_size := self._img_size:
-            if (parent := self.parent) and (monitor := positioner.get_monitor(*parent.position)):
-                width, height = img_size
-                img_size = min(monitor.width - 70, width or 0), min(monitor.height - 70, height or 0)
+            if monitor := self.get_monitor():
+                mon_w, mon_h = monitor.work_area.size
+                img_w, img_h = img_size
+                img_size = min(mon_w - 60, img_w or 0), min(mon_h - 60, img_h or 0)
             kwargs['img_size'] = img_size
         return ClockImage(**kwargs)
 

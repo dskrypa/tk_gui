@@ -18,6 +18,7 @@ from weakref import finalize, WeakSet
 from PIL import ImageGrab
 
 from .assets import PYTHON_LOGO
+from .caching import cached_property
 from .config import WindowConfig, WindowConfigProperty
 from .elements.menu import Menu
 from .enums import BindTargets, Anchor, Justify, Side, BindEvent, CallbackAction
@@ -25,7 +26,7 @@ from .event_handling import BindMixin, BindMapping, BindMap, BindManager
 from .event_handling.decorators import delayed_event_handler, _tk_event_handler
 from .event_handling.utils import MotionTracker, Interrupt
 from .exceptions import DuplicateKeyError
-from .positioning import positioner, Monitor
+from .monitors import Monitor, Rectangle, monitor_manager
 from .pseudo_elements.row_container import RowContainer
 from .styles import Style, StyleSpec
 from .utils import ON_LINUX, ON_WINDOWS, ProgramMetadata, extract_kwargs
@@ -343,13 +344,27 @@ class Window(BindMixin, RowContainer):
 
     @property
     def true_size(self) -> XY:
-        x, y = self._root.geometry().split('+', 1)[0].split('x', 1)
-        return int(x), int(y)
+        width, height = self._root.geometry().split('+', 1)[0].split('x', 1)
+        return int(width), int(height)
 
-    @property
+    @cached_property
     def title_bar_height(self) -> int:
         root = self._root
         return root.winfo_rooty() - root.winfo_y()
+
+    @cached_property
+    def visible_border_width(self) -> int:
+        """
+        The width of visible window borders, in pixels.  Full outer width = inner width + (outer_border_width * 2).
+        """
+        # Note: It is not possible to do this with tkinter alone.
+        try:
+            from ctypes import windll
+        except ImportError:
+            return 1  # TODO: Handle non-Windows
+        # Docs: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getsystemmetrics
+        # SM_CXBORDER: The width of a window border. Equivalent to the SM_CXEDGE value for windows with the 3-D look.
+        return windll.user32.GetSystemMetrics(5)  # 5 = SM_CXBORDER
 
     def set_min_size(self, width: int, height: int):
         root = self._root
@@ -361,14 +376,19 @@ class Window(BindMixin, RowContainer):
         root.maxsize(width, height)
         root.update_idletasks()
 
-    def _outer_size(self) -> XY:
-        # Outer dimensions of the window, used for calculating relative position
-        width, height = self.true_size
-        # width, height = self.size
+    def inner_rect(self) -> Rectangle:
+        width, height, x, y = self._true_size_and_pos
+        return Rectangle.from_pos_and_size(x, y, width, height)
+
+    def outer_rect(self) -> Rectangle:
+        width, height, x, y = self._true_size_and_pos
         if not self.no_title_bar:
             height += self.title_bar_height
-            # height += 30  # Title bar size on Windows 10; more info would be needed for portability
-        return width, height
+        # Note: There seems to be an -8px offset between x and the actual distance from the edge of the screen, which
+        # correlates with the value of (root.winfo_rootx() - root.winfo_x()), but including it below calculation
+        # results in incorrect positioning.
+        vis_bw = self.visible_border_width
+        return Rectangle.from_pos_and_size(x, y, width + (2 * vis_bw), height)
 
     def _get_monitor(self, init: bool = False) -> Optional[Monitor]:
         if init:
@@ -379,7 +399,7 @@ class Window(BindMixin, RowContainer):
         else:
             x, y = self.position
 
-        if not (monitor := positioner.get_monitor(x, y)):
+        if not (monitor := monitor_manager.get_monitor(x, y)):
             log.debug(f'Could not find monitor for pos={x, y}')
         return monitor
 
@@ -395,9 +415,13 @@ class Window(BindMixin, RowContainer):
 
         root = self._root
         root.update_idletasks()
+
         width, height = root.winfo_reqwidth(), root.winfo_reqheight()
-        max_width = monitor.width - 100
-        max_height = monitor.height - 130
+        work_area = monitor.work_area
+        max_width = work_area.width - 100
+        max_height = work_area.height - 50
+        # max_width = monitor.width - 100
+        # max_height = monitor.height - 130
         if width < max_width and height < max_height:
             return
 
@@ -417,20 +441,22 @@ class Window(BindMixin, RowContainer):
     # endregion
 
     @property
-    def true_size_and_pos(self) -> tuple[XY, XY]:
+    def _true_size_and_pos(self) -> tuple[int, int, int, int]:
         root = self._root
-        root.update_idletasks()
-        size, pos = root.geometry().split('+', 1)
+        size, x, y = root.geometry().split('+', 2)
         w, h = size.split('x', 1)
-        x, y = pos.split('+', 1)
-        return (int(w), int(h)), (int(x), int(y))
+        return int(w), int(h), int(x), int(y)
+
+    @property
+    def true_size_and_pos(self) -> tuple[XY, XY]:
+        w, h, x, y = self._true_size_and_pos
+        return (w, h), (x, y)
 
     # region Position
 
     @property
     def position(self) -> XY:
         root = self._root
-        # root.update_idletasks()
         return root.winfo_x(), root.winfo_y()
 
     @position.setter
@@ -438,7 +464,6 @@ class Window(BindMixin, RowContainer):
         root = self._root
         try:
             root.geometry('+{}+{}'.format(*pos))
-            # root.x root.y = pos
             root.update_idletasks()
         except AttributeError:  # root has not been created yet
             self.config.position = pos
@@ -450,7 +475,7 @@ class Window(BindMixin, RowContainer):
 
     @property
     def monitor(self) -> Optional[Monitor]:
-        return positioner.get_monitor(*self.position)
+        return monitor_manager.get_monitor(*self.position)
 
     def move_to_center(self, other: Window = None):
         """
@@ -459,31 +484,23 @@ class Window(BindMixin, RowContainer):
 
         :param other: A :class:`.Window`
         """
-        win_w, win_h = self._outer_size()
+        win_rect = target_rect = self.outer_rect()
         try:
-            x, y = other.position
+            parent_rect = target_rect = other.outer_rect()
         except (TypeError, AttributeError):
-            x, y = self.position
-        if not (monitor := positioner.get_monitor(x, y)):
+            parent_rect = None
+        # log.debug(f'Moving {self=} with {win_rect=} to center relative to {other=} with {parent_rect=}')
+        if not (monitor := monitor_manager.get_monitor(*target_rect.position)):
             return
-        try:
-            par_w, par_h = other._outer_size()
-        except AttributeError:  # Either other is None, or other has been closed already
-            x = monitor.x + (monitor.width - win_w) // 2
-            y = monitor.y + (monitor.height - win_h) // 2
+        elif parent_rect:
+            centered = parent_rect.center(win_rect)
+            # log.debug(f'Centered {win_rect=} within {parent_rect=} => {centered=}')
+            centered = monitor.work_area.lazy_center(centered)
+            # log.debug(f'  > Final {centered=}')
         else:
-            x += (par_w - win_w) // 2
-            y += (par_h - win_h) // 2
-            # If being centered on the window places it in a bad position, center on the monitor instead
-            x_min, y_min = monitor.x, monitor.y
-            x_max = x_min + monitor.width
-            y_max = y_min + monitor.height
-            if x < x_min or (x + win_w) > x_max:
-                x = x_min + (monitor.width - win_w) // 2
-            if y < y_min or (y + win_h) > y_max:
-                y = y_min + (monitor.height - win_h) // 2
-
-        self.position = x, y
+            centered = monitor.work_area.center(win_rect)
+            # log.debug(f'Centered {win_rect=} within {work_area=} => {centered=}')
+        self.position = centered.position
 
     @property
     def mouse_position(self) -> XY:
@@ -675,7 +692,7 @@ class Window(BindMixin, RowContainer):
         inner.update_idletasks()
         width = self.x_config.target_size(inner)
         height = inner.winfo_reqheight()
-        max_outer_height = monitor.height - 130
+        max_outer_height = monitor.work_area.height - 50
         max_inner_height = max_outer_height - 50
         if height > max_outer_height / 3:
             height = min(max_inner_height, height // y_div)
@@ -806,7 +823,7 @@ class Window(BindMixin, RowContainer):
         widget_id = widget._w  # noqa
         if (element := self.widget_id_element_map.get(widget_id)) and element.ignore_grab:
             return
-        self._motion_tracker = MotionTracker(self.true_size_and_pos[1], event)
+        self._motion_tracker = MotionTracker(self.true_position, event)
 
     def _handle_grab_anywhere_motion(self, event: Event):
         try:
@@ -1046,11 +1063,7 @@ class Window(BindMixin, RowContainer):
     # endregion
 
     def get_screenshot(self) -> PILImage:
-        (width, height), (x, y) = self.true_size_and_pos
-        if not self.no_title_bar:
-            height += self.title_bar_height
-
-        return ImageGrab.grab((x, y, x + width, y + height))
+        return ImageGrab.grab(self.outer_rect().as_bbox())
 
     @classmethod
     def get_active_windows(cls, is_popup: Bool = None, *, sort_by_last_focus: bool = False) -> list[Window]:

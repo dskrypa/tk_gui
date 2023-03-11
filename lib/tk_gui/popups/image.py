@@ -83,7 +83,8 @@ class NewImagePopup(Popup):
         if text := self.text:
             text_row = [Text(text, side='t')]
             return [text_row, image_row] if self.text_above_img else [image_row, text_row]
-        return [image_row]
+        else:
+            return [image_row]
 
     @cached_property
     def gui_image(self) -> Image:
@@ -91,15 +92,15 @@ class NewImagePopup(Popup):
         src = self.src_image
         if src.pil_image:
             log.debug(f'{self}: Using {init_size=} to display image={src!r} with {src.format=} mime={src.mime_type!r}')
-        return Image(src, size=init_size, pad=(2, 2))
+        self.image = image = src.as_size(init_size)
+        return Image(image, size=init_size, pad=(2, 2))
 
     def _init_size(self) -> XY:
-        # TODO: Need to fix init position (currently too low)
         src_w, src_h = self.src_image.size
         if monitor := self.get_monitor():
-            mon_w, mon_h = monitor.width, monitor.height
+            mon_w, mon_h = monitor.work_area.size
             log.debug(f'_init_size: monitor size={(mon_w, mon_h)}')
-            return min(mon_w - 70, src_w), min(mon_h - 70, src_h)
+            return min(mon_w - 60, src_w), min(mon_h - 60, src_h)
         return src_w, src_h
 
     @event_handler('SIZE_CHANGED')

@@ -13,11 +13,10 @@ from typing import TYPE_CHECKING, Any, Union
 
 from tk_gui.caching import cached_property
 from tk_gui.event_handling import HandlesEvents, BindMap
-from tk_gui.positioning import positioner
+from tk_gui.monitors import Monitor, monitor_manager
 from tk_gui.window import Window
 
 if TYPE_CHECKING:
-    from screeninfo import Monitor
     from tk_gui.typing import Layout, Key
 
 __all__ = ['WindowInitializer']
@@ -124,11 +123,11 @@ class WindowInitializer(HandlesEvents, ABC):
 
     def get_monitor(self) -> Monitor | None:
         if window := self.__dict__.get('window'):
-            return positioner.get_monitor(*window.position)
+            return monitor_manager.get_monitor(*window.position)
         elif parent := self.parent:
-            return positioner.get_monitor(*parent.position)
+            return monitor_manager.get_monitor(*parent.position)
         else:
-            return positioner.get_monitor(0, 0)
+            return monitor_manager.get_monitor(0, 0)
 
     # region Run Methods
 
