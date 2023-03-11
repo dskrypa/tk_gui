@@ -9,17 +9,16 @@ from __future__ import annotations
 
 from base64 import b64encode
 from io import BytesIO
-from typing import TYPE_CHECKING, Optional, Union, TypeVar
+from typing import TYPE_CHECKING, Optional, Union, TypeVar, Iterator, Iterable
 
-from PIL.Image import Image as PILImage, new as new_image
-from PIL.ImageDraw import ImageDraw, Draw
+from PIL.Image import Image as PILImage, new as new_image, core as pil_image_core
 from PIL.ImageFont import FreeTypeFont, truetype
 
 from .color import color_to_rgb, find_unused_color
 from .utils import ICONS_DIR, calculate_resize
 
 if TYPE_CHECKING:
-    from ..typing import XY, Color, ImageType  # noqa
+    from ..typing import XY, Color, RGB, RGBA, ImageType  # noqa
 
 __all__ = ['Icons', 'PlaceholderCache', 'placeholder_icon_cache']
 
@@ -27,6 +26,9 @@ ICON_DIR = ICONS_DIR.joinpath('bootstrap')
 
 Icon = Union[str, int]
 IMG = TypeVar('IMG', bound='ImageType')
+
+_core_draw = pil_image_core.draw
+_core_fill = pil_image_core.fill
 
 
 class Icons:
@@ -64,14 +66,15 @@ class Icons:
             return icon  # TODO: This may not be valid either...
 
     def _font_and_size(self, size: XY = None) -> tuple[FreeTypeFont, XY]:
-        if size:
-            font = self.font.font_variant(size=max(size))
+        font = self.font
+        font_size = font.size
+        if size and (new_size := max(size)) != font_size:
+            font = font.font_variant(size=new_size)
         else:
-            font = self.font
-            size = (font.size, font.size)
+            size = (font_size, font_size)
         return font, size
 
-    def draw(self, icon: Icon, size: XY = None, color: Color = '#000000', bg: Color = '#ffffff') -> PILImage:
+    def draw(self, icon: Icon, size: XY = None, color: Color = (0, 0, 0), bg: Color = (255, 255, 255)) -> PILImage:
         """
         :param icon: The name of the icon stored in :meth:`.char_names` to render.
         :param size: The font size to use, in pixels, if different from the size used to initialize this :class:`Icons`.
@@ -83,17 +86,26 @@ class Icons:
         """
         icon = self._normalize(icon)
         font, size = self._font_and_size(size)
-        image: PILImage = new_image('RGBA', size, color_to_rgb(bg))
-        draw: ImageDraw = Draw(image)
-        draw.text((0, 0), icon, fill=color_to_rgb(color), font=font)
-        return image
+        # from PIL.ImageDraw import ImageDraw
+        # image: PILImage = new_image('RGBA', size, color_to_rgb(bg))
+        # ImageDraw(image).text((0, 0), icon, fill=color_to_rgb(color), font=font)
+        # return image
+        return draw_icon(size, self._normalize(icon), color_to_rgb(color), color_to_rgb(bg), font)
+
+    def draw_many(
+        self, icons: Iterable[Icon], size: XY = None, color: Color = (0, 0, 0), bg: Color = (255, 255, 255)
+    ) -> Iterator[tuple[PILImage, Icon]]:
+        font, size = self._font_and_size(size)
+        bg, fg = color_to_rgb(bg), color_to_rgb(color)
+        for icon in icons:
+            yield draw_icon(size, self._normalize(icon), fg, bg, font), icon
 
     def draw_base64(self, *args, **kwargs) -> bytes:
         bio = BytesIO()
         self.draw(*args, **kwargs).save(bio, 'PNG')
         return b64encode(bio.getvalue())
 
-    def draw_alpha_cropped(self, icon: Icon, size: XY = None, color: Color = '#000000', bg: Color = None) -> PILImage:
+    def draw_alpha_cropped(self, icon: Icon, size: XY = None, color: Color = (0, 0, 0), bg: Color = None) -> PILImage:
         """
         Draws the specified icon with an automatically selected background color that will be rendered transparent, and
         crops the image so that the visible icon will reach the edges of the canvas.
@@ -135,6 +147,18 @@ def _calculate_redraw_size(image: PILImage, exp_width: int, exp_height: int) -> 
     target_size = calculate_resize(x2 - x1, y2 - y1, trg_width, trg_height)  # Necessary to stay within bounds
     # log.debug(f'Using {target_size=} {trg_width=} x {trg_height=}')
     return target_size
+
+
+def draw_icon(size: XY, text: str, fg: RGB | RGBA, bg: RGB | RGBA, font: FreeTypeFont) -> PILImage:
+    image: PILImage = new_image('RGBA', size, bg)
+    draw = _core_draw(image.im, 0)
+    ink = draw.draw_ink(fg)
+    f = font.font
+    f_size, offset = f.getsize(text, 'L')
+    mask = _core_fill('L', f_size, 0)
+    f.render(text, mask.id, 'L', None, None, None, 0, ink, 0, 0)
+    draw.draw_bitmap(offset, mask, ink)
+    return image
 
 
 class PlaceholderCache:
