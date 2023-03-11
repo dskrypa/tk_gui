@@ -21,9 +21,10 @@ from tk_gui.caching import cached_property
 from tk_gui.utils import get_user_temp_dir
 
 if TYPE_CHECKING:
-    from tk_gui.typing import XY, ImageType, PathLike, OptXYF
+    from tk_gui.typing import XY, ImageType, PathLike, OptXYF, Color
+    from .icons import Icons, Icon
 
-__all__ = ['ImageWrapper', 'SourceImage', 'ResizedImage']
+__all__ = ['ImageWrapper', 'SourceImage', 'ResizedImage', 'IconSourceImage']
 log = logging.getLogger(__name__)
 
 Box = tuple[float, float, float, float]
@@ -180,10 +181,10 @@ class SourceImage(ImageWrapper):
 
     @classmethod
     def from_image(cls, image: ImageType | ImageWrapper) -> SourceImage:
-        if isinstance(image, ResizedImage):
-            return image.source
-        elif isinstance(image, SourceImage):
+        if isinstance(image, SourceImage):
             return image
+        elif isinstance(image, ResizedImage):
+            return image.source
         else:
             return cls(image)
 
@@ -252,6 +253,44 @@ class SourceImage(ImageWrapper):
         image = self.get_image_as_size(size, keep_ratio, resample=resample, **kwargs)
         resized_cache[path] = resized = ResizedImage(self, image, path)
         return resized
+
+
+class IconSourceImage(SourceImage):
+    def __init__(
+        self,
+        icons: Icons,
+        icon: Icon,
+        image: PILImage = None,
+        color: Color = '#000000',
+        bg: Color = '#ffffff',
+        init_size: int = 500,
+    ):
+        self._icons = icons
+        self._icon = icon
+        self._color = color
+        self._bg = bg
+        self._init_size = init_size
+        if image is None:
+            if (size := icons.font.size) < init_size:
+                size = init_size
+            image = icons.draw(icon, (size, size), color=color, bg=bg)
+        super().__init__(image)
+
+    @cached_property
+    def size(self) -> XY:
+        if (image := self.pil_image) is None or image.size[0] < self._init_size:
+            size = (self._init_size, self._init_size)
+            self._original = image = self._icons.draw(self._icon, size, color=self._color, bg=self._bg)
+            self.__dict__['pil_image'] = image
+        return image.size
+
+    def as_size(self, size: XY | None, keep_ratio: bool = True, **kwargs) -> ResizedImage:
+        if size:
+            size = self.target_size(size, keep_ratio)
+        if not size or size == self.size:
+            return ResizedImage(self, self.pil_image)
+        image = self._icons.draw(self._icon, size, color=self._color, bg=self._bg)
+        return ResizedImage(self, image)
 
 
 class ResizedImage(ImageWrapper):

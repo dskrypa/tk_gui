@@ -19,6 +19,7 @@ from tk_gui.elements.text import Multiline, gui_log_handler
 from tk_gui.event_handling import ClickHighlighter
 from tk_gui.images.icons import Icons
 from tk_gui.images.utils import ICONS_DIR
+from tk_gui.images.wrapper import IconSourceImage
 from tk_gui.popups.about import AboutPopup
 from tk_gui.popups.raw import PickColor
 from tk_gui.window import Window
@@ -73,16 +74,19 @@ class GuiTest(Command):
     def icons(self):
         icons = Icons(30)
         layout, row = [], []
-        for i, name in enumerate(icons.char_names):
+        for i, (icon, name) in enumerate(icons.draw_many(icons.char_names)):
             if row and i % 5 == 0:
                 layout.append(row[:-1])
                 row = []
 
-            row += [Image(icons.draw(name)), Text(name, size=(30, 1)), VerticalSeparator()]
+            iw = IconSourceImage(icons, name, icon, init_size=3000)
+            row += [Image(iw, popup=True), Text(name, size=(30, 1)), VerticalSeparator()]
+
         if row:
             layout.append(row[:-1])
 
-        Window(layout, 'Icon Test', size=(300, 500), exit_on_esc=True, scroll_y=True).run()
+        config = {'remember_size': False, 'remember_position': False}
+        Window(layout, 'Icon Test', size=(300, 500), exit_on_esc=True, scroll_y=True, config=config).run()
 
     @action(default=True)
     def window(self):
