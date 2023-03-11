@@ -97,7 +97,7 @@ class ImagePopup(Popup):
         src_w, src_h = self.src_image.size
         if monitor := self.get_monitor():
             mon_w, mon_h = monitor.work_area.size
-            log.debug(f'_init_size: monitor size={(mon_w, mon_h)}')
+            # log.debug(f'_init_size: monitor size={(mon_w, mon_h)}')
             return min(mon_w - 60, src_w), min(mon_h - 60, src_h)
         return src_w, src_h
 
@@ -198,7 +198,7 @@ class AnimatedPopup(Popup):
         src_w, src_h = self.orig_size
         if monitor := self.get_monitor():
             mon_w, mon_h = monitor.work_area.size
-            log.debug(f'_init_size: monitor size={(mon_w, mon_h)}')
+            # log.debug(f'_init_size: monitor size={(mon_w, mon_h)}')
             return min(mon_w - 60, src_w), min(mon_h - 60, src_h)
         return src_w, src_h
 

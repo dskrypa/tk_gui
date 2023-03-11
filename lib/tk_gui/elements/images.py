@@ -19,10 +19,9 @@ from PIL.ImageSequence import Iterator as FrameIterator
 from PIL.ImageTk import PhotoImage
 
 from tk_gui.enums import Anchor
-from tk_gui.images import SevenSegmentDisplay, calculate_resize, as_image
+from tk_gui.images import SevenSegmentDisplay, calculate_resize
 from tk_gui.images.cycle import FrameCycle, PhotoImageCycle
 from tk_gui.images.spinner import Spinner
-from tk_gui.images.utils import get_image_path
 from tk_gui.images.wrapper import ImageWrapper, SourceImage, ResizedImage
 from tk_gui.styles import Style, StyleSpec
 from .element import Element
@@ -443,13 +442,11 @@ def normalize_image_cycle(image: AnimatedType, size: XY = None, last_frame_num: 
             clock.resize_full(*size)
             frame_cycle.last_time -= frame_cycle.SECOND
     else:
-        try:
-            path = get_image_path(image)
-        except ValueError:
-            image = as_image(image)
-            frame_cycle = FrameCycle(tuple(FrameIterator(image)), PhotoImage)
-        else:
+        src_image = SourceImage.from_image(image)
+        if path := src_image.path:
             frame_cycle = PhotoImageCycle(path)
+        else:
+            frame_cycle = FrameCycle(tuple(FrameIterator(src_image.pil_image)), PhotoImage)
 
         # TODO: Likely need a different lib for gif resize
         # if size and size != get_size(image):
@@ -477,14 +474,16 @@ def normalize_image_cycle(image: AnimatedType, size: XY = None, last_frame_num: 
     return frame_cycle
 
 
-def get_size(image: Union[AnimatedType, SevenSegmentDisplay]) -> XY:
+def get_size(image: AnimatedType | SevenSegmentDisplay | ImageWrapper) -> XY:
     if isinstance(image, Spinner):
         return image.size
     elif isinstance(image, SevenSegmentDisplay):
         return image.time_size()
         # return image.width, image.height
-    image = as_image(image)
-    return image.size
+    elif isinstance(image, ImageWrapper):
+        return image.size
+    else:
+        return SourceImage.from_image(image).size
 
 
 def _extract_kwargs(kwargs: dict[str, Any], keys: set[str], defaults: dict[str, Any]) -> dict[str, Any]:

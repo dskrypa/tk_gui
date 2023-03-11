@@ -9,14 +9,17 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 from tkinter import PhotoImage
-from typing import Iterator, Iterable, Callable, Union, TypeVar, Generic, Optional
+from typing import TYPE_CHECKING, Iterator, Iterable, Callable, Union, TypeVar, Generic, Optional
 
 from PIL.GifImagePlugin import GifImageFile
 from PIL.Image import Image as PILImage, new as new_image
 from PIL.ImageSequence import Iterator as FrameIterator
 from PIL.ImageTk import PhotoImage as PilPhotoImage
 
-from .utils import as_image
+from .wrapper import SourceImage
+
+if TYPE_CHECKING:
+    from tk_gui.typing import PathLike
 
 __all__ = ['FrameCycle', 'PhotoImageCycle']
 log = logging.getLogger(__name__)
@@ -98,16 +101,15 @@ class FrameCycle(Generic[T_co]):
 
 
 class PhotoImageCycle(FrameCycle[PhotoImage]):
-    __slots__ = ('path', '_pi_frames')
+    __slots__ = ('src_image', '_pi_frames')
 
-    def __init__(self, path: Union[Path, str], duration: int = None, default_duration: int = 100):  # noqa
-        self.path = Path(path).expanduser()
+    def __init__(self, path: PathLike, duration: int = None, default_duration: int = 100):  # noqa
+        self.src_image = src_image = SourceImage.from_image(Path(path).expanduser())
         self.n = 0
-        image = as_image(self.path)
         self._pi_frames = tuple(
-            PhotoImage(file=path.as_posix(), format=f'gif -index {n}') for n in range(image.n_frames)
+            PhotoImage(file=path.as_posix(), format=f'gif -index {n}') for n in range(src_image.pil_image.n_frames)
         )
-        self._frames = tuple(FrameIterator(image))
+        self._frames = tuple(FrameIterator(src_image.pil_image))
         self._wrapper = PhotoImage
         self._duration = duration
         self._default_duration = default_duration
@@ -117,6 +119,10 @@ class PhotoImageCycle(FrameCycle[PhotoImage]):
 
         self._frames_and_durations = tuple((pi, get_duration(f)) for pi, f in zip(self._pi_frames, self._frames))
         self.first_delay = self._frames_and_durations[0][1]
+
+    @property
+    def path(self) -> Path:
+        return self.src_image.path
 
 
 # region Frame Extraction

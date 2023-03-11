@@ -18,7 +18,7 @@ from PIL.ImageTk import PhotoImage
 
 from tk_gui.enums import Justify, Anchor
 from tk_gui.event_handling import BindMap, BindMapping, CustomEventResultsMixin
-from tk_gui.images import as_image, scale_image
+from tk_gui.images.wrapper import SourceImage, ResizedImage
 from tk_gui.utils import Inheritable
 from .element import Interactive
 from .mixins import DisableableMixin
@@ -52,6 +52,8 @@ class Button(CustomEventResultsMixin, DisableableMixin, Interactive, base_style_
     bind_enter: bool = False
     callback: BindCallback = None
     _action: ButtonAction | None = None
+    _src_image: SourceImage
+    __image: ResizedImage | SourceImage
 
     def __init__(
         self,
@@ -101,18 +103,17 @@ class Button(CustomEventResultsMixin, DisableableMixin, Interactive, base_style_
 
     @property
     def image(self) -> Optional[PILImage]:
-        return self._image
+        return self.__image.pil_image
 
     @image.setter
     def image(self, value: ImageType):
-        self._image = image = as_image(value)
-        if not image or not self.size:
+        self.__image = self._src_image = src_image = SourceImage.from_image(value)
+        if not (image := src_image.pil_image) or not self.size:
             return
-
         iw, ih = image.size
         width, height = self.size
         if ih > height or iw > width:
-            self._image = scale_image(image, width - 1, height - 1)
+            self.__image = src_image.as_size((width - 1, height - 1))
         # if text := self.text:
         #     style = self.style
         #     state = self.style_state

@@ -1,2 +1,2 @@
-from .utils import as_image, image_to_bytes, scale_image, calculate_resize
+from .utils import calculate_resize
 from .clock import SevenSegmentDisplay
