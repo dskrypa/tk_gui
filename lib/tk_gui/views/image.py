@@ -6,7 +6,8 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import TYPE_CHECKING, TypeVar, ParamSpec
+from pathlib import Path
+from typing import TYPE_CHECKING, TypeVar, ParamSpec, Iterator
 
 from tk_gui.caching import cached_property
 from tk_gui.elements import Image, Text, BasicRowFrame, ScrollFrame, SizeGrip
@@ -63,12 +64,95 @@ class ImageScrollFrame(ScrollFrame):
         right.resize(width, 1)
 
 
+class InfoBar(BasicRowFrame):
+    element_map: dict[str, Text]
+
+    def __init__(self, data: dict[str, str], side='b', fill='both', pad=(0, 0), **kwargs):
+        self.element_map = element_map = self._init_element_map(data)
+        super().__init__([*element_map.values(), SizeGrip(pad=(0, 0))], side=side, fill=fill, pad=pad, **kwargs)
+
+    def _init_element_map(self, data: dict[str, str]) -> dict[str, Text]:  # noqa
+        kwargs = {'use_input_style': True, 'justify': 'c', 'pad': (1, 0)}
+        # TODO: Better auto-sizing of these fields
+        return {
+            'size': Text(data['size'], size=(20, 1), **kwargs),
+            'dir_pos': Text(data['dir_pos'], size=(8, 1), **kwargs),
+            'size_pct': Text(data['size_pct'], size=(6, 1), **kwargs),
+            'size_bytes': Text(data['size_bytes'], size=(20, 1), **kwargs),
+            'mod_time': Text(data['mod_time'], size=(20, 1), **kwargs),
+        }
+
+    def update_fields(self, data: dict[str, str]):
+        element_map = self.element_map
+        for key, val in data.items():
+            element_map[key].update(val)
+
+
+class ImageDir:
+    _SUFFIXES = {'.png', '.jpg', '.jpeg', '.bmp', '.webp', '.svg'}  # TODO: Support more; support gif, etc
+
+    def __init__(self, path: Path):
+        if not path.is_dir():
+            raise TypeError(f'Invalid image dir={path.as_posix()!r} - not a directory')
+        self.path = path
+
+    @cached_property
+    def _image_paths(self) -> list[Path]:
+        ok_suffixes = self._SUFFIXES
+        image_paths = [p for p in self.path.iterdir() if p.is_file() and p.suffix.lower() in ok_suffixes]
+        image_paths.sort(key=lambda p: p.name.lower())
+        return image_paths
+
+    # region Container Methods
+
+    def __len__(self) -> int:
+        return len(self._image_paths)
+
+    def __getitem__(self, item: int) -> Path:
+        return self._image_paths[item]
+
+    def __iter__(self) -> Iterator[Path]:
+        yield from self._image_paths
+
+    # endregion
+
+    # region Index Methods
+
+    def index(self, path: Path) -> int:
+        return self._image_paths.index(path)
+
+    def get_prev_index(self, path: Path) -> int | None:
+        try:
+            index = self.index(path) - 1
+        except IndexError:
+            return None
+        return None if index < 0 else index
+
+    def get_next_index(self, path: Path) -> int | None:
+        try:
+            index = self.index(path) + 1
+        except IndexError:
+            return None
+        return None if index >= len(self._image_paths) else index
+
+    # endregion
+
+
 class ActiveImage:
     src_image: SourceImage
+    image_dir: ImageDir = None
 
-    def __init__(self, image: ImageType | ImageWrapper):
+    def __init__(self, image: ImageType | ImageWrapper, image_dir: ImageDir = None):
         self.src_image = SourceImage.from_image(image)
         self.image = self.src_image
+        if image_dir is None:
+            self.image_dir = ImageDir(self.src_image.path.parent)
+        else:
+            self.image_dir = image_dir
+
+    @cached_property
+    def path(self) -> Path:
+        return self.src_image.path
 
     @cached_property
     def file_name(self) -> str:
@@ -92,12 +176,16 @@ class ActiveImage:
             mod_time = datetime.fromtimestamp(stat_results.st_mtime).isoformat(' ', 'seconds')
         return mod_time, readable_bytes(size_b), readable_bytes(self.src_image.raw_size)
 
+    @cached_property
+    def dir_index(self) -> int:
+        return self.image_dir.index(self.path) + 1
+
     def get_info_bar_data(self) -> dict[str, str]:
         image = self.image
         mod_time, file_b, raw_b = self._file_info
         return {
             'size': f'{image.size_str} x {image.bits_per_pixel} BPP',
-            'dir_pos': '1/1',  # TODO
+            'dir_pos': f'{self.dir_index}/{len(self.image_dir)}',
             'size_pct': f'{image.size_percent:.0%}',
             'size_bytes': f'{file_b} / {raw_b}',
             'mod_time': mod_time,
@@ -115,13 +203,18 @@ class ImageView(View):
     menu = MenuProperty(MenuBar)
     _last_size: XY = None
     active_image: ActiveImage
+    image_dir: ImageDir
 
     def __init__(self, image: ImageType | ImageWrapper, title: str = None, **kwargs):
         kwargs.setdefault('margins', (0, 0))
         kwargs.setdefault('exit_on_esc', True)
         # kwargs.setdefault('config_name', self.__class__.__name__)
         super().__init__(title=title or 'Image View', **kwargs)
-        self.active_image = ActiveImage(image)
+        self._set_active_image(image)
+
+    def _set_active_image(self, image: ImageType | ImageWrapper, image_dir: ImageDir = None):
+        self.active_image = ActiveImage(image, image_dir)
+        self.image_dir = self.active_image.image_dir
 
     # region Title
 
@@ -155,22 +248,8 @@ class ImageView(View):
         yield [self.info_bar]
 
     @cached_property
-    def info_bar_elements(self) -> dict[str, Text]:
-        data = self.active_image.get_info_bar_data()
-        kwargs = {'use_input_style': True, 'justify': 'c', 'pad': (1, 0)}
-        # TODO: Better auto-sizing of these fields
-        return {
-            'size': Text(data['size'], size=(20, 1), **kwargs),
-            'dir_pos': Text(data['dir_pos'], size=(8, 1), **kwargs),
-            'size_pct': Text(data['size_pct'], size=(6, 1), **kwargs),
-            'size_bytes': Text(data['size_bytes'], size=(20, 1), **kwargs),
-            'mod_time': Text(data['mod_time'], size=(20, 1), **kwargs),
-        }
-
-    @cached_property
-    def info_bar(self) -> BasicRowFrame:
-        pad = (0, 0)
-        return BasicRowFrame([*self.info_bar_elements.values(), SizeGrip(pad=pad)], side='b', fill='both', pad=pad)
+    def info_bar(self) -> InfoBar:
+        return InfoBar(self.active_image.get_info_bar_data())
 
     @cached_property
     def image_frame(self) -> ImageScrollFrame:
@@ -194,16 +273,35 @@ class ImageView(View):
     def _update(self, image: ResizedImage):
         self.gui_image.update(image, image.size)
         self.window.set_title(self.title)
-        for key, val in self.active_image.get_info_bar_data().items():
-            self.info_bar_elements[key].update(val)
+        self.info_bar.update_fields(self.active_image.get_info_bar_data())
+        self._update_size()
+
+    def _update_active_image(self, image: ImageType | ImageWrapper, image_dir: ImageDir = None):
+        # TODO: Center and avoid over-zoom on new images
+        # TODO: Horizontal scroll is not always registering correctly
+        # TODO: Shrink to fit if larger than current window
+        self._set_active_image(image, image_dir)
+        self._update(self.active_image.resize(self._init_size()))
+
+    def _update_size(self, size: XY = None):
+        # TODO: Resize creep on init sometimes
+        try:
+            win_w, win_h = size
+        except TypeError:
+            win_w, win_h = self.window.size
+        to_fill = win_w - self.active_image.image.width - self._width_offset
+        if (spacer_w := to_fill // 2) < 5:
+            spacer_w = 1
+        # log.debug(f'Using spacer {spc_w=} from {win_w=}, {self.image.width=}, {to_fill=}')
+        self.image_frame.update_spacer_width(spacer_w)
+        self.image_frame.update_scroll_region((win_w, win_h - self._height_offset))
 
     # region Event Handling
 
     @menu['File']['Open'].callback
     def open_file(self, event):
         if path := pick_file_popup(self.active_image.src_image.path.parent, title='Pick Image', parent=self.window):
-            self.active_image = ActiveImage(path)
-            self._update(self.active_image.resize(self._init_size()))
+            self._update_active_image(path)
 
     @cached_property
     def _height_offset(self) -> int:
@@ -225,13 +323,7 @@ class ImageView(View):
     def handle_size_changed(self, event: Event, size: XY):
         if self._last_size != size:
             self._last_size = size
-            win_w, win_h = size
-            to_fill = win_w - self.active_image.image.width - self._width_offset
-            if (spacer_w := to_fill // 2) < 5:
-                spacer_w = 1
-            # log.debug(f'Using spacer {spc_w=} from {win_w=}, {self.image.width=}, {to_fill=}')
-            self.image_frame.update_spacer_width(spacer_w)
-            self.image_frame.update_scroll_region((win_w, win_h - self._height_offset))
+            self._update_size(size)
 
     @event_handler('<Control-MouseWheel>')
     @delayed_event_handler(delay_ms=75, widget_attr='_widget')
@@ -244,6 +336,20 @@ class ImageView(View):
 
     def _zoom_image(self, percent: float):
         self._update(self.active_image.scale_percent(percent))
-        # TODO: Update spacers on scroll
+        # TODO: Add shortcut to reset zoom to 100%, to fit window, to a specified value, etc
+        # TODO: Add way to grab image to drag the current view around
+
+    @event_handler('<Left>')
+    def handle_left_arrow(self, event: Event):
+        image_dir = self.image_dir
+        if (index := image_dir.get_prev_index(self.active_image.path)) is not None:
+            self._update_active_image(image_dir[index], image_dir)
+        # TODO: Popup dialog to pick next dir or wrap around upon hitting either end
+
+    @event_handler('<Right>')
+    def handle_right_arrow(self, event: Event):
+        image_dir = self.image_dir
+        if (index := image_dir.get_next_index(self.active_image.path)) is not None:
+            self._update_active_image(image_dir[index], image_dir)
 
     # endregion
