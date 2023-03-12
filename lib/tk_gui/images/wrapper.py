@@ -8,9 +8,8 @@ import logging
 from abc import ABC, abstractmethod
 from hashlib import sha256
 from io import BytesIO
-from math import floor, ceil
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 from cachetools import LRUCache
 from PIL.Image import Resampling, MIME, Image as PILImage, open as open_image
@@ -18,19 +17,18 @@ from PIL.ImageTk import PhotoImage
 from PIL.JpegImagePlugin import RAWMODE
 
 from tk_gui.caching import cached_property
+from tk_gui.geometry import Box, Sized
 from tk_gui.utils import get_user_temp_dir
 
 if TYPE_CHECKING:
-    from tk_gui.typing import XY, ImageType, PathLike, OptXYF, Color
+    from tk_gui.typing import XY, ImageType, PathLike, Color
     from .icons import Icons, Icon
 
 __all__ = ['ImageWrapper', 'SourceImage', 'ResizedImage', 'IconSourceImage']
 log = logging.getLogger(__name__)
 
-Box = tuple[float, float, float, float]
 
-
-class ImageWrapper(ABC):
+class ImageWrapper(Sized, ABC):
     @property
     @abstractmethod
     def pil_image(self) -> PILImage | None:
@@ -53,55 +51,18 @@ class ImageWrapper(ABC):
     # region Size
 
     @cached_property
+    def width(self) -> int:
+        return self.size[0]
+
+    @cached_property
+    def height(self) -> int:
+        return self.size[1]
+
+    @cached_property
     def size(self) -> XY:
         if (image := self.pil_image) is None:
             return 0, 0
         return image.size
-
-    @cached_property
-    def aspect_ratio(self) -> float:
-        width, height = self.size
-        return width / height
-
-    def _new_aspect_ratio_size(self, width: float, height: float) -> XY:
-        """Copied logic from :meth:`PIL.Image.Image.thumbnail`"""
-        x, y = floor(width), floor(height)
-        if x / y >= self.aspect_ratio:
-            x = self._new_aspect_ratio_width(y)
-        else:
-            y = self._new_aspect_ratio_height(x)
-        return x, y
-
-    def _new_aspect_ratio_width(self, y: int) -> int:
-        aspect = self.aspect_ratio
-        return _round_aspect(y * aspect, key=lambda n: abs(aspect - n / y))
-
-    def _new_aspect_ratio_height(self, x: int) -> int:
-        aspect = self.aspect_ratio
-        return _round_aspect(x / aspect, key=lambda n: 0 if n == 0 else abs(aspect - x / n))
-
-    def target_size(self, size: OptXYF, keep_ratio: bool = True) -> XY:
-        dst_w, dst_h = size
-        if dst_w is dst_h is None:
-            return self.size
-        elif None not in size:
-            if keep_ratio:
-                return self._new_aspect_ratio_size(dst_w, dst_h)
-            return floor(dst_w), floor(dst_h)
-        elif keep_ratio:
-            if dst_w is None:
-                dst_h = floor(dst_h)
-                dst_w = self._new_aspect_ratio_width(dst_h)
-            elif dst_h is None:
-                dst_w = floor(dst_w)
-                dst_h = self._new_aspect_ratio_height(dst_w)
-            return dst_w, dst_h
-        else:
-            src_w, src_h = self.size
-            if dst_w is None:
-                return src_w, floor(dst_h)
-            elif dst_h is None:
-                return floor(dst_w), src_h
 
     @cached_property
     def size_percent(self) -> float:
@@ -118,6 +79,13 @@ class ImageWrapper(ABC):
         raise NotImplementedError
 
     # endregion
+
+    @cached_property
+    def box(self) -> Box:
+        return Box.from_pos_and_size(0, 0, *self.size)
+
+    def get_bbox(self) -> Box:
+        return Box(*self.pil_image.getbbox())
 
     # region Format
 
@@ -148,7 +116,7 @@ class ImageWrapper(ABC):
         size: XY,
         keep_ratio: bool = True,
         resample: Resampling = None,
-        box: Box = None,
+        box: tuple[float, float, float, float] = None,
         reducing_gap: float = None,
     ) -> PILImage:
         size = self.target_size(size, keep_ratio)
@@ -369,8 +337,3 @@ class ImageCache:
 
 
 resized_cache: ImageCache = ImageCache()
-
-
-def _round_aspect(number: float, key: Callable[[float], float]) -> int:
-    rounded = min(floor(number), ceil(number), key=key)
-    return rounded if rounded > 1 else 1

@@ -10,7 +10,7 @@ import logging
 from typing import TYPE_CHECKING, Optional, Any
 
 from ..elements.buttons import OK
-from ..images.utils import icon_path
+from ..images.icons import icon_path
 from .base import BasicPopup
 from .basic_prompts import BoolPopup, TextPromptPopup, LoginPromptPopup, PasswordPromptPopup
 

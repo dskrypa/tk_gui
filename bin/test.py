@@ -17,8 +17,7 @@ from tk_gui.elements.menu.items import ToUpperCase, ToTitleCase, ToLowerCase, Op
 from tk_gui.elements.menu.items import CloseWindow
 from tk_gui.elements.text import Multiline, gui_log_handler
 from tk_gui.event_handling import ClickHighlighter
-from tk_gui.images.icons import Icons
-from tk_gui.images.utils import ICONS_DIR
+from tk_gui.images.icons import Icons, ICONS_DIR
 from tk_gui.images.wrapper import IconSourceImage
 from tk_gui.popups.about import AboutPopup
 from tk_gui.popups.raw import PickColor

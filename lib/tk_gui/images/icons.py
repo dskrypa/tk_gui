@@ -8,19 +8,24 @@ bootstrap-icons font.
 from __future__ import annotations
 
 from base64 import b64encode
+from importlib.resources import path as get_data_path
 from io import BytesIO
 from typing import TYPE_CHECKING, Optional, Union, TypeVar, Iterator, Iterable
 
 from PIL.Image import Image as PILImage, new as new_image, core as pil_image_core
 from PIL.ImageFont import FreeTypeFont, truetype
 
+from tk_gui.geometry import Box
 from .color import color_to_rgb, find_unused_color
-from .utils import ICONS_DIR, calculate_resize
 
 if TYPE_CHECKING:
-    from ..typing import XY, Color, RGB, RGBA, ImageType  # noqa
+    from pathlib import Path
+    from tk_gui.typing import XY, Color, RGB, RGBA, ImageType  # noqa
 
-__all__ = ['Icons', 'PlaceholderCache', 'placeholder_icon_cache']
+__all__ = ['Icons', 'PlaceholderCache', 'placeholder_icon_cache', 'icon_path']
+
+with get_data_path('tk_gui', 'icons') as _icon_path:
+    ICONS_DIR = _icon_path
 
 ICON_DIR = ICONS_DIR.joinpath('bootstrap')
 
@@ -127,26 +132,16 @@ class Icons:
             if len(bg) != 3:
                 bg = (*bg, 0)
 
-        image = self.draw(icon, size, color, bg)
         # While the image will need to be drawn twice, the extra step is unavoidable to be able to produce an image
         # that matches the expected size due to differences in shapes between icons.
-        target_size = _calculate_redraw_size(image, *self._font_and_size(size)[1])
+        image = self.draw(icon, size, color, bg)
+        # The dimensions that would have been the result of cropping the image from the initial size are used with the
+        # expected size to calculate the larger target width/height necessary to produce an image that is as close as
+        # possible to the expected size after it has been cropped.
+        target_size = Box(*image.getbbox()).scale_size(self._font_and_size(size)[1])
         image = self.draw(icon, target_size, color, bg)
         bbox = image.getbbox()
         return image.crop(bbox)
-
-
-def _calculate_redraw_size(image: PILImage, exp_width: int, exp_height: int) -> XY:
-    # The dimensions that would have been the result of cropping the image from the initial size are used with the
-    # expected size to calculate the larger target width/height necessary to produce an image that is as close as
-    # possible to the expected size after it has been cropped.
-    x1, y1, x2, y2 = image.getbbox()
-    crp_width, crp_height = (x2 - x1), (y2 - y1)  # Cropped width/height
-    trg_width = exp_width / (crp_width / exp_width)
-    trg_height = exp_height / (crp_height / exp_height)
-    target_size = calculate_resize(x2 - x1, y2 - y1, trg_width, trg_height)  # Necessary to stay within bounds
-    # log.debug(f'Using {target_size=} {trg_width=} x {trg_height=}')
-    return target_size
 
 
 def draw_icon(size: XY, text: str, fg: RGB | RGBA, bg: RGB | RGBA, font: FreeTypeFont) -> PILImage:
@@ -191,3 +186,7 @@ class PlaceholderCache:
 
 
 placeholder_icon_cache: PlaceholderCache = PlaceholderCache()
+
+
+def icon_path(rel_path: str) -> Path:
+    return ICONS_DIR.joinpath(rel_path)

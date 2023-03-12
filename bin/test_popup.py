@@ -6,8 +6,7 @@ import time
 from cli_command_parser import Command, Action, Counter, Option, main
 
 from tk_gui.__version__ import __author_email__, __version__, __author__, __url__  # noqa
-from tk_gui.images.icons import Icons
-from tk_gui.images.utils import ICONS_DIR
+from tk_gui.images.icons import Icons, ICONS_DIR
 from tk_gui.popups import ImagePopup, AnimatedPopup, SpinnerPopup, ClockPopup, BasicPopup
 from tk_gui.popups.about import AboutPopup
 from tk_gui.popups.basic_prompts import TextPromptPopup, LoginPromptPopup
