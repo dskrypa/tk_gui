@@ -15,6 +15,7 @@ class ImageViewer(Command):
 
     def __init__(self):
         logging.getLogger('PIL.PngImagePlugin').setLevel(50)
+        logging.getLogger('PIL.TiffImagePlugin').setLevel(50)
         log_fmt = '%(asctime)s %(levelname)s %(name)s %(lineno)d %(message)s' if self.verbose > 1 else '%(message)s'
         level = logging.DEBUG if self.verbose else logging.INFO
         logging.basicConfig(level=level, format=log_fmt)

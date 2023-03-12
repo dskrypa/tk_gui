@@ -56,6 +56,7 @@ class ImageScrollFrame(ScrollFrame):
         return Image(None, side='left', **kwargs), Image(None, side='right', **kwargs)
 
     def get_custom_layout(self) -> Layout:
+        # TODO: Top/bottom spacers, or implement something using Canvas's create_image properly...
         yield [*self.spacers, self.__image]
 
     def update_spacer_width(self, width: int):
@@ -142,9 +143,10 @@ class ActiveImage:
     src_image: SourceImage
     image_dir: ImageDir = None
 
-    def __init__(self, image: ImageType | ImageWrapper, image_dir: ImageDir = None):
+    def __init__(self, image: ImageType | ImageWrapper, window_size: XY = None, image_dir: ImageDir = None):
         self.src_image = SourceImage.from_image(image)
-        self.image = self.src_image
+        self.image = image = self.src_image.as_size(window_size)
+        log.debug(f'Initialized ActiveImage with {image=}')
         if image_dir is None:
             self.image_dir = ImageDir(self.src_image.path.parent)
         else:
@@ -208,12 +210,13 @@ class ImageView(View):
     def __init__(self, image: ImageType | ImageWrapper, title: str = None, **kwargs):
         kwargs.setdefault('margins', (0, 0))
         kwargs.setdefault('exit_on_esc', True)
-        # kwargs.setdefault('config_name', self.__class__.__name__)
+        kwargs.setdefault('config_name', self.__class__.__name__)
         super().__init__(title=title or 'Image View', **kwargs)
         self._set_active_image(image)
 
     def _set_active_image(self, image: ImageType | ImageWrapper, image_dir: ImageDir = None):
-        self.active_image = ActiveImage(image, image_dir)
+        src_image = SourceImage.from_image(image)
+        self.active_image = ActiveImage(src_image, self._init_size(src_image), image_dir)
         self.image_dir = self.active_image.image_dir
 
     # region Title
@@ -244,6 +247,8 @@ class ImageView(View):
 
     def get_pre_window_layout(self) -> Layout:
         yield [self.menu]
+
+    def get_post_window_layout(self) -> Layout:
         yield [self.image_frame]
         yield [self.info_bar]
 
@@ -257,11 +262,17 @@ class ImageView(View):
 
     @cached_property
     def gui_image(self) -> Image:
-        image = self.active_image.resize(self._init_size())
+        image = self.active_image.resize(self._init_size(self.active_image.src_image))
         return Image(image, size=image.size, pad=(0, 0))
 
-    def _init_size(self) -> XY:
-        src_w, src_h = self.active_image.src_image.size
+    def _init_size(self, src_image: SourceImage) -> XY:
+        src_w, src_h = src_image.size
+        try:
+            win_w, win_h = self.window.true_size
+        except AttributeError:  # Initial image
+            pass
+        else:
+            src_w, src_h = min(win_w, src_w), min(win_h, src_h)
         if monitor := self.get_monitor():
             mon_w, mon_h = monitor.work_area.size
             # log.debug(f'_init_size: monitor size={(mon_w, mon_h)}')
@@ -281,14 +292,15 @@ class ImageView(View):
         # TODO: Horizontal scroll is not always registering correctly
         # TODO: Shrink to fit if larger than current window
         self._set_active_image(image, image_dir)
-        self._update(self.active_image.resize(self._init_size()))
+        # self._update(self.active_image.resize((self._init_size()))
+        self._update(self.active_image.image)
 
     def _update_size(self, size: XY = None):
         # TODO: Resize creep on init sometimes
         try:
             win_w, win_h = size
         except TypeError:
-            win_w, win_h = self.window.size
+            win_w, win_h = self.window.true_size
         to_fill = win_w - self.active_image.image.width - self._width_offset
         if (spacer_w := to_fill // 2) < 5:
             spacer_w = 1
@@ -348,6 +360,7 @@ class ImageView(View):
 
     @event_handler('<Right>')
     def handle_right_arrow(self, event: Event):
+        # TODO: Add support for ctrl+left/right to jump by (up to) 5 instead of 1
         image_dir = self.image_dir
         if (index := image_dir.get_next_index(self.active_image.path)) is not None:
             self._update_active_image(image_dir[index], image_dir)
