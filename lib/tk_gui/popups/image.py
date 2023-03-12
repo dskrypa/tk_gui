@@ -7,13 +7,14 @@ Tkinter GUI image popups
 from __future__ import annotations
 
 import logging
+from abc import ABC, abstractmethod
 from concurrent.futures import Future, TimeoutError
 from threading import Thread
-from typing import TYPE_CHECKING, Optional, Union, Callable, TypeVar, ParamSpec
+from typing import TYPE_CHECKING, Optional, Callable, TypeVar, ParamSpec
 
 from tk_gui.caching import cached_property
 from tk_gui.elements import Text
-from tk_gui.elements.images import AnimatedType, Image, BaseImage, Animation, ClockImage, SpinnerImage, get_size
+from tk_gui.elements.images import Image, BaseImage, BaseAnimation, Animation, ClockImage, SpinnerImage
 from tk_gui.event_handling import event_handler
 from tk_gui.event_handling.futures import run_func_in_future
 from tk_gui.images.wrapper import ImageWrapper, SourceImage
@@ -25,8 +26,6 @@ if TYPE_CHECKING:
 
 __all__ = ['ImagePopup', 'AnimatedPopup', 'SpinnerPopup', 'ClockPopup']
 log = logging.getLogger(__name__)
-
-_NotSet = object()
 
 P = ParamSpec('P')
 T = TypeVar('T')
@@ -124,38 +123,31 @@ def _get_new_size(image: BaseImage, new_w: int, new_h: int) -> XY | None:
     return None
 
 
-class AnimatedPopup(Popup):
-    _gui_image: Animation = _NotSet
+class BaseAnimatedPopup(Popup, ABC):
+    gui_image: BaseAnimation
+    _empty: bool = True
     _last_size: XY
     orig_size: XY
-    _empty: bool = True
     text: str = None
     text_above_img: bool = True
 
-    def __init__(
-        self,
-        image: Union[ImageType, AnimatedType],
-        title: str = None,
-        *,
-        text: str = None,
-        text_above_img: bool = True,
-        **kwargs,
-    ):
+    def __init__(self, title: str = None, *, text: str = None, text_above_img: bool = True, **kwargs):
         kwargs.setdefault('margins', (0, 0))
         kwargs.setdefault('bind_esc', True)
         kwargs.setdefault('keep_on_top', False)
         kwargs.setdefault('can_minimize', True)
         super().__init__(title=title or 'Image', **kwargs)
-        if self.gui_image is _NotSet:
-            # This will only happen for non-cached properties, but it will also (intentionally) force subclasses that
-            # usa a cached_property to populate the value immediately.
-            self.gui_image = image
+        self.gui_image = self.init_gui_image()
         if text:
             self.text = text
             self.text_above_img = text_above_img
 
     def __repr__(self) -> str:
-        return f'<{self.__class__.__name__}[title={self.title!r}, orig={self.orig_size}, empty: {self._empty}]>'
+        return f'<{self.__class__.__name__}[title={self.title!r}, orig={self.orig_size}]>'
+
+    @abstractmethod
+    def init_gui_image(self) -> BaseAnimation:
+        raise NotImplementedError
 
     # region Title
 
@@ -181,18 +173,6 @@ class AnimatedPopup(Popup):
             text_row = [Text(text, side='t')]
             return [text_row, image_row] if self.text_above_img else [image_row, text_row]
         return [image_row]
-
-    @property
-    def gui_image(self) -> Animation:
-        return self._gui_image
-
-    @gui_image.setter
-    def gui_image(self, value: AnimatedType):
-        # log.debug(f'_set_image: {image=}')
-        self.orig_size = get_size(value) if value else (0, 0)
-        self._last_size = init_size = self._init_size()
-        self._gui_image = animation = Animation(value, size=init_size, pad=(2, 2))
-        self._empty = animation.size == (0, 0)
 
     def _init_size(self) -> XY:
         src_w, src_h = self.orig_size
@@ -260,7 +240,35 @@ class AnimatedPopup(Popup):
                     window.update()
 
 
-class SpinnerPopup(AnimatedPopup):
+class AnimatedPopup(BaseAnimatedPopup):
+    src_image: SourceImage
+    gui_image: Animation
+
+    def __init__(
+        self,
+        image: ImageType | ImageWrapper,
+        title: str = None,
+        *,
+        text: str = None,
+        text_above_img: bool = True,
+        **kwargs,
+    ):
+        self.src_image = SourceImage.from_image(image)
+        super().__init__(title=title, text=text, text_above_img=text_above_img, **kwargs)
+
+    def __repr__(self) -> str:
+        return f'<{self.__class__.__name__}[title={self.title!r}, orig={self.orig_size}, empty={self._empty}]>'
+
+    def init_gui_image(self) -> Animation:
+        self.orig_size = self.src_image.size
+        self._last_size = init_size = self._init_size()
+        animation = Animation(self.src_image, size=init_size, pad=(2, 2))
+        self._empty = animation.size == (0, 0)
+        return animation
+
+
+class SpinnerPopup(BaseAnimatedPopup):
+    gui_image: SpinnerImage
     _empty = False
 
     def __init__(self, *args, img_size: XY = None, **kwargs):
@@ -270,26 +278,25 @@ class SpinnerPopup(AnimatedPopup):
         kwargs.setdefault('can_minimize', False)
         kwargs.setdefault('no_title_bar', True)
         # kwargs.setdefault('alpha_channel', 0.8)  # This would make it semi-transparent; transparent_color didn't work
-        super().__init__(None, *args, **kwargs)
+        super().__init__(*args, **kwargs)
 
-    @cached_property
-    def gui_image(self) -> SpinnerImage:
+    def init_gui_image(self) -> SpinnerImage:
         self.orig_size = self._img_size or SpinnerImage.DEFAULT_SIZE
         self._last_size = init_size = self._init_size()
         return SpinnerImage(size=init_size, pad=(2, 2))
 
 
-class ClockPopup(AnimatedPopup):
+class ClockPopup(BaseAnimatedPopup):
+    gui_image: ClockImage
     _empty = False
 
     def __init__(self, *args, img_size: XY = None, toggle_slim_on_click: bool = False, **kwargs):
         self._img_size = img_size
         self._toggle_slim_on_click = toggle_slim_on_click
         kwargs.setdefault('style', {'bg': '#000000'})
-        super().__init__(None, *args, **kwargs)
+        super().__init__(*args, **kwargs)
 
-    @cached_property
-    def gui_image(self) -> ClockImage:
+    def init_gui_image(self) -> ClockImage:
         kwargs = {'toggle_slim_on_click': self._toggle_slim_on_click, 'pad': (2, 2)}
         if img_size := self._img_size:
             self.orig_size = img_size

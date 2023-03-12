@@ -115,8 +115,10 @@ class Spinner:
         self.size = (size, size) if isinstance(size, int) else size
         return self
 
-    def cycle(self, wrapper: Callable = None, duration: int = None, default_duration: int = 100) -> FrameCycle:
-        return FrameCycle(self.frames(), wrapper, duration, default_duration)
+    def cycle(
+        self, wrapper: Callable = None, duration: int = None, default_duration: int = 100, n: int = 0
+    ) -> FrameCycle:
+        return FrameCycle(self.frames(), wrapper, duration, default_duration, n=n)
 
     def save_frames(self, path: PathLike, prefix: str = 'frame_', format: str = 'PNG', mode: str = None):  # noqa
         path = _prepare_dir(path)

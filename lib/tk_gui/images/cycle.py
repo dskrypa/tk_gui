@@ -36,8 +36,9 @@ class FrameCycle(Generic[T_co]):
         wrapper: Callable[[PILImage], T_co] = None,
         duration: int = None,
         default_duration: int = 100,
+        n: int = 0
     ):
-        self.n = 0
+        self.n = n
         self._wrapper = wrapper
         self._duration = duration
         self._default_duration = default_duration
@@ -103,9 +104,9 @@ class FrameCycle(Generic[T_co]):
 class PhotoImageCycle(FrameCycle[PhotoImage]):
     __slots__ = ('src_image', '_pi_frames')
 
-    def __init__(self, path: PathLike, duration: int = None, default_duration: int = 100):  # noqa
+    def __init__(self, path: PathLike, duration: int = None, default_duration: int = 100, n: int = 0):  # noqa
         self.src_image = src_image = SourceImage.from_image(Path(path).expanduser())
-        self.n = 0
+        self.n = n
         self._pi_frames = tuple(
             PhotoImage(file=path.as_posix(), format=f'gif -index {n}') for n in range(src_image.pil_image.n_frames)
         )

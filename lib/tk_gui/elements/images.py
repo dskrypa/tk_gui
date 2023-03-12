@@ -8,18 +8,16 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from datetime import datetime, timedelta
 from inspect import Signature
-from pathlib import Path
 from tkinter import Label, TclError, Event
 from typing import TYPE_CHECKING, Optional, Any, Union
 
-from PIL.Image import Image as PILImage, Resampling
+from PIL.Image import Resampling
 from PIL.ImageSequence import Iterator as FrameIterator
 from PIL.ImageTk import PhotoImage
 
 from tk_gui.enums import Anchor
-from tk_gui.images import SevenSegmentDisplay, calculate_resize
+from tk_gui.images.clock import SevenSegmentDisplay, ClockCycle
 from tk_gui.images.cycle import FrameCycle, PhotoImageCycle
 from tk_gui.images.spinner import Spinner
 from tk_gui.images.wrapper import ImageWrapper, SourceImage, ResizedImage
@@ -30,20 +28,16 @@ if TYPE_CHECKING:
     from tk_gui.pseudo_elements import Row
     from tk_gui.typing import XY, BindTarget, ImageType, Bool, TkContainer, HasFrame
 
-__all__ = ['Image', 'Animation', 'SpinnerImage', 'ClockImage', 'get_size']
+__all__ = ['Image', 'Animation', 'SpinnerImage', 'ClockImage']
 log = logging.getLogger(__name__)
 
-AnimatedType = Union[PILImage, Spinner, Path, str, '_ClockCycle']
-_Image = Optional[Union[PILImage, PhotoImage]]
-ImageAndSize = tuple[_Image, int, int]
-ImageCycle = Union[FrameCycle, '_ClockCycle']
+ImageCycle = Union[FrameCycle, ClockCycle]
 
 
 class BaseImage(Element, ABC, base_style_layer='image'):
     _callback: BindTarget = None
     widget: Label = None
     animated: bool = False
-    popup_title: str = None
     anchor_image: Anchor = Anchor.NONE
 
     def __init_subclass__(cls, animated: bool = None, **kwargs):
@@ -88,7 +82,7 @@ class BaseImage(Element, ABC, base_style_layer='image'):
     def grid_into(self, parent: HasFrame, row: int, column: int, **kwargs):
         raise RuntimeError('Grid is not currently supported for images')
 
-    def _pack_into(self, row: Row, image: _Image, width: int, height: int):
+    def _pack_into(self, row: Row, image: PhotoImage, width: int, height: int):
         # log.debug(f'Packing {image=} into row with {width=}, {height=}')
         kwargs = {
             'width': width,
@@ -107,7 +101,7 @@ class BaseImage(Element, ABC, base_style_layer='image'):
         if (callback := self._callback) is not None:
             self.left_click_cb = self.normalize_callback(callback)
 
-    def _re_pack(self, image: _Image, width: int, height: int):
+    def _re_pack(self, image: PhotoImage, width: int, height: int):
         # log.debug(f'_re_pack: {width=}, {height=}, {self}')
         self.size = (width, height)
         widget: Label = self.widget
@@ -121,6 +115,7 @@ class BaseImage(Element, ABC, base_style_layer='image'):
 class Image(BaseImage):
     _src_image: SourceImage = None
     _resize_kwargs: dict[str, bool | Resampling | None]
+    popup_title: str = None
 
     def __init__(
         self,
@@ -195,28 +190,23 @@ class Image(BaseImage):
         ImagePopup(src_image, title, parent=self.window).run()
 
 
-class Animation(BaseImage, animated=True):
+class BaseAnimation(BaseImage, ABC, animated=True):
     image_cycle: FrameCycle
 
-    def __init__(
-        self,
-        image: AnimatedType,
-        last_frame_num: int = 0,
-        paused: bool = False,
-        *,
-        callback: BindTarget = None,
-        **kwargs,
-    ):
+    def __init__(self, last_frame_num: int = 0, paused: bool = False, *, callback: BindTarget = None, **kwargs):
         Element.__init__(self, **kwargs)
-        self.__image = image
         self._last_frame_num = last_frame_num
         self._next_id = None
         self._run = not paused
         self._callback = callback
 
+    @abstractmethod
+    def init_image_cycle(self) -> ImageCycle:
+        raise NotImplementedError
+
     def pack_into(self, row: Row):
         # log.debug(f'pack_into: {self.size=}')
-        self.image_cycle = image_cycle = normalize_image_cycle(self.__image, self.size, self._last_frame_num)
+        self.image_cycle = image_cycle = self.init_image_cycle()
         # log.debug(f'Prepared {len(image_cycle)} frames')
         frame, delay = next(image_cycle)
         try:
@@ -230,40 +220,9 @@ class Animation(BaseImage, animated=True):
         if self._run:
             self._next_id = self.widget.after(delay, self.next)
 
-    # region Size & Resize
-
-    def target_size(self, width: int, height: int) -> XY:
-        try:
-            size = self.__image.size
-        except AttributeError:
-            size = self.size
-        return calculate_resize(*size, width, height)
-
+    @abstractmethod
     def resize(self, width: int, height: int):
-        # log.debug(f'resize: {width=}, {height=}, {self}')
-        # self.size = size = (width, height)
-        self.image_cycle = image_cycle = self._resize_cycle((width, height))
-        image = self.__image
-        try:
-            width, height = size = image.size
-        except AttributeError:
-            try:
-                width, height = size = image.width, image.height
-            except AttributeError:  # TODO: Improve this...
-                return
-
-        # self.size = size
-        frame, delay = next(image_cycle)
-        self._re_pack(frame, width, height)
-        if self._run:
-            self._cancel()
-            self.next()
-            # self._next_id = self.widget.after(delay, self.next)
-
-    def _resize_cycle(self, size: XY) -> ImageCycle:
-        return normalize_image_cycle(self.__image, size, self.image_cycle.n)
-
-    # endregion
+        raise NotImplementedError
 
     # region Display Animation Frames
 
@@ -317,7 +276,45 @@ class Animation(BaseImage, animated=True):
     # endregion
 
 
-class SpinnerImage(Animation):
+class Animation(BaseAnimation):
+    _src_image: SourceImage = None
+
+    def __init__(
+        self,
+        image: ImageType | ImageWrapper = None,
+        last_frame_num: int = 0,
+        paused: bool = False,
+        *,
+        callback: BindTarget = None,
+        **kwargs,
+    ):
+        super().__init__(last_frame_num=last_frame_num, paused=paused, callback=callback, **kwargs)
+        self._src_image = SourceImage.from_image(image)
+
+    def init_image_cycle(self) -> ImageCycle:
+        src_image = self._src_image
+        if path := src_image.path:
+            return PhotoImageCycle(path, n=self._last_frame_num)
+        else:
+            return FrameCycle(tuple(FrameIterator(src_image.pil_image)), PhotoImage, n=self._last_frame_num)
+
+    # region Size & Resize
+
+    def target_size(self, width: int, height: int) -> XY:
+        return self._src_image.target_size((width, height))
+
+    def resize(self, width: int, height: int):
+        # log.debug(f'resize: {width=}, {height=}, {self}')
+        # Note: GIF resizing does not work well with PIL - a different lib is likely necessary
+        self._re_pack(next(self.image_cycle)[0], *self._src_image.size)
+        if self._run:
+            self._cancel()
+            self.next()
+
+    # endregion
+
+
+class SpinnerImage(BaseAnimation):
     _spinner_keys = set(Signature.from_callable(Spinner).parameters.keys())
     DEFAULT_SIZE = (200, 200)
     DEFAULT_KWARGS = {'frame_fade_pct': 0.01, 'frame_duration_ms': 20, 'frames_per_spoke': 1}
@@ -329,47 +326,34 @@ class SpinnerImage(Animation):
         """
         spinner_kwargs = _extract_kwargs(kwargs, self._spinner_keys, self.DEFAULT_KWARGS)
         size = spinner_kwargs.setdefault('size', self.DEFAULT_SIZE)
-        self.spinner = spinner = Spinner(**spinner_kwargs)
-        super().__init__(spinner, size=size, **kwargs)
+        self.spinner = Spinner(**spinner_kwargs)
+        super().__init__(size=size, **kwargs)
+
+    def init_image_cycle(self) -> ImageCycle:
+        if size := self.size:
+            self.spinner.resize(size)
+        return self.spinner.cycle(PhotoImage, n=self._last_frame_num)
 
     def target_size(self, width: int, height: int) -> XY:
-        # TODO: Add support for keeping aspect ratio
+        # TODO: Add support for keeping aspect ratio?
         return width, height
+
+    def resize(self, width: int, height: int):
+        # log.debug(f'resize: {width=}, {height=}, {self}')
+        spinner = self.spinner
+        spinner.resize((width, height))
+        self.image_cycle = frame_cycle = spinner.cycle(PhotoImage, n=self.image_cycle.n)
+        self._re_pack(next(frame_cycle)[0], *spinner.size)
+        if self._run:
+            self._cancel()
+            self.next()
 
 
 # region Digital Clock
 
 
-class _ClockCycle:
-    __slots__ = ('clock', 'delay', 'last_time', '_last_frame', 'n')
-    SECOND = timedelta(seconds=1)
-
-    def __init__(self, clock: SevenSegmentDisplay):
-        self.clock = clock
-        self.delay = 200 if clock.seconds else 1000
-        self.last_time = datetime.now() - self.SECOND
-        self._last_frame = None
-        self.n = 0
-
-    def __next__(self):
-        now = datetime.now()
-        if now.second != self.last_time.second:
-            self.last_time = now
-            self._last_frame = frame = PhotoImage(self.clock.draw_time(now))
-        else:
-            frame = self._last_frame
-
-        return frame, self.delay
-
-    back = __next__
-
-    @property
-    def size(self) -> XY:
-        return self.clock.time_size()
-
-
-class ClockImage(Animation):
-    image_cycle: _ClockCycle
+class ClockImage(BaseAnimation):
+    image_cycle: ClockCycle
     _clock_keys = set(Signature.from_callable(SevenSegmentDisplay).parameters.keys())
     DEFAULT_KWARGS = {'bar_pct': 0.2, 'width': 40}
 
@@ -409,81 +393,36 @@ class ClockImage(Animation):
 
         kwargs.setdefault('pad', (0, 0))
         kwargs.setdefault('size', clock.time_size())
-        super().__init__(_ClockCycle(clock), style=style or Style(bg='black'), **kwargs)
+        super().__init__(style=style or Style(bg='black'), **kwargs)
+        self._clock_cycle = ClockCycle(clock)
 
     def toggle_slim(self, event: Event = None):
-        slim = self._slim
-        clock = self.clock
+        slim, clock = self._slim, self.clock
         clock.resize(bar_pct=(clock.bar_pct * (2 if slim else 0.5)), preserve_height=True)
         self._slim = not slim
-        self.image_cycle.last_time -= _ClockCycle.SECOND
+        self.image_cycle.last_time -= ClockCycle.SECOND
 
-    def _resize_cycle(self, size: XY) -> ImageCycle:
-        self.clock.resize_full(*size)
-        self.image_cycle.last_time -= _ClockCycle.SECOND
-        return self.image_cycle
+    def init_image_cycle(self) -> ImageCycle:
+        frame_cycle = self._clock_cycle
+        if size := self.size:
+            frame_cycle.clock.resize_full(*size)
+            frame_cycle.last_time -= frame_cycle.SECOND
+        return frame_cycle
 
     def target_size(self, width: int, height: int) -> XY:
         return self.clock.calc_resize_width(width, height)[0]
 
+    def resize(self, width: int, height: int):
+        # log.debug(f'resize: {width=}, {height=}, {self}')
+        self.clock.resize_full(width, height)
+        self.image_cycle.last_time -= ClockCycle.SECOND
+        self._re_pack(next(self.image_cycle)[0], *self._clock_cycle.size)
+        if self._run:
+            self._cancel()
+            self.next()
+
 
 # endregion
-
-
-def normalize_image_cycle(image: AnimatedType, size: XY = None, last_frame_num: int = 0) -> ImageCycle:
-    if isinstance(image, Spinner):
-        if size:
-            image.resize(size)
-        frame_cycle = image.cycle(PhotoImage)
-    elif isinstance(image, _ClockCycle):
-        frame_cycle = image
-        if size:
-            clock = frame_cycle.clock
-            clock.resize_full(*size)
-            frame_cycle.last_time -= frame_cycle.SECOND
-    else:
-        src_image = SourceImage.from_image(image)
-        if path := src_image.path:
-            frame_cycle = PhotoImageCycle(path)
-        else:
-            frame_cycle = FrameCycle(tuple(FrameIterator(src_image.pil_image)), PhotoImage)
-
-        # TODO: Likely need a different lib for gif resize
-        # if size and size != get_size(image):
-        #     frame_cycle = frame_cycle.resized(*size)
-
-    # elif isinstance(image, (Path, str)):
-    #     frame_cycle = PhotoImageCycle(Path(image).expanduser())
-    #     if size:
-    #         log.debug(f'Resizing {frame_cycle=} to {size=}')
-    #         frame_cycle = frame_cycle.resized(*size)
-    # else:  # TODO: PhotoImageCycle will not result in expected resize behavior...
-    #     if path := getattr(image, 'filename', None) or getattr(getattr(image, 'fp', None), 'name', None):
-    #         frame_cycle = PhotoImageCycle(Path(path))
-    #         if size:
-    #             log.debug(f'Resizing {frame_cycle=} to {size=}')
-    #             frame_cycle = frame_cycle.resized(*size)
-    #     else:
-    #         raise ValueError(f'Unexpected image type for {image=}')
-    #         # image = AnimatedGif(image)
-    #         # if size:
-    #         #     image = image.resize(size, 1)
-    #         # frame_cycle = image.cycle(PhotoImage)
-
-    frame_cycle.n = last_frame_num
-    return frame_cycle
-
-
-def get_size(image: AnimatedType | SevenSegmentDisplay | ImageWrapper) -> XY:
-    if isinstance(image, Spinner):
-        return image.size
-    elif isinstance(image, SevenSegmentDisplay):
-        return image.time_size()
-        # return image.width, image.height
-    elif isinstance(image, ImageWrapper):
-        return image.size
-    else:
-        return SourceImage.from_image(image).size
 
 
 def _extract_kwargs(kwargs: dict[str, Any], keys: set[str], defaults: dict[str, Any]) -> dict[str, Any]:

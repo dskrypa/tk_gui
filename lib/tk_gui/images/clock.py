@@ -6,19 +6,20 @@ Utilities for working with PIL images.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from math import floor, ceil
 from typing import TYPE_CHECKING, Optional, Iterator
 
 from PIL.Image import Image as PILImage, new as new_image
 from PIL.ImageDraw import ImageDraw, Draw
+from PIL.ImageTk import PhotoImage
 
 from .color import color_to_rgb, find_unused_color
 
 if TYPE_CHECKING:
     from ..typing import XY
 
-__all__ = ['SevenSegmentDisplay']
+__all__ = ['SevenSegmentDisplay', 'ClockCycle']
 
 PolygonPoints = tuple[tuple[float, float], ...]
 
@@ -276,3 +277,31 @@ class SevenSegmentDisplay:
         y3 = y2 + bar
         yield (x0, y0), (x1, y0), (x1, y1), (x0, y1)
         yield (x0, y2), (x1, y2), (x1, y3), (x0, y3)
+
+
+class ClockCycle:
+    __slots__ = ('clock', 'delay', 'last_time', '_last_frame', 'n')
+    SECOND = timedelta(seconds=1)
+
+    def __init__(self, clock: SevenSegmentDisplay):
+        self.clock = clock
+        self.delay = 200 if clock.seconds else 1000
+        self.last_time = datetime.now() - self.SECOND
+        self._last_frame = None
+        self.n = 0
+
+    def __next__(self):
+        now = datetime.now()
+        if now.second != self.last_time.second:
+            self.last_time = now
+            self._last_frame = frame = PhotoImage(self.clock.draw_time(now))
+        else:
+            frame = self._last_frame
+
+        return frame, self.delay
+
+    back = __next__
+
+    @property
+    def size(self) -> XY:
+        return self.clock.time_size()
