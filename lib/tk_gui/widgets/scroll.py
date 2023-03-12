@@ -185,8 +185,10 @@ class ScrollableListbox(ScrollableWidget, Frame, inner_cls=Listbox):
 
 class ScrollableContainer(ScrollableBase, ABC):
     _y_bind, _x_bind = ('<MouseWheel>', '<Shift-MouseWheel>') if ON_WINDOWS else ('<4>', '<5>')
+    auto_resize: bool = True
     canvas: Canvas
     inner_widget: TkContainer
+    _inner_id: int = None
     _last_scroll_region: tuple[int, int, int, int] = ()
     _last_size: XY = ()
     _x_config: AxisConfig
@@ -209,6 +211,7 @@ class ScrollableContainer(ScrollableBase, ABC):
         x_config: AxisConfig = None,
         y_config: AxisConfig = None,
         resize_offset: int = 43,  # Not sure whether this value is dynamic
+        auto_resize: bool = True,
         **kwargs,
     ):
         if 'relief' not in kwargs:
@@ -220,6 +223,8 @@ class ScrollableContainer(ScrollableBase, ABC):
         self.init_canvas(style, pad)
         self.init_inner(inner_cls, **(inner_kwargs or {}))
         self.resize_offset = resize_offset
+        if not auto_resize:
+            self.auto_resize = auto_resize
         if self._y_config.fill or self._x_config.fill:
             # If this was bound to the window, it would not handle some events well (ends up not filling)
             get_parent_or_none(self).bind('<Configure>', self._maybe_resize_scroll_region, add=True)  # noqa
@@ -247,7 +252,7 @@ class ScrollableContainer(ScrollableBase, ABC):
         kwargs.setdefault('highlightthickness', 0)
         canvas = self.canvas
         self.inner_widget = inner_widget = cls(canvas, **kwargs)
-        canvas.create_window(0, 0, window=inner_widget, anchor='nw')
+        self._inner_id = canvas.create_window(0, 0, window=inner_widget, anchor='nw')
         scroll_y, scroll_x = self._y_config.scroll, self._x_config.scroll
         if scroll_y:
             canvas.bind_all(self._y_bind, _scroll_y, add='+')
@@ -297,10 +302,16 @@ class ScrollableContainer(ScrollableBase, ABC):
     #     self.canvas.itemconfigure(self._inner_widget_id, width=event.width, height=event.height)
 
     @cached_property
+    def widgets(self) -> list[BaseWidget]:
+        return [self.canvas, self.inner_widget, *self._widgets()]
+
+    @cached_property
     def _top_level(self) -> Toplevel:
         return get_root_widget(self)
 
     def resize_scroll_region(self, size: XY | None, update_idletasks: Bool = True, force: Bool = False):
+        if not self.auto_resize and not force:
+            return
         inner = self.inner_widget
         if update_idletasks:
             inner.update_idletasks()  # Required for the required height/width to be correct
@@ -344,10 +355,6 @@ class ScrollableContainer(ScrollableBase, ABC):
             # log.debug(f'Updating scroll region to {bbox=} != {self._last_scroll_region=} for {self}')
             canvas.configure(scrollregion=bbox)
             self._last_scroll_region = bbox
-
-    @cached_property
-    def widgets(self) -> list[BaseWidget]:
-        return [self.canvas, self.inner_widget, *self._widgets()]
 
 
 class ScrollableToplevel(ScrollableContainer, Toplevel):
