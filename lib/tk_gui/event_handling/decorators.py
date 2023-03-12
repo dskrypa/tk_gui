@@ -39,10 +39,17 @@ class DelayedEventHandler:
         self.name = name
         self.cb_id_attr = f'__{name}_cb_id'
 
+    def __repr__(self) -> str:
+        func, widget_attr, delay_ms = self.func, self.delay_ms, self.delay_ms
+        return f'<{self.__class__.__name__}({func=}, {widget_attr=}, {delay_ms=})>'
+
     def __get__(self, instance: C, owner: Type[C]) -> DelayedEventHandler | BindCallback:
         if instance is None:
             return self
         return partial(self.handle_event, instance)
+
+    def __call__(self, instance: C, *args, **kwargs):
+        return self.handle_event(instance, *args, **kwargs)
 
     def handle_event(self, instance: C, event: Event):
         if widget_attr := self.widget_attr:
