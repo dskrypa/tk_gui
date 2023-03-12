@@ -12,7 +12,7 @@ from tk_gui.caching import cached_property
 from tk_gui.elements import Image, Text, BasicRowFrame, ScrollFrame, SizeGrip
 from tk_gui.elements.menu import MenuProperty, Menu, MenuGroup, MenuItem, CloseWindow
 from tk_gui.event_handling import event_handler, delayed_event_handler
-from tk_gui.images.wrapper import ImageWrapper, SourceImage
+from tk_gui.images.wrapper import ImageWrapper, SourceImage, ResizedImage
 from tk_gui.popups.about import AboutPopup
 from tk_gui.popups import pick_file_popup
 from tk_gui.utils import readable_bytes
@@ -63,28 +63,71 @@ class ImageScrollFrame(ScrollFrame):
         right.resize(width, 1)
 
 
+class ActiveImage:
+    src_image: SourceImage
+
+    def __init__(self, image: ImageType | ImageWrapper):
+        self.src_image = SourceImage.from_image(image)
+        self.image = self.src_image
+
+    @cached_property
+    def file_name(self) -> str:
+        if path := self.src_image.path:
+            return path.name
+        return ''
+
+    def title_parts(self) -> tuple[str, str]:
+        prefix = f'{self.file_name} - ' if self.file_name else ''
+        suffix = '' if self.image.size_percent == 1 else f' (Zoom: {self.image.size_str})'
+        return prefix, suffix
+
+    @cached_property
+    def _file_info(self) -> tuple[str, str, str]:
+        try:
+            stat_results = self.src_image.path.stat()
+        except AttributeError:
+            size_b, mod_time = 0, ''
+        else:
+            size_b = stat_results.st_size
+            mod_time = datetime.fromtimestamp(stat_results.st_mtime).isoformat(' ', 'seconds')
+        return mod_time, readable_bytes(size_b), readable_bytes(self.src_image.raw_size)
+
+    def get_info_bar_data(self) -> dict[str, str]:
+        image = self.image
+        mod_time, file_b, raw_b = self._file_info
+        return {
+            'size': f'{image.size_str} x {image.bits_per_pixel} BPP',
+            'dir_pos': '1/1',  # TODO
+            'size_pct': f'{image.size_percent:.0%}',
+            'size_bytes': f'{file_b} / {raw_b}',
+            'mod_time': mod_time,
+        }
+
+    def resize(self, size: XY) -> ResizedImage:
+        self.image = image = self.src_image.as_size(size)
+        return image
+
+    def scale_percent(self, percent: float) -> ResizedImage:
+        return self.resize(self.image.scale_percent(percent))
+
+
 class ImageView(View):
     menu = MenuProperty(MenuBar)
     _last_size: XY = None
-    src_image: SourceImage
+    active_image: ActiveImage
 
     def __init__(self, image: ImageType | ImageWrapper, title: str = None, **kwargs):
         kwargs.setdefault('margins', (0, 0))
         kwargs.setdefault('exit_on_esc', True)
         # kwargs.setdefault('config_name', self.__class__.__name__)
         super().__init__(title=title or 'Image View', **kwargs)
-        self.src_image = SourceImage.from_image(image)
-        self.image = self.src_image
+        self.active_image = ActiveImage(image)
 
     # region Title
 
     @property
     def title(self) -> str:
-        try:
-            prefix = f'{self.src_image.path.name} - '
-        except AttributeError:
-            prefix = ''
-        suffix = '' if self.image.size_percent == 1 else f' (Zoom: {self.image.size_str})'
+        prefix, suffix = self.active_image.title_parts()
         return f'{prefix}{self._title}{suffix})'
 
     @title.setter
@@ -94,13 +137,8 @@ class ImageView(View):
     # endregion
 
     def __repr__(self) -> str:
-        return f'<{self.__class__.__name__}[title={self._title!r}, src_image={self.src_image!r}]>'
-
-    @property
-    def image_name(self) -> str:
-        if path := self.src_image.path:
-            return path.name
-        return ''
+        src_image = self.active_image.src_image
+        return f'<{self.__class__.__name__}[title={self._title!r}, {src_image=}]>'
 
     # def init_window(self):
     #     from tk_gui.event_handling import ClickHighlighter
@@ -109,33 +147,16 @@ class ImageView(View):
     #     ClickHighlighter(level=0, log_event=True, log_event_kwargs=kwargs).register(window)
     #     return window
 
+    # region Layout
+
     def get_pre_window_layout(self) -> Layout:
         yield [self.menu]
         yield [self.image_frame]
         yield [self.info_bar]
 
-    def get_info_bar_data(self) -> dict[str, str]:
-        image = self.image
-        try:
-            stat_results = self.src_image.path.stat()
-        except AttributeError:
-            size_b, mod_time = 0, ''
-        else:
-            size_b = stat_results.st_size
-            mod_time = datetime.fromtimestamp(stat_results.st_mtime).isoformat(' ', 'seconds')
-
-        file_b, raw_b = readable_bytes(size_b), readable_bytes(image.raw_size)
-        return {
-            'size': f'{image.size_str} x {image.bits_per_pixel} BPP',
-            'dir_pos': '1/1',  # TODO
-            'size_pct': f'{image.size_percent:.0%}',
-            'size_bytes': f'{file_b} / {raw_b}',
-            'mod_time': mod_time,
-        }
-
     @cached_property
     def info_bar_elements(self) -> dict[str, Text]:
-        data = self.get_info_bar_data()
+        data = self.active_image.get_info_bar_data()
         kwargs = {'use_input_style': True, 'justify': 'c', 'pad': (1, 0)}
         # TODO: Better auto-sizing of these fields
         return {
@@ -157,31 +178,32 @@ class ImageView(View):
 
     @cached_property
     def gui_image(self) -> Image:
-        init_size = self._init_size()
-        src = self.src_image
-        if src.pil_image:
-            log.debug(f'{self}: Using {init_size=} to display image={src!r} with {src.format=} mime={src.mime_type!r}')
-        self.image = image = src.as_size(init_size)
+        image = self.active_image.resize(self._init_size())
         return Image(image, size=image.size, pad=(0, 0))
 
     def _init_size(self) -> XY:
-        src_w, src_h = self.src_image.size
+        src_w, src_h = self.active_image.src_image.size
         if monitor := self.get_monitor():
             mon_w, mon_h = monitor.work_area.size
             # log.debug(f'_init_size: monitor size={(mon_w, mon_h)}')
             return min(mon_w - 60, src_w), min(mon_h - 60, src_h)
         return src_w, src_h
 
+    # endregion
+
+    def _update(self, image: ResizedImage):
+        self.gui_image.update(image, image.size)
+        self.window.set_title(self.title)
+        for key, val in self.active_image.get_info_bar_data().items():
+            self.info_bar_elements[key].update(val)
+
+    # region Event Handling
+
     @menu['File']['Open'].callback
     def open_file(self, event):
-        if path := pick_file_popup(self.src_image.path.parent, title='Pick Image', parent=self.window):
-            self.src_image = src_image = SourceImage(path)
-            init_size = self._init_size()
-            self.image = image = src_image.as_size(init_size)
-            self.gui_image.update(image, image.size)
-            self.window.set_title(self.title)
-            for key, val in self.get_info_bar_data().items():
-                self.info_bar_elements[key].update(val)
+        if path := pick_file_popup(self.active_image.src_image.path.parent, title='Pick Image', parent=self.window):
+            self.active_image = ActiveImage(path)
+            self._update(self.active_image.resize(self._init_size()))
 
     @cached_property
     def _height_offset(self) -> int:
@@ -196,6 +218,7 @@ class ImageView(View):
 
     @cached_property
     def _widget(self):
+        # Needed for delayed_event_handler
         return self.window._root
 
     @event_handler('SIZE_CHANGED')
@@ -203,7 +226,7 @@ class ImageView(View):
         if self._last_size != size:
             self._last_size = size
             win_w, win_h = size
-            to_fill = win_w - self.image.width - self._width_offset
+            to_fill = win_w - self.active_image.image.width - self._width_offset
             if (spacer_w := to_fill // 2) < 5:
                 spacer_w = 1
             # log.debug(f'Using spacer {spc_w=} from {win_w=}, {self.image.width=}, {to_fill=}')
@@ -220,8 +243,7 @@ class ImageView(View):
             self._zoom_image(1.1)
 
     def _zoom_image(self, percent: float):
-        self.image = image = self.src_image.as_size(self.image.scale_percent(percent))
-        self.gui_image.update(image, image.size)
-        self.window.set_title(self.title)
-        for key, val in self.get_info_bar_data().items():
-            self.info_bar_elements[key].update(val)
+        self._update(self.active_image.scale_percent(percent))
+        # TODO: Update spacers on scroll
+
+    # endregion
