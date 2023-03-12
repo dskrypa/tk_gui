@@ -46,7 +46,10 @@ class FilePopup(RawPopup, ABC):
 
     def __init__(self, initial_dir: PathLike = None, title: str = None, **kwargs):
         super().__init__(title=title, **kwargs)
-        self.initial_dir = initial_dir
+        try:
+            self.initial_dir = initial_dir.as_posix()
+        except AttributeError:
+            self.initial_dir = initial_dir
 
 
 class PickFolder(FilePopup):

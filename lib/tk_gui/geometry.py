@@ -34,6 +34,10 @@ class Sized(ABC):
     def size(self) -> XY:
         return self.width, self.height
 
+    @property
+    def size_str(self) -> str:
+        return '{}x{}'.format(*self.size)
+
     # region Aspect Ratio
 
     @cached_property
@@ -44,10 +48,13 @@ class Sized(ABC):
     def new_aspect_ratio_size(self, width: float, height: float) -> XY:
         """Copied logic from :meth:`PIL.Image.Image.thumbnail`"""
         x, y = floor(width), floor(height)
-        if x / y >= self.aspect_ratio:
-            x = self.new_aspect_ratio_width(y)
-        else:
-            y = self.new_aspect_ratio_height(x)
+        try:
+            if x / y >= self.aspect_ratio:
+                x = self.new_aspect_ratio_width(y)
+            else:
+                y = self.new_aspect_ratio_height(x)
+        except ZeroDivisionError:
+            pass
         return x, y
 
     def new_aspect_ratio_width(self, y: int) -> int:
@@ -96,6 +103,10 @@ class Sized(ABC):
         trg_w = dst_w / (self.width / dst_w)
         trg_h = dst_h / (self.height / dst_h)
         return self.target_size((trg_w, trg_h), keep_ratio)
+
+    def scale_percent(self, percent: float) -> XY:
+        src_w, src_h = self.size
+        return self.target_size((src_w * percent, src_h * percent))
 
     # endregion
 

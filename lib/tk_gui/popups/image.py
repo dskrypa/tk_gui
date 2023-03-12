@@ -62,8 +62,7 @@ class ImagePopup(Popup):
 
     @property
     def title(self) -> str:
-        img_w, img_h = self.image.size
-        return f'{self._title} ({img_w}x{img_h}, {self.image.size_percent:.0%})'
+        return f'{self._title} ({self.image.size_str}, {self.image.size_percent:.0%})'
 
     @title.setter
     def title(self, value: str):
@@ -72,8 +71,7 @@ class ImagePopup(Popup):
     # endregion
 
     def __repr__(self) -> str:
-        title, src_image = self._title, self.src_image
-        return f'<{self.__class__.__name__}[{title=}, {src_image=}]>'
+        return f'<{self.__class__.__name__}[title={self._title!r}, src_image={self.src_image!r}]>'
 
     def get_pre_window_layout(self) -> Layout:
         image_row = [self.gui_image]
