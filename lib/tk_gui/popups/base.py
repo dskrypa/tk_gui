@@ -182,8 +182,8 @@ class BasicPopup(Popup):
         lines = self.lines
         n_lines = len(lines)
         if self.multiline:
-            monitor = self.get_monitor()
-            lines_to_show = max(1, min(monitor.height // self.style.char_height(), n_lines) + 1)
+            work_area = self.get_monitor().work_area
+            lines_to_show = max(1, min(work_area.height // self.style.char_height(), n_lines) + 1)
         else:
             lines_to_show = 1
 

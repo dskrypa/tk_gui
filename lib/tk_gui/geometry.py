@@ -1,4 +1,5 @@
 """
+Generic Sized and Box classes defined for common tasks related to positioning, resizing, etc.
 """
 
 from __future__ import annotations
