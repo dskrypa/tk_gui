@@ -136,7 +136,7 @@ class StateValues(Generic[T_co]):
     def new(
         cls, layer: StyleLayer, name: str, values: Union[RawStateValues, StateValues[T_co]] = None
     ) -> StateValues[T_co]:
-        if not values:
+        if values is None:
             return cls(layer, name)
         elif isinstance(values, cls):
             return values.copy(layer, name)
