@@ -16,11 +16,12 @@ from tk_gui.pseudo_elements.row import RowBase
 from tk_gui.pseudo_elements.row_container import RowContainer
 from tk_gui.styles import Style, StyleSpec
 from tk_gui.utils import call_with_popped
+from tk_gui.widgets.config import AxisConfig
 from tk_gui.widgets.scroll import ScrollableFrame, ScrollableLabelFrame
 from .element import Element, InteractiveMixin
 
 if TYPE_CHECKING:
-    from tk_gui.typing import Layout, Bool, XY, TkContainer
+    from tk_gui.typing import Layout, Bool, XY, TkContainer, E
     from tk_gui.pseudo_elements.row import Row
 
 __all__ = [
@@ -147,7 +148,10 @@ class RowFrame(FrameMixin, RowBase, Element, ABC, base_style_layer='frame'):
 
     def __init__(self, **kwargs):
         self.init_frame_from_kwargs(kwargs)
+        style = kwargs.pop('style', None)
         Element.__init__(self, **kwargs)
+        if style:
+            self.style = Style.get_style(style)
         # Note: self.parent is set in Element.pack_into_row
 
     def __repr__(self) -> str:
@@ -175,11 +179,75 @@ class RowFrame(FrameMixin, RowBase, Element, ABC, base_style_layer='frame'):
 
 
 class BasicRowFrame(RowFrame):
-    elements: Sequence[Element] = None  # Necessary to satisfy the ABC
+    elements: Sequence[E] = None  # Necessary to satisfy the ABC
 
-    def __init__(self, elements: Sequence[Element], **kwargs):
+    def __init__(self, elements: Sequence[E], **kwargs):
         super().__init__(**kwargs)
         self.elements = elements
+
+
+class BasicScrollableRowFrame(RowFrame):
+    elements: Sequence[E] = None  # Necessary to satisfy the ABC
+    widget: ScrollableFrame
+    inner_frame: TkFrame
+    inner_style: Optional[Style] = None
+    grid: Bool = False
+
+    def __init__(
+        self,
+        elements: Sequence[E],
+        inner_style: StyleSpec = None,
+        grid: Bool = False,
+        auto_resize: bool = True,
+        **kwargs,
+    ):
+        self.x_config = AxisConfig.from_kwargs('x', kwargs)
+        self.y_config = AxisConfig.from_kwargs('y', kwargs)
+        super().__init__(**kwargs)
+        self.elements = elements
+        self._auto_resize = auto_resize
+        if inner_style:
+            self.inner_style = Style.get_style(inner_style)
+        if grid:
+            self.grid = grid
+
+    def _prepare_pack_kwargs(self) -> dict[str, Any]:
+        style = self.style
+        outer_kw: dict[str, Any] = style.get_map('frame', bd='border_width', background='bg', relief='relief')
+        if inner_style := self.inner_style:
+            inner_kw = inner_style.get_map('frame', bd='border_width', background='bg', relief='relief')
+        else:
+            # inner_style = style
+            inner_kw = outer_kw.copy()
+
+        inner_kw['takefocus'] = outer_kw['takefocus'] = int(self.allow_focus)
+        outer_kw['style'] = style
+        outer_kw['inner_kwargs'] = inner_kw
+        return outer_kw
+
+    def _init_widget(self, tk_container: TkContainer):
+        kwargs = self._prepare_pack_kwargs()
+        self.widget = outer_frame = ScrollableFrame(
+            self.parent.frame,
+            x_config=self.x_config,
+            y_config=self.y_config,
+            auto_resize=self._auto_resize,
+            **kwargs,
+        )
+        self.inner_frame = outer_frame.inner_widget
+
+    def pack_into(self, row: Row):
+        self._init_widget(row.frame)
+        outer_frame = self.widget
+        if self.grid:
+            self.grid_rows()
+        else:
+            self.pack_rows()
+        outer_frame.resize_scroll_region(self.size)
+        self.pack_widget()
+
+    def update_scroll_region(self, size: Optional[XY] = None):
+        self.widget.resize_scroll_region(size)
 
 
 class InteractiveRowFrame(InteractiveMixin, RowFrame, ABC):
@@ -218,9 +286,9 @@ class InteractiveRowFrame(InteractiveMixin, RowFrame, ABC):
 
 
 class BasicInteractiveRowFrame(InteractiveRowFrame):
-    elements: Sequence[Element] = None  # Necessary to satisfy the ABC
+    elements: Sequence[E] = None  # Necessary to satisfy the ABC
 
-    def __init__(self, elements: Sequence[Element], **kwargs):
+    def __init__(self, elements: Sequence[E], **kwargs):
         super().__init__(**kwargs)
         self.elements = elements
 
@@ -250,6 +318,9 @@ class CustomLayoutRowContainer(RowContainer, ABC):
         if layout := self.get_custom_layout():
             self.add_rows(layout)
         super().grid_rows()
+
+
+# region Non-Scrollable Frames
 
 
 class Frame(FrameMixin, Element, CustomLayoutRowContainer, base_style_layer='frame'):
@@ -305,6 +376,9 @@ class InteractiveFrame(InteractiveFrameMixin, Frame, ABC):
         return f'<{self.__class__.__name__}[id={self.id}, {key_str}{size=}, {visible=}, {rows=}, {disabled=}]>'
 
 
+# endregion
+
+
 class ScrollFrame(Element, CustomLayoutRowContainer, base_style_layer='frame'):
     widget: Union[ScrollableLabelFrame, ScrollableFrame]
     inner_frame: Union[TkFrame, LabelFrame]
@@ -322,6 +396,7 @@ class ScrollFrame(Element, CustomLayoutRowContainer, base_style_layer='frame'):
         border_mode: FrameMode = 'outer',
         inner_style: StyleSpec = None,
         grid: Bool = False,
+        auto_resize: bool = True,
         **kwargs,
     ):
         self.init_container_from_kwargs(layout, kwargs=kwargs)
@@ -331,6 +406,7 @@ class ScrollFrame(Element, CustomLayoutRowContainer, base_style_layer='frame'):
         self.anchor_title = Anchor(anchor_title)
         self.border = border
         self.border_mode = border_mode
+        self._auto_resize = auto_resize
         if inner_style:
             self.inner_style = Style.get_style(inner_style)
         if grid:
@@ -388,7 +464,11 @@ class ScrollFrame(Element, CustomLayoutRowContainer, base_style_layer='frame'):
         labeled = self.title and self.title_mode in {'outer', 'both'}
         outer_cls = ScrollableLabelFrame if labeled else ScrollableFrame
         self.widget = outer_frame = outer_cls(
-            self.parent.frame, x_config=self.x_config, y_config=self.y_config, **kwargs
+            self.parent.frame,
+            x_config=self.x_config,
+            y_config=self.y_config,
+            auto_resize=self._auto_resize,
+            **kwargs,
         )
         self.inner_frame = outer_frame.inner_widget
 
