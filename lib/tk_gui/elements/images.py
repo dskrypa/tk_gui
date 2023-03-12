@@ -17,10 +17,8 @@ from PIL.ImageSequence import Iterator as FrameIterator
 from PIL.ImageTk import PhotoImage
 
 from tk_gui.enums import Anchor
+from tk_gui.images import ImageWrapper, SourceImage, ResizedImage, FrameCycle, PhotoImageCycle, Spinner
 from tk_gui.images.clock import SevenSegmentDisplay, ClockCycle
-from tk_gui.images.cycle import FrameCycle, PhotoImageCycle
-from tk_gui.images.spinner import Spinner
-from tk_gui.images.wrapper import ImageWrapper, SourceImage, ResizedImage
 from tk_gui.styles import Style, StyleSpec
 from .element import Element
 
@@ -32,6 +30,9 @@ __all__ = ['Image', 'Animation', 'SpinnerImage', 'ClockImage']
 log = logging.getLogger(__name__)
 
 ImageCycle = Union[FrameCycle, ClockCycle]
+
+
+# region Static Images
 
 
 class BaseImage(Element, ABC, base_style_layer='image'):
@@ -177,6 +178,11 @@ class Image(BaseImage):
     def target_size(self, width: int, height: int) -> XY:
         return self._src_image.target_size((width, height), keep_ratio=self._resize_kwargs['keep_ratio'])
 
+    def update(self, image: ImageType | ImageWrapper, size: XY = None):
+        if size:
+            self.size = size
+        self.image = image
+
     def resize(self, width: int, height: int) -> ResizedImage:
         resized = self._src_image.as_size((width, height), **self._resize_kwargs)
         self._re_pack(resized.as_tk_image(), *resized.size)
@@ -188,6 +194,11 @@ class Image(BaseImage):
         src_image = self._src_image
         title = self.popup_title or (src_image.path.name if src_image.path else None)
         ImagePopup(src_image, title, parent=self.window).run()
+
+
+# endregion
+
+# region Animated Images
 
 
 class BaseAnimation(BaseImage, ABC, animated=True):
@@ -347,9 +358,6 @@ class SpinnerImage(BaseAnimation):
         if self._run:
             self._cancel()
             self.next()
-
-
-# region Digital Clock
 
 
 class ClockImage(BaseAnimation):

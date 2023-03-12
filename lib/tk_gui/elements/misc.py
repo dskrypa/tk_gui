@@ -25,8 +25,8 @@ class SizeGrip(ElementBase):
     """Visual indicator that resizing is possible, located at the bottom-right corner of a window"""
     widget: Sizegrip
 
-    def __init__(self, side: Union[str, Side] = tkc.BOTTOM, **kwargs):
-        super().__init__(side=side, **kwargs)
+    def __init__(self, side: Union[str, Side] = tkc.BOTTOM, pad: XY = (0, 0), **kwargs):
+        super().__init__(side=side, pad=pad, **kwargs)
 
     def _init_widget(self, tk_container: TkContainer):
         style = self.style
