@@ -12,11 +12,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from cachetools import LRUCache
-from PIL.Image import Resampling, MIME, Image as PILImage, open as open_image
+from PIL.Image import Resampling, MIME, Image as PILImage, open as open_image, core as pil_image_core, new as new_image
 from PIL.ImageTk import PhotoImage
 from PIL.JpegImagePlugin import RAWMODE
 
 from tk_gui.caching import cached_property
+from tk_gui.constants import IMAGE_MODE_TO_BPP
 from tk_gui.geometry import Box, Sized
 from tk_gui.utils import get_user_temp_dir
 
@@ -111,6 +112,27 @@ class ImageWrapper(Sized, ABC):
 
     # endregion
 
+    @cached_property
+    def bits_per_pixel(self) -> int | None:
+        return IMAGE_MODE_TO_BPP.get(self.pil_image.mode)
+
+    @cached_property
+    def raw_size(self) -> int:
+        image = self.pil_image
+        image.load()
+        if (width := image.width) == 0 or image.height == 0:
+            return 0
+
+        encoder = pil_image_core.raw_encoder(image.mode, image.mode)
+        encoder.setimage(image.im)
+        buf_size = max(65536, width * 4)
+        raw_size = 0
+        while True:
+            _, status, data = encoder.encode(buf_size)
+            raw_size += len(data)
+            if status:  # Technically, if < 0, Image.tobytes would raise a RuntimeError
+                return raw_size
+
     def get_image_as_size(
         self,
         size: XY,
@@ -120,7 +142,8 @@ class ImageWrapper(Sized, ABC):
         reducing_gap: float = None,
     ) -> PILImage:
         size = self.target_size(size, keep_ratio)
-        image = self.pil_image
+        if not (image := self.pil_image):
+            return new_image('RGB', size)
         if image.mode == 'P' and resample not in (None, Resampling.NEAREST):
             # In this case, Image.resize ignores the resample arg and uses Resampling.NEAREST, so convert to RGB first
             image = image.convert('RGB')
