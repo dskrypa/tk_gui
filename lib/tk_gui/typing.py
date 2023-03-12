@@ -41,6 +41,7 @@ BindTarget = Union[BindCallback, EventCallback, ButtonEventCB, 'BindTargets', st
 
 AnyEle = Union['ElementBase', 'Element']
 E = TypeVar('E', bound=AnyEle)
+ElementRow = Iterable[E]
 
 PathLike = Union['Path', str]
 OptInt = Optional[int]
@@ -133,7 +134,7 @@ class Layout(Protocol[E]):
     __slots__ = ()
 
     @abstractmethod
-    def __iter__(self) -> Iterator[Iterable[E] | Row[E]]:
+    def __iter__(self) -> Iterator[ElementRow | Row[E]]:
         pass
 
 

@@ -19,7 +19,7 @@ __all__ = [
     'get_parent_or_none', 'get_root_widget', 'get_widget_ancestor', 'find_descendants',
     'unbind', 'get_bound_events', 'log_bound_events',
     'get_config_str', 'log_config_str', 'WidgetData', 'log_event_widget_data', 'log_widget_data',
-    'get_selection_pos',
+    'get_selection_pos', 'get_size_and_pos',
 ]
 log = logging.getLogger(__name__)
 
@@ -305,6 +305,12 @@ def get_config_str(widget: Misc, keys: Collection[str] = None) -> str:
 
 def log_config_str(widget: Misc, prefix: str = '', keys: Collection[str] = None, level: int = logging.DEBUG):
     log.log(level, f'{prefix}{widget!r} config={get_config_str(widget, keys)}')
+
+
+def get_size_and_pos(widget: Misc) -> tuple[int, int, int, int]:
+    size, x, y = widget.winfo_geometry().split('+', 2)
+    w, h = size.split('x', 1)
+    return int(w), int(h), int(x), int(y)
 
 
 # endregion

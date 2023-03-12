@@ -10,10 +10,11 @@ import logging
 import sys
 from getpass import getuser
 from inspect import stack
+from math import log as math_log
 from pathlib import Path
 from platform import system
 from tempfile import gettempdir
-from typing import TYPE_CHECKING, Optional, Type, Any, Callable, Collection, Iterable, Sequence
+from typing import TYPE_CHECKING, Optional, Type, Any, Callable, Collection, Iterable, Sequence, Union, Mapping
 
 from .constants import STYLE_CONFIG_KEYS
 
@@ -22,7 +23,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     'ON_WINDOWS', 'ON_LINUX', 'ON_MAC', 'Inheritable', 'ProgramMetadata', 'ViewLoggerAdapter',
-    'tcl_version', 'max_line_len', 'call_with_popped', 'extract_kwargs', 'get_user_temp_dir',
+    'tcl_version', 'max_line_len', 'call_with_popped', 'extract_kwargs', 'get_user_temp_dir', 'readable_bytes',
 ]
 log = logging.getLogger(__name__)
 
@@ -240,3 +241,48 @@ def get_user_temp_dir(*sub_dirs, mode: int = 0o777) -> Path:
     if not path.exists():
         path.mkdir(mode=mode, parents=True, exist_ok=True)
     return path
+
+
+def readable_bytes(
+    size: Union[float, int],
+    dec_places: int = None,
+    dec_by_unit: Mapping[str, int] = None,
+    si: bool = False,
+    bits: bool = False,
+    i: bool = False,
+    rate: Union[bool, str] = False,
+) -> str:
+    """
+    :param size: The number of bytes to render as a human-readable string
+    :param dec_places: Number of decimal places to include (overridden by dec_by_unit if specified)
+    :param dec_by_unit: Mapping of {unit: number of decimal places to include}
+    :param si: Use the International System of Units (SI) definition (base-10) instead of base-2 (default: base-2)
+    :param bits: Use lower-case ``b`` instead of ``B``
+    :param i: Include the ``i`` before ``B`` to indicate that this suffix is based on the base-2 value (this only
+      affects the unit in the string - use ``si=True`` to use base-10)
+    :param rate: Whether the unit is a rate or not.  If True, ``/s`` will be appended to the unit.  If a string is
+      provided, that string will be appended instead.
+    """
+    units = ('B ', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB')  # len=9 @ YB -> max exp = 8
+    kilo = 1000 if si else 1024
+    abs_size = abs(size)
+    try:
+        exp = min(int(math_log(abs_size, kilo)), 8) if abs_size > 0 else 0  # update 8 to len-1 if units are added
+    except TypeError as e:
+        raise ValueError(f'Invalid {size=}') from e
+
+    unit = units[exp]
+    if dec_places is not None:
+        dec = dec_places
+    elif dec_by_unit and isinstance(dec_by_unit, dict):
+        dec = dec_by_unit.get(unit, 2)
+    else:
+        dec = 2 if exp else 0
+
+    if bits:
+        unit = unit.replace('B', 'b')
+    if i and exp and not si:  # no `i` is necessary for B/b
+        unit = unit[0] + 'i' + unit[1]
+    if rate:
+        unit = unit.strip() + ('/s' if rate is True else rate) + ('' if exp else ' ')  # noqa
+    return f'{size / kilo ** exp:,.{dec}f} {unit}'
