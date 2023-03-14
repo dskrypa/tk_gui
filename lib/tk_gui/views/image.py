@@ -306,7 +306,7 @@ class ImageView(View):
             spacer_w = 1
         # log.debug(f'Using spacer {spc_w=} from {win_w=}, {self.image.width=}, {to_fill=}')
         self.image_frame.update_spacer_width(spacer_w)
-        self.image_frame.update_scroll_region((win_w, win_h - self._height_offset))
+        self.image_frame.resize_scroll_region((win_w, win_h - self._height_offset))
 
     # region Event Handling
 

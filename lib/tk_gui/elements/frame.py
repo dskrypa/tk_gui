@@ -380,6 +380,11 @@ class InteractiveFrame(InteractiveFrameMixin, Frame, ABC):
 
 
 class ScrollFrame(Element, CustomLayoutRowContainer, base_style_layer='frame'):
+    """
+    An element that wraps a :class:`.ScrollableLabelFrame` or :class:`.ScrollableFrame` (custom) widget, which consists
+    of a minimum of 3~5 widgets - the outer Frame or LabelFrame, (optional) X and/or Y Scrollbar widgets, a Canvas, and
+    an inner Frame or LabelFrame.
+    """
     widget: Union[ScrollableLabelFrame, ScrollableFrame]
     inner_frame: Union[TkFrame, LabelFrame]
     inner_style: Optional[Style] = None
@@ -483,7 +488,7 @@ class ScrollFrame(Element, CustomLayoutRowContainer, base_style_layer='frame'):
         # TODO: Add auto-fill support for non-scrollable frames
         self.pack_widget()
 
-    def update_scroll_region(self, size: Optional[XY] = None):
+    def resize_scroll_region(self, size: Optional[XY] = None):
         self.widget.resize_scroll_region(size)
 
 

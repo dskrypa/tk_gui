@@ -431,7 +431,7 @@ class Window(BindMixin, RowContainer):
             height = max_height
         self.size = (width, height)
 
-    def update_scroll_region(self, size: Optional[XY] = None):
+    def resize_scroll_region(self, size: Optional[XY] = None):
         outer, inner = self._root, self.root
         if outer != inner:
             outer.resize_scroll_region(size)

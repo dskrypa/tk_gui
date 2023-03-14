@@ -107,7 +107,7 @@ class WindowInitializer(HandlesEvents, ABC):
                 window.show()
             else:  # The scroll region only needs to be updated if the window was already shown
                 try:
-                    window.update_scroll_region()
+                    window.resize_scroll_region()
                 except TypeError:  # It was not scrollable
                     pass
         if parent := self.parent:

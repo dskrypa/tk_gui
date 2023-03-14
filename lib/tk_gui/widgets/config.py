@@ -92,7 +92,7 @@ class AxisConfig(Generic[ScrollAmount]):
             return size_div
         return self._default_divs[self.axis]
 
-    def target_size(self, inner_container: TkContainer) -> int:
+    def target_size(self, inner_container: BaseWidget) -> int:
         # Target size for a scrollable region
         if self.fill:
             # Even if this overshoots the available space, it is handled well
