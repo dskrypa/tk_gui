@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, TypeVar, ParamSpec, Iterator
 
 from tk_gui.caching import cached_property
-from tk_gui.elements import Image, Text, BasicRowFrame, ScrollFrame, SizeGrip
+from tk_gui.elements import Image, ScrollFrame, InfoBar
 from tk_gui.elements.menu import MenuProperty, Menu, MenuGroup, MenuItem, CloseWindow
 from tk_gui.event_handling import event_handler, delayed_event_handler
 from tk_gui.images.wrapper import ImageWrapper, SourceImage, ResizedImage
@@ -63,30 +63,6 @@ class ImageScrollFrame(ScrollFrame):
         left, right = self.spacers
         left.resize(width, 1)
         right.resize(width, 1)
-
-
-class InfoBar(BasicRowFrame):
-    element_map: dict[str, Text]
-
-    def __init__(self, data: dict[str, str], side='b', fill='both', pad=(0, 0), **kwargs):
-        self.element_map = element_map = self._init_element_map(data)
-        super().__init__([*element_map.values(), SizeGrip(pad=(0, 0))], side=side, fill=fill, pad=pad, **kwargs)
-
-    def _init_element_map(self, data: dict[str, str]) -> dict[str, Text]:  # noqa
-        kwargs = {'use_input_style': True, 'justify': 'c', 'pad': (1, 0)}
-        # TODO: Better auto-sizing of these fields
-        return {
-            'size': Text(data['size'], size=(20, 1), **kwargs),
-            'dir_pos': Text(data['dir_pos'], size=(8, 1), **kwargs),
-            'size_pct': Text(data['size_pct'], size=(6, 1), **kwargs),
-            'size_bytes': Text(data['size_bytes'], size=(20, 1), **kwargs),
-            'mod_time': Text(data['mod_time'], size=(20, 1), **kwargs),
-        }
-
-    def update_fields(self, data: dict[str, str]):
-        element_map = self.element_map
-        for key, val in data.items():
-            element_map[key].update(val)
 
 
 class ImageDir:
@@ -254,7 +230,9 @@ class ImageView(View):
 
     @cached_property
     def info_bar(self) -> InfoBar:
-        return InfoBar(self.active_image.get_info_bar_data())
+        sizes = {'size': (20, 1), 'dir_pos': (8, 1), 'size_pct': (6, 1), 'size_bytes': (20, 1), 'mod_time': (20, 1)}
+        data = {key: (val, sizes[key]) for key, val in self.active_image.get_info_bar_data().items()}
+        return InfoBar.from_dict(data)
 
     @cached_property
     def image_frame(self) -> ImageScrollFrame:
@@ -284,7 +262,7 @@ class ImageView(View):
     def _update(self, image: ResizedImage):
         self.gui_image.update(image, image.size)
         self.window.set_title(self.title)
-        self.info_bar.update_fields(self.active_image.get_info_bar_data())
+        self.info_bar.update(self.active_image.get_info_bar_data())
         self._update_size()
 
     def _update_active_image(self, image: ImageType | ImageWrapper, image_dir: ImageDir = None):

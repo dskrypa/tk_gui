@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from cachetools import LRUCache
-from PIL.Image import Resampling, MIME, Image as PILImage, open as open_image, core as pil_image_core, new as new_image
+from PIL.Image import Resampling, MIME, Image as PILImage, open as open_image, new as new_image
 from PIL.ImageTk import PhotoImage
 from PIL.JpegImagePlugin import RAWMODE
 
@@ -120,18 +120,7 @@ class ImageWrapper(Sized, ABC):
     def raw_size(self) -> int:
         image = self.pil_image
         image.load()
-        if (width := image.width) == 0 or image.height == 0:
-            return 0
-
-        encoder = pil_image_core.raw_encoder(image.mode, image.mode)
-        encoder.setimage(image.im)
-        buf_size = max(65536, width * 4)
-        raw_size = 0
-        while True:
-            _, status, data = encoder.encode(buf_size)
-            raw_size += len(data)
-            if status:  # Technically, if < 0, Image.tobytes would raise a RuntimeError
-                return raw_size
+        return len(image.im)  # This provides the raw / uncompressed size
 
     def get_image_as_size(
         self,

@@ -11,14 +11,17 @@ from tkinter import Frame
 from tkinter.ttk import Sizegrip
 from typing import TYPE_CHECKING, Union, Any
 
+from tk_gui.caching import cached_property
 from .element import ElementBase
+from .frame import RowFrame
+from .text import Text
 
 if TYPE_CHECKING:
-    from ..enums import Side
-    from ..pseudo_elements import Row
-    from ..typing import XY, TkContainer
+    from tk_gui.enums import Side
+    from tk_gui.pseudo_elements import Row
+    from tk_gui.typing import XY, TkContainer, E, TkSide, TkFill
 
-__all__ = ['SizeGrip', 'Spacer']
+__all__ = ['SizeGrip', 'Spacer', 'InfoBar']
 
 
 class SizeGrip(ElementBase):
@@ -53,3 +56,41 @@ class Spacer(ElementBase):
     def _init_widget(self, tk_container: TkContainer):
         width, height = self.size
         self.widget = Frame(tk_container, width=width, height=height, **self.style_config)
+
+
+class InfoBar(RowFrame):
+    element_map: dict[str, Text]
+
+    def __init__(
+        self, element_map: dict[str, Text], side: TkSide = 'b', fill: TkFill = 'both', pad: XY = (0, 0), **kwargs
+    ):
+        super().__init__(side=side, fill=fill, pad=pad, **kwargs)
+        self.element_map = element_map
+
+    @classmethod
+    def from_dict(cls, data: dict[str, str | tuple[str, XY]], **kwargs) -> InfoBar:
+        element_map = {}
+        for key, val in data.items():
+            # TODO: Implement/improve auto-sizing for these fields
+            if isinstance(val, tuple):
+                val, size = val
+            else:
+                size = None
+            element_map[key] = Text(val, size=size, use_input_style=True, justify='c', pad=(1, 0))
+
+        return cls(element_map, **kwargs)
+
+    @cached_property
+    def elements(self) -> tuple[E, ...]:
+        return (*self.element_map.values(), SizeGrip(pad=(0, 0)))
+
+    def __getitem__(self, key: str) -> str:
+        return self.element_map[key].value
+
+    def __setitem__(self, key: str, value: str):
+        self.element_map[key].update(value)
+
+    def update(self, data: dict[str, str]):
+        element_map = self.element_map
+        for key, val in data.items():
+            element_map[key].update(val)
