@@ -6,6 +6,12 @@ from typing import Union, Optional, Literal, Mapping, Any
 from tk_gui.enums import StyleState
 from tk_gui.typing import OptInt, OptStr
 
+Layer = Literal[
+    'base', 'insert', 'scroll', 'arrows', 'radio', 'checkbox', 'frame', 'combo', 'progress', 'image', 'tooltip', 'text',
+    'button', 'listbox', 'link', 'selected', 'input', 'table', 'table_header', 'table_alt', 'slider', 'menu',
+    'checkbox_label',
+]
+
 StateName = Literal['default', 'disabled', 'invalid', 'active', 'highlight']
 StyleAttr = Literal[
     'font', 'tk_font', 'fg', 'bg', 'border_width', 'relief',

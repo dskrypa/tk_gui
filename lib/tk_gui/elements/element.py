@@ -16,14 +16,14 @@ from tk_gui.caching import ClearableCachedPropertyMixin, cached_property
 from tk_gui.enums import StyleState, Anchor, Justify, Side, BindTargets
 from tk_gui.event_handling import BindMixin, BindMapping
 from tk_gui.pseudo_elements.tooltips import ToolTip
-from tk_gui.styles import Style, StyleLayer, Layer
+from tk_gui.styles import Style, StyleLayer
 from tk_gui.utils import Inheritable, call_with_popped, extract_style
 from tk_gui.widgets.utils import find_descendants
 
 if TYPE_CHECKING:
     from tkinter import Widget, Event, BaseWidget
     from tk_gui.pseudo_elements.row import RowBase
-    from tk_gui.styles.typing import StyleSpec
+    from tk_gui.styles.typing import StyleSpec, Layer
     from tk_gui.typing import XY, Bool, BindCallback, Key, TkFill, BindTarget, HasFrame, TkContainer
     from tk_gui.window import Window
     from .menu import Menu

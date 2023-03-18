@@ -1,5 +1,7 @@
 from .colors import BLACK, GREY_L_1, CYAN_0, YLW_L_0
-from .style import Style, DEFAULT_FONT
+from .style import Style
+
+DEFAULT_FONT = ('Helvetica', 10)
 
 # States: (default, disabled, invalid, active, highlight (may be interpreted as 'selected' for some uses))
 _common = {

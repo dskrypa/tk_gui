@@ -21,8 +21,7 @@ from .element import Element
 if TYPE_CHECKING:
     from tkinter import BaseWidget
     from tk_gui.pseudo_elements import Row
-    from tk_gui.styles import Layer
-    from tk_gui.styles.typing import Font
+    from tk_gui.styles.typing import Font, Layer
     from tk_gui.typing import TkContainer
 
 __all__ = ['TableColumn', 'Table']
