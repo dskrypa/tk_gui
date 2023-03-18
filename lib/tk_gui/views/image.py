@@ -10,9 +10,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING, TypeVar, ParamSpec, Iterator
 
 from tk_gui.caching import cached_property
-from tk_gui.elements import Image, ScrollFrame, InfoBar
+from tk_gui.elements import Image, ScrollFrame, InfoBar, ScrollableImage
 from tk_gui.elements.menu import MenuProperty, Menu, MenuGroup, MenuItem, CloseWindow
 from tk_gui.event_handling import event_handler, delayed_event_handler
+from tk_gui.geometry import Box
 from tk_gui.images.wrapper import ImageWrapper, SourceImage, ResizedImage
 from tk_gui.popups.about import AboutPopup
 from tk_gui.popups import pick_file_popup
@@ -38,31 +39,31 @@ class MenuBar(Menu):
         MenuItem('About', AboutPopup)
 
 
-class ImageScrollFrame(ScrollFrame):
-    def __init__(self, image: Image, **kwargs):
-        kwargs.setdefault('pad', (0, 0))
-        kwargs.setdefault('anchor', 'c')
-        kwargs.setdefault('side', 't')
-        kwargs.setdefault('scroll_y', True)
-        kwargs.setdefault('scroll_x', True)
-        kwargs.setdefault('scroll_y_amount', 1)
-        kwargs.setdefault('style', {'bg': '#000000', 'border_width': 0})
-        super().__init__(**kwargs)
-        self.__image = image
-
-    @cached_property
-    def spacers(self) -> tuple[Image, Image]:
-        kwargs = {'style': self.style, 'size': (1, 1), 'pad': (0, 0), 'keep_ratio': False}
-        return Image(None, side='left', **kwargs), Image(None, side='right', **kwargs)
-
-    def get_custom_layout(self) -> Layout:
-        # TODO: Top/bottom spacers, or implement something using Canvas's create_image properly...
-        yield [*self.spacers, self.__image]
-
-    def update_spacer_width(self, width: int):
-        left, right = self.spacers
-        left.resize(width, 1)
-        right.resize(width, 1)
+# class ImageScrollFrame(ScrollFrame):
+#     def __init__(self, image: Image, **kwargs):
+#         kwargs.setdefault('pad', (0, 0))
+#         kwargs.setdefault('anchor', 'c')
+#         kwargs.setdefault('side', 't')
+#         kwargs.setdefault('scroll_y', True)
+#         kwargs.setdefault('scroll_x', True)
+#         kwargs.setdefault('scroll_y_amount', 1)
+#         kwargs.setdefault('style', {'bg': '#000000', 'border_width': 0})
+#         super().__init__(**kwargs)
+#         self.__image = image
+#
+#     @cached_property
+#     def spacers(self) -> tuple[Image, Image]:
+#         kwargs = {'style': self.style, 'size': (1, 1), 'pad': (0, 0), 'keep_ratio': False}
+#         return Image(None, side='left', **kwargs), Image(None, side='right', **kwargs)
+#
+#     def get_custom_layout(self) -> Layout:
+#         # TODO: Top/bottom spacers, or implement something using Canvas's create_image properly...
+#         yield [*self.spacers, self.__image]
+#
+#     def update_spacer_width(self, width: int):
+#         left, right = self.spacers
+#         left.resize(width, 1)
+#         right.resize(width, 1)
 
 
 class ImageDir:
@@ -119,9 +120,9 @@ class ActiveImage:
     src_image: SourceImage
     image_dir: ImageDir = None
 
-    def __init__(self, image: ImageType | ImageWrapper, window_size: XY = None, image_dir: ImageDir = None):
+    def __init__(self, image: ImageType | ImageWrapper, new_size: XY = None, image_dir: ImageDir = None):
         self.src_image = SourceImage.from_image(image)
-        self.image = image = self.src_image.as_size(window_size)
+        self.image = image = self.src_image.as_size(new_size)
         log.debug(f'Initialized ActiveImage with {image=}')
         if image_dir is None:
             self.image_dir = ImageDir(self.src_image.path.parent)
@@ -188,19 +189,64 @@ class ImageView(View):
         kwargs.setdefault('exit_on_esc', True)
         kwargs.setdefault('config_name', self.__class__.__name__)
         super().__init__(title=title or 'Image View', **kwargs)
-        self._set_active_image(image)
-
-    def _set_active_image(self, image: ImageType | ImageWrapper, image_dir: ImageDir = None):
-        src_image = SourceImage.from_image(image)
-        self.active_image = ActiveImage(src_image, self._init_size(src_image), image_dir)
+        self.active_image = ActiveImage(SourceImage.from_image(image))
         self.image_dir = self.active_image.image_dir
+        if size := self._new_window_size():
+            self.window_kwargs['size'] = size
+
+    # region Size
+
+    def _new_window_size(self) -> XY | None:
+        if self.config.size or self.window_kwargs.get('size'):
+            return None
+
+        img_box = self.active_image.src_image.box.with_size_offset(60)
+        if monitor := self.get_monitor():
+            work_area = monitor.work_area.with_size_offset(-60)
+            if not img_box.fits_inside(work_area):
+                return img_box.fit_inside_size(work_area.size)
+
+        return img_box.size
+
+    @cached_property
+    def _height_offset(self) -> int:
+        style = self.window.style
+        # footer_req_height = self.info_bar.widget.winfo_reqheight()  # Usually 22
+        footer_bd = style.input.border_width.disabled or 1
+        footer_req_height = style.char_height() + (2 * footer_bd) + 4
+        # scroll_x_height = self.gui_image.widget.scroll_bar_x.winfo_reqheight()  # Usually 12->15 / 14->17
+        scroll = style.get_map('scroll', aw='arrow_width', bw='bar_width', bd='border_width')
+        scroll_width = max(scroll.get('aw', 12), scroll.get('bw', 12))
+        scroll_x_height = scroll_width + (2 * scroll.get('bd', 1)) + 1
+        # log.debug(f'{footer_req_height=}, {scroll_x_height=}')
+        return footer_req_height + scroll_x_height
+
+    @cached_property
+    def _width_offset(self) -> int:
+        style = self.window.style
+        # scroll_y_width = self.gui_image.widget.scroll_bar_y.winfo_reqwidth()  #
+        scroll = style.get_map('scroll', aw='arrow_width', bw='bar_width', bd='border_width')
+        scroll_width = max(scroll.get('aw', 12), scroll.get('bw', 12))
+        scroll_y_width = scroll_width + (2 * scroll.get('bd', 1)) + 1
+        return scroll_y_width
+
+    @property
+    def _window_box(self) -> Box:
+        win_box = Box.from_pos_and_size(0, 0, *self.window.true_size)
+        return win_box.with_size_offset((-self._width_offset, -self._height_offset))
+
+    # endregion
 
     # region Title
 
     @property
     def title(self) -> str:
-        prefix, suffix = self.active_image.title_parts()
-        return f'{prefix}{self._title}{suffix})'
+        try:
+            prefix, suffix = self.active_image.title_parts()
+        except AttributeError:  # During init with no config_name
+            return self._title
+        else:
+            return f'{prefix}{self._title}{suffix})'
 
     @title.setter
     def title(self, value: str):
@@ -212,12 +258,15 @@ class ImageView(View):
         src_image = self.active_image.src_image
         return f'<{self.__class__.__name__}[title={self._title!r}, {src_image=}]>'
 
-    # def init_window(self):
-    #     from tk_gui.event_handling import ClickHighlighter
-    #     window = super().init_window()
-    #     kwargs = {'window': window, 'show_config': True, 'show_pack_info': True}
-    #     ClickHighlighter(level=0, log_event=True, log_event_kwargs=kwargs).register(window)
-    #     return window
+    def init_window(self):
+        from tk_gui.event_handling import ClickHighlighter
+        window = super().init_window()
+        kwargs = {
+            'window': window, 'show_config': True, 'show_pack_info': True,
+            # 'show_ttk_info': True
+        }
+        ClickHighlighter(level=0, log_event=True, log_event_kwargs=kwargs).register(window)
+        return window
 
     # region Layout
 
@@ -225,7 +274,8 @@ class ImageView(View):
         yield [self.menu]
 
     def get_post_window_layout(self) -> Layout:
-        yield [self.image_frame]
+        # yield [self.image_frame]
+        yield [self.gui_image]
         yield [self.info_bar]
 
     @cached_property
@@ -234,28 +284,20 @@ class ImageView(View):
         data = {key: (val, sizes[key]) for key, val in self.active_image.get_info_bar_data().items()}
         return InfoBar.from_dict(data)
 
-    @cached_property
-    def image_frame(self) -> ImageScrollFrame:
-        return ImageScrollFrame(self.gui_image)
+    # @cached_property
+    # def image_frame(self) -> ImageScrollFrame:
+    #     return ImageScrollFrame(self.gui_image)
 
     @cached_property
-    def gui_image(self) -> Image:
-        image = self.active_image.resize(self._init_size(self.active_image.src_image))
-        return Image(image, size=image.size, pad=(0, 0))
-
-    def _init_size(self, src_image: SourceImage) -> XY:
-        src_w, src_h = src_image.size
-        try:
-            win_w, win_h = self.window.true_size
-        except AttributeError:  # Initial image
-            pass
-        else:
-            src_w, src_h = min(win_w, src_w), min(win_h, src_h)
-        if monitor := self.get_monitor():
-            mon_w, mon_h = monitor.work_area.size
-            # log.debug(f'_init_size: monitor size={(mon_w, mon_h)}')
-            return min(mon_w - 60, src_w), min(mon_h - 60, src_h)
-        return src_w, src_h
+    def gui_image(self) -> ScrollableImage:
+        style = self.window.style.sub_style(bg='#000000', border_width=0)
+        win_box = self._window_box
+        src_image = self.active_image.src_image
+        fit_size = src_image.box.fit_inside_size(win_box.size)
+        image = self.active_image.resize(fit_size)
+        return ScrollableImage(
+            image, size=win_box.size, pad=(0, 0), anchor='c', side='t', fill='both', expand=True, style=style
+        )
 
     # endregion
 
@@ -266,54 +308,48 @@ class ImageView(View):
         self._update_size()
 
     def _update_active_image(self, image: ImageType | ImageWrapper, image_dir: ImageDir = None):
-        # TODO: Center and avoid over-zoom on new images
-        # TODO: Horizontal scroll is not always registering correctly
-        # TODO: Shrink to fit if larger than current window
-        self._set_active_image(image, image_dir)
-        # self._update(self.active_image.resize((self._init_size()))
+        # TODO: Center on new images
+        src_image = SourceImage.from_image(image)
+        self.active_image = ActiveImage(src_image, src_image.box.fit_inside_size(self._window_box.size), image_dir)
+        self.image_dir = self.active_image.image_dir
         self._update(self.active_image.image)
 
     def _update_size(self, size: XY = None):
-        # TODO: Resize creep on init sometimes
         try:
             win_w, win_h = size
         except TypeError:
             win_w, win_h = self.window.true_size
-        to_fill = win_w - self.active_image.image.width - self._width_offset
-        if (spacer_w := to_fill // 2) < 5:
-            spacer_w = 1
+            # win_w, win_h = self._window_box.size  # Note: Using this resulted in losing the info bar
+
+        # to_fill = win_w - self.active_image.image.width - self._width_offset
+        # if (spacer_w := to_fill // 2) < 5:
+        #     spacer_w = 1
         # log.debug(f'Using spacer {spc_w=} from {win_w=}, {self.image.width=}, {to_fill=}')
-        self.image_frame.update_spacer_width(spacer_w)
-        self.image_frame.resize_scroll_region((win_w, win_h - self._height_offset))
+        # self.image_frame.update_spacer_width(spacer_w)
+        # self.image_frame.resize_scroll_region((win_w, win_h - self._height_offset))
+
+        frame_height = win_h - self._height_offset
+        # TODO: Fix centering
+        log.debug(f'Using {frame_height=} from {win_h=}, {self._height_offset=}')
+        self.gui_image.widget.resize(win_w, frame_height)
 
     # region Event Handling
-
-    @menu['File']['Open'].callback
-    def open_file(self, event):
-        if path := pick_file_popup(self.active_image.src_image.path.parent, title='Pick Image', parent=self.window):
-            self._update_active_image(path)
-
-    @cached_property
-    def _height_offset(self) -> int:
-        footer_req_height = self.info_bar.widget.winfo_reqheight()
-        scroll_x_height = self.image_frame.widget.scroll_bar_x.winfo_reqheight()
-        return footer_req_height + scroll_x_height
-
-    @cached_property
-    def _width_offset(self) -> int:
-        scroll_y_width = self.image_frame.widget.scroll_bar_y.winfo_reqwidth()
-        return scroll_y_width
 
     @cached_property
     def _widget(self):
         # Needed for delayed_event_handler
-        return self.window._root
+        return self.window.root
 
     @event_handler('SIZE_CHANGED')
     def handle_size_changed(self, event: Event, size: XY):
+        # TODO: If image is <100% and the window is expanded to be able to show it closer to full size, resize image
         if self._last_size != size:
             self._last_size = size
             self._update_size(size)
+
+    # endregion
+
+    # region Zoom
 
     @event_handler('<Control-MouseWheel>')
     @delayed_event_handler(delay_ms=75, widget_attr='_widget')
@@ -328,6 +364,15 @@ class ImageView(View):
         self._update(self.active_image.scale_percent(percent))
         # TODO: Add shortcut to reset zoom to 100%, to fit window, to a specified value, etc
         # TODO: Add way to grab image to drag the current view around
+
+    # endregion
+
+    # region File Change / Directory Traversal
+
+    @menu['File']['Open'].callback
+    def open_file(self, event):
+        if path := pick_file_popup(self.active_image.src_image.path.parent, title='Pick Image', parent=self.window):
+            self._update_active_image(path)
 
     @event_handler('<Left>')
     def handle_left_arrow(self, event: Event):
