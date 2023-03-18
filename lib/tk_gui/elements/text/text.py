@@ -336,13 +336,13 @@ class Text(TextValueMixin, LinkableMixin, Element):
                 **self._style_config,
             }
         else:
-            config = {
+            style_cfg = {
                 **style.get_map('text', bd='border_width', fg='fg', bg='bg', font='font', relief='relief'),
                 **style.get_map('text', readonlybackground='bg'),
                 **self._style_config,
             }
-            config.setdefault('relief', 'flat')
-            return config
+            style_cfg.setdefault('relief', 'flat')
+            return style_cfg
 
     @property
     def base_style_layer_and_state(self) -> tuple[StyleLayer, StyleState]:
@@ -606,24 +606,24 @@ class Multiline(InteractiveText, disabled_state='disabled'):
     def style_config(self) -> dict[str, Any]:
         style, state = self.style, self.style_state
         if self._read_only_style:
-            config = {
+            style_cfg = {
                 'highlightthickness': 0,
                 **style.get_map('text', bd='border_width', fg='fg', bg='bg', font='font', relief='relief'),
                 **style.get_map('text', 'highlight', selectforeground='fg', selectbackground='bg'),
                 **self._style_config,
             }
-            config.setdefault('relief', 'flat')
+            style_cfg.setdefault('relief', 'flat')
         else:
-            config: dict[str, Any] = {
+            style_cfg: dict[str, Any] = {
                 'highlightthickness': 0,
                 **style.get_map('input', state, bd='border_width', fg='fg', bg='bg', font='font', relief='relief'),
                 **style.get_map('input', 'highlight', selectforeground='fg', selectbackground='bg'),
                 **style.get_map('insert', insertbackground='bg'),
                 **self._style_config,
             }
-            config.setdefault('relief', 'sunken')
+            style_cfg.setdefault('relief', 'sunken')
 
-        return config
+        return style_cfg
 
     # endregion
 

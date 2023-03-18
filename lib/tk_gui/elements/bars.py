@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Iterable, Iterator, Union, Any
 
 from tk_gui.caching import cached_property
 from tk_gui.event_handling.decorators import delayed_event_handler
-from tk_gui.widgets.config import FillConfig
+from tk_gui.widgets.configuration import FillConfig
 from ..exceptions import WindowClosed
 from .element import ElementBase, Element, Interactive
 from .mixins import DisableableMixin, CallbackCommandMixin
@@ -269,7 +269,7 @@ class Slider(DisableableMixin, CallbackCommandMixin, Interactive, base_style_lay
 
     @property
     def style_config(self) -> dict[str, Any]:
-        config: dict[str, Any] = {
+        style_cfg: dict[str, Any] = {
             'highlightthickness': 0,
             **self.style.get_map(
                 'slider', self.style_state, bd='border_width', font='font', fg='fg', bg='bg',
@@ -277,8 +277,8 @@ class Slider(DisableableMixin, CallbackCommandMixin, Interactive, base_style_lay
             ),
             **self._style_config,
         }
-        config.setdefault('relief', tkc.FLAT)
-        return config
+        style_cfg.setdefault('relief', tkc.FLAT)
+        return style_cfg
 
     def _init_widget(self, tk_container: TkContainer):
         min_val, max_val, interval, default = self.min_value, self.max_value, self.interval, self.default

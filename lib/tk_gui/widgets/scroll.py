@@ -12,12 +12,12 @@ import tkinter.constants as tkc
 from abc import ABC, abstractmethod
 from tkinter import BaseWidget, Frame, LabelFrame, Canvas, Widget, Event, Toplevel, Text, Listbox, TclError
 from tkinter.ttk import Scrollbar, Treeview
-from typing import TYPE_CHECKING, Type, Mapping, Union, Optional, Any, Iterator
+from typing import TYPE_CHECKING, Type, Mapping, Union, Optional, Any, Iterator, Callable, Literal
 
 from tk_gui.caching import cached_property
 from tk_gui.event_handling.decorators import delayed_event_handler
 from tk_gui.utils import ON_WINDOWS
-from .config import AxisConfig
+from .configuration import AxisConfig
 from .utils import get_parent_or_none, get_root_widget
 
 if TYPE_CHECKING:
@@ -31,6 +31,7 @@ __all__ = [
 log = logging.getLogger(__name__)
 
 ScrollOuter = Union[BaseWidget, 'ScrollableBase', 'ScrollableContainer']
+ScrollCommand = Callable[[Literal['moveto'], str | float], Any]
 
 AXIS_DIR_SIDE_ANCHOR = {'x': (tkc.HORIZONTAL, tkc.BOTTOM, tkc.S), 'y': (tkc.VERTICAL, tkc.RIGHT, tkc.E)}
 
@@ -197,11 +198,12 @@ class ComplexScrollable(ScrollableBase, ABC):
         self: Union[Widget, Toplevel, ComplexScrollable],
         parent: Optional[BaseWidget] = None,
         style: Style = None,
-        pad: XY = None,
+        pad: XY = None,  # TODO: Clarify this is for the canvas
         *,
         x_config: AxisConfig = None,
         y_config: AxisConfig = None,
         resize_offset: int = 43,  # Not sure whether this value is dynamic
+        verify: bool = False,
         **kwargs,
     ):
         if 'relief' not in kwargs:
@@ -210,20 +212,20 @@ class ComplexScrollable(ScrollableBase, ABC):
         self._x_config = x_config or AxisConfig('x')
         self._y_config = y_config or AxisConfig('y')
         super().__init__(parent, **kwargs)
-        self.init_canvas(style, pad)
+        self.init_canvas(style, pad, verify)
         self.resize_offset = resize_offset
         self._init_binds()
 
     def init_canvas_kwargs(self, style: Style = None) -> dict[str, Any]:
         return style.get_map('frame', background='bg') if style else {}
 
-    def init_canvas(self, style: Style = None, pad: XY = None):
+    def init_canvas(self, style: Style = None, pad: XY = None, verify: bool = False):
         kwargs = self.init_canvas_kwargs(style)
         self.canvas = canvas = Canvas(self, borderwidth=0, highlightthickness=0, **kwargs)
         if self._x_config.scroll:
-            self.scroll_bar_x = _add_scroll_bar(self, canvas, 'x', style, {'expand': 'false'})
+            self.scroll_bar_x = _add_scroll_bar(self, canvas, 'x', style, {'expand': 'false'}, verify=verify)
         if self._y_config.scroll:
-            self.scroll_bar_y = _add_scroll_bar(self, canvas, 'y', style, {'fill': 'y', 'expand': True})
+            self.scroll_bar_y = _add_scroll_bar(self, canvas, 'y', style, {'fill': 'y', 'expand': True}, verify=verify)
 
         kwargs = {'side': 'left', 'fill': 'both', 'expand': True}
         try:
@@ -239,7 +241,6 @@ class ComplexScrollable(ScrollableBase, ABC):
         if y_config.scroll:
             self.canvas.bind_all(self._y_bind, _scroll_y, add='+')
         if x_config.scroll:
-            # TODO: Both bind_all calls were always performed when either was configured to scroll - should they be?
             self.canvas.bind_all(self._x_bind, _scroll_x, add='+')
         if y_config.scroll or x_config.scroll:
             self.bind('<Configure>', self._maybe_update_scroll_region, add=True)
@@ -252,8 +253,8 @@ class ComplexScrollable(ScrollableBase, ABC):
     # region Scroll Methods
 
     def scroll_y(self, event: Event):
+        # log.debug(f'scroll_y: {event=}, {self.canvas.yview()=}')
         if (event.num == 5 or event.delta < 0) and (canvas := self.canvas).yview() != (0, 1):
-            # TODO: event.delta / 120 units?
             # canvas.yview_scroll(4, 'units')
             canvas.yview_scroll(*self._y_config.view_scroll_args(True))
         elif (event.num == 4 or event.delta > 0) and (canvas := self.canvas).yview() != (0, 1):
@@ -261,12 +262,13 @@ class ComplexScrollable(ScrollableBase, ABC):
             canvas.yview_scroll(*self._y_config.view_scroll_args(False))
 
     def scroll_x(self, event: Event):
-        if event.num == 5 or event.delta < 0:
-            # self.canvas.xview_scroll(4, 'units')
-            self.canvas.xview_scroll(*self._x_config.view_scroll_args(True))
-        elif event.num == 4 or event.delta > 0:
-            # self.canvas.xview_scroll(-4, 'units')
-            self.canvas.xview_scroll(*self._x_config.view_scroll_args(False))
+        # log.debug(f'scroll_x: {event=}, {self.canvas.xview()=}')
+        if (event.num == 5 or event.delta < 0) and (canvas := self.canvas).xview() != (0, 1):
+            # canvas.xview_scroll(4, 'units')
+            canvas.xview_scroll(*self._x_config.view_scroll_args(True))
+        elif (event.num == 4 or event.delta > 0) and (canvas := self.canvas).xview() != (0, 1):
+            # canvas.xview_scroll(-4, 'units')
+            canvas.xview_scroll(*self._x_config.view_scroll_args(False))
 
     def find_container_scroll_cb(self, scroll_bar_name: str, axis: Axis) -> Optional[BindCallback]:
         if self.has_scrollable_bar(scroll_bar_name):
@@ -323,12 +325,17 @@ class ComplexScrollable(ScrollableBase, ABC):
 
     @delayed_event_handler(delay_ms=75)
     def _maybe_update_scroll_region(self, event: Event = None):
+        self.maybe_update_scroll_region()
+
+    def maybe_update_scroll_region(self):
         canvas = self.canvas
         bbox = canvas.bbox('all')  # top left (x, y), bottom right (x, y) I think ==>> last 2 => (width, height)
         if self._last_scroll_region != bbox:
             # log.debug(f'Updating scroll region to {bbox=} != {self._last_scroll_region=} for {self}')
             canvas.configure(scrollregion=bbox)
             self._last_scroll_region = bbox
+        # else:
+        #     log.debug(f'{self!r}: Skipping scroll region update ({bbox=})')
 
 
 class ScrollableContainer(ComplexScrollable, ABC):
@@ -444,18 +451,39 @@ def _scroll_x(event: Event):
 # endregion
 
 
+def _make_scroll_command(widget: Widget, axis: Axis) -> ScrollCommand:
+    axis_view = getattr(widget, f'{axis}view')
+
+    def _scroll_command(action, fraction):
+        if axis_view() != (0, 1):
+            return axis_view(action, fraction)
+        return None
+
+    return _scroll_command
+
+
 def _add_scroll_bar(
     outer: ScrollOuter,
     inner: Widget,
     axis: Axis,
     style: Style = None,
     pack_kwargs: Mapping[str, Any] = None,
+    *,
+    verify: bool = False,
+    command: ScrollCommand = None,
 ) -> Scrollbar:
     direction, side, anchor = AXIS_DIR_SIDE_ANCHOR[axis]
+    if verify:
+        if command is not None:
+            raise ScrollConfigError(f'A specific scroll {command=} cannot be combined with {verify=}')
+        command = _make_scroll_command(inner, axis)
+    elif command is None:
+        command = getattr(inner, f'{axis}view')
+
     scroll_bar = Scrollbar(
         outer,
         orient=direction,
-        command=getattr(inner, f'{axis}view'),
+        command=command,
         style=_prepare_scroll_bar_style(style, direction),
     )
     inner.configure({f'{axis}scrollcommand': scroll_bar.set})
@@ -486,3 +514,7 @@ def _prepare_scroll_bar_style(style: Style | None, direction: str) -> str | None
         ttk_style.map(name, background=bg_list, arrowcolor=ac_list)
 
     return name
+
+
+class ScrollConfigError(Exception):
+    """Raised when an invalid configuration is provided."""

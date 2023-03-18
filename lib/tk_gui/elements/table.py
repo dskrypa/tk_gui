@@ -149,11 +149,11 @@ class Table(Element, base_style_layer='table'):
         return name, ttk_style
 
     def _tk_style_config(self, ttk_style: TtkStyle, name: str, layer: Layer) -> dict[str, Union[Font, str, None]]:
-        config = self.style.get_map(layer, foreground='fg', background='bg', font='font')
-        if layer == 'table' and (bg := config.get('background')):
-            config['fieldbackground'] = bg
-        ttk_style.configure(name, **config)
-        return config
+        style_cfg = self.style.get_map(layer, foreground='fg', background='bg', font='font')
+        if layer == 'table' and (bg := style_cfg.get('background')):
+            style_cfg['fieldbackground'] = bg
+        ttk_style.configure(name, **style_cfg)
+        return style_cfg
 
     def _init_widget(self, tk_container: TkContainer):
         columns, style = self.columns, self.style

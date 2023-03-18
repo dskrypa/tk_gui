@@ -16,7 +16,7 @@ from tk_gui.pseudo_elements.row import RowBase
 from tk_gui.pseudo_elements.row_container import RowContainer
 from tk_gui.styles import Style, StyleSpec
 from tk_gui.utils import call_with_popped
-from tk_gui.widgets.config import AxisConfig
+from tk_gui.widgets.configuration import AxisConfig
 from tk_gui.widgets.scroll import ScrollableFrame, ScrollableLabelFrame
 from .element import Element, InteractiveMixin
 
@@ -79,17 +79,17 @@ class FrameMixin:
     @property
     def style_config(self) -> dict[str, Any]:
         style = self.style
-        config = {
+        style_cfg = {
             **style.get_map('frame', bd='border_width', background='bg', relief='relief'),
             **self._style_config,
         }
         if self.border:
-            config.setdefault('relief', 'groove')
-            config.update(style.get_map('frame', highlightcolor='bg', highlightbackground='bg'))
+            style_cfg.setdefault('relief', 'groove')
+            style_cfg.update(style.get_map('frame', highlightcolor='bg', highlightbackground='bg'))
         if self.title:
-            config.update(style.get_map('frame', foreground='fg', font='font'))
+            style_cfg.update(style.get_map('frame', foreground='fg', font='font'))
 
-        return config
+        return style_cfg
 
     def _init_widget(self, tk_container: TkContainer):
         kwargs = self.style_config

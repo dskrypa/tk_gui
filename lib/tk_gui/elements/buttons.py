@@ -202,16 +202,16 @@ class Button(CustomEventResultsMixin, DisableableMixin, Interactive, base_style_
     @property
     def style_config(self) -> dict[str, Any]:
         style, state = self.style, self.style_state
-        config = {
+        style_cfg = {
             **style.get_map('button', state, bd='border_width', font='font', foreground='fg', background='bg'),
             **style.get_map('button', 'active', activeforeground='fg', activebackground='bg'),
             **style.get_map('button', 'highlight', highlightcolor='fg', highlightbackground='bg'),
             **self._style_config,
         }
         if style.button.border_width[state] == 0:
-            config['relief'] = tkc.FLAT  # May not work on mac
+            style_cfg['relief'] = tkc.FLAT  # May not work on mac
 
-        return config
+        return style_cfg
 
     def _init_widget(self, tk_container: TkContainer):
         # self.string_var = StringVar()
