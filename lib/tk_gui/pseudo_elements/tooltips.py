@@ -11,11 +11,12 @@ import tkinter.constants as tkc
 from tkinter import Toplevel, TclError, Event, Label
 from typing import TYPE_CHECKING, Optional
 
-from ..styles import Style, StyleSpec
+from tk_gui.styles import Style
 
 if TYPE_CHECKING:
-    from ..elements.element import Element
-    from ..typing import XY
+    from tk_gui.elements.element import Element
+    from tk_gui.styles.typing import StyleSpec
+    from tk_gui.typing import XY
 
 __all__ = ['ToolTip']
 log = logging.getLogger(__name__)

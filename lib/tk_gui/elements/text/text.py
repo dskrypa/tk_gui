@@ -17,7 +17,7 @@ from tk_gui.caching import cached_property
 from tk_gui.constants import LEFT_CLICK
 from tk_gui.enums import Justify, Anchor
 from tk_gui.event_handling import BindManager
-from tk_gui.styles import Style, Font, StyleState, StyleLayer
+from tk_gui.styles import Style, StyleState, StyleLayer
 from tk_gui.utils import Inheritable, max_line_len, call_with_popped
 from tk_gui.widgets.scroll import ScrollableText
 from tk_gui.widgets.utils import unbind
@@ -28,6 +28,7 @@ from .links import LinkTarget, _Link
 if TYPE_CHECKING:
     from tkinter.ttk import Scrollbar
     from tk_gui.pseudo_elements import Row
+    from tk_gui.styles.typing import Font
     from tk_gui.typing import Bool, XY, BindTarget, TraceCallback, TkFill, HasFrame, TkContainer
 
 __all__ = ['Text', 'Link', 'Input', 'Multiline', 'Label', 'ValidatedInput', 'NumericInput', 'FloatInput', 'IntInput']

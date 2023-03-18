@@ -16,13 +16,14 @@ from tk_gui.caching import ClearableCachedPropertyMixin, cached_property
 from tk_gui.enums import StyleState, Anchor, Justify, Side, BindTargets
 from tk_gui.event_handling import BindMixin, BindMapping
 from tk_gui.pseudo_elements.tooltips import ToolTip
-from tk_gui.styles import Style, StyleSpec, StyleLayer, Layer
+from tk_gui.styles import Style, StyleLayer, Layer
 from tk_gui.utils import Inheritable, call_with_popped, extract_style
 from tk_gui.widgets.utils import find_descendants
 
 if TYPE_CHECKING:
     from tkinter import Widget, Event, BaseWidget
     from tk_gui.pseudo_elements.row import RowBase
+    from tk_gui.styles.typing import StyleSpec
     from tk_gui.typing import XY, Bool, BindCallback, Key, TkFill, BindTarget, HasFrame, TkContainer
     from tk_gui.window import Window
     from .menu import Menu
@@ -91,7 +92,7 @@ class ElementBase(ClearableCachedPropertyMixin, ABC):
         if fill:
             self.fill = fill
         if style:
-            self.style = style
+            self.style = style  # noqa
         if ignore_grab:
             self.ignore_grab = ignore_grab
 
@@ -210,7 +211,7 @@ class ElementBase(ClearableCachedPropertyMixin, ABC):
 
     def update_style(self, style: StyleSpec = None, **kwargs):
         if style:
-            self.style = style
+            self.style = style  # noqa
             self.configure_widget(**(self.style_config | kwargs))
         elif kwargs:
             self.configure_widget(**kwargs)

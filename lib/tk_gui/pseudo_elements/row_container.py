@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Optional, Union, Any, Iterator, Type, Generic,
 
 from tk_gui.caching import cached_property
 from tk_gui.enums import Anchor, Justify, Side
-from tk_gui.styles import Style, StyleSpec
+from tk_gui.styles import Style
 from tk_gui.utils import call_with_popped
 from tk_gui.typing import XY, Layout, Bool, TkContainer, E, ScrollWhat, Top
 from tk_gui.widgets.configuration import AxisConfig, ScrollAmount
@@ -22,6 +22,7 @@ from .row import Row, RowBase
 
 if TYPE_CHECKING:
     from tk_gui.elements.element import ElementBase
+    from tk_gui.styles.typing import StyleSpec
     from tk_gui.window import Window
 
 __all__ = ['RowContainer', 'CONTAINER_PARAMS']

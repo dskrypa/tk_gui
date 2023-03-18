@@ -44,6 +44,7 @@ E = TypeVar('E', bound=AnyEle)
 ElementRow = Iterable[E]
 
 PathLike = Union['Path', str]
+OptStr = Optional[str]
 OptInt = Optional[int]
 OptFloat = Optional[float]
 Bool = Union[bool, Any]

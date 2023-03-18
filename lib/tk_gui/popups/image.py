@@ -101,15 +101,15 @@ class ImagePopup(Popup):
     @event_handler('SIZE_CHANGED')
     def handle_size_changed(self, event: Event, size: XY):
         if not self.src_image.pil_image or self._last_size == size:
-            # log.debug(f'Ignoring config {event=} {size=} for {self}')
+            # log.debug(f'Ignoring size change {event=} {size=} for {self}')
             return
         self._last_size = size
         if new_size := _get_new_size(self.gui_image, *size):
-            # log.debug(f'Handling config {event=} {size=} for {self}')
+            # log.debug(f'Handling size change {event=} {size=} for {self}')
             self.image = self.gui_image.resize(*new_size)
             self.window.set_title(self.title)
         # else:
-        #     log.debug(f'No change necessary for config {event=} {size=} for {self}')
+        #     log.debug(f'No change necessary for size change {event=} {size=} for {self}')
 
 
 def _get_new_size(image: BaseImage, new_w: int, new_h: int) -> XY | None:
@@ -201,9 +201,9 @@ class BaseAnimatedPopup(Popup, ABC):
     @event_handler('SIZE_CHANGED')
     def handle_size_changed(self, event: Event, size: XY):
         if self._empty or self._last_size == size:
-            # log.debug(f'Ignoring config {event=} for {self} @ {monotonic()}')
+            # log.debug(f'Ignoring size change {event=} for {self} @ {monotonic()}')
             return
-        # log.debug(f'Handling config {event=} for {self}')
+        # log.debug(f'Handling size change {event=} for {self}')
         if new_size := self._get_new_size(*size):
             self._last_size = size
             self.gui_image.resize(*new_size)

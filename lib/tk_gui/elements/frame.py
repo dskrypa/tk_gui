@@ -14,13 +14,14 @@ from typing import TYPE_CHECKING, Optional, Union, Type, Literal, Any, Callable,
 from tk_gui.enums import Anchor
 from tk_gui.pseudo_elements.row import RowBase
 from tk_gui.pseudo_elements.row_container import RowContainer
-from tk_gui.styles import Style, StyleSpec
+from tk_gui.styles import Style
 from tk_gui.utils import call_with_popped
 from tk_gui.widgets.configuration import AxisConfig
 from tk_gui.widgets.scroll import ScrollableFrame, ScrollableLabelFrame
 from .element import Element, InteractiveMixin
 
 if TYPE_CHECKING:
+    from tk_gui.styles.typing import StyleSpec
     from tk_gui.typing import Layout, Bool, XY, TkContainer, E
     from tk_gui.pseudo_elements.row import Row
 

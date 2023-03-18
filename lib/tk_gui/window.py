@@ -28,7 +28,7 @@ from .event_handling.utils import MotionTracker, Interrupt
 from .exceptions import DuplicateKeyError
 from .monitors import Monitor, Rectangle, monitor_manager
 from .pseudo_elements.row_container import RowContainer
-from .styles import Style, StyleSpec
+from .styles import Style
 from .utils import ON_LINUX, ON_WINDOWS, ProgramMetadata, extract_kwargs
 from .widgets.scroll import ScrollableToplevel
 from .widgets.utils import log_event_widget_data, get_root_widget  # noqa
@@ -37,6 +37,7 @@ if TYPE_CHECKING:
     from pathlib import Path
     from PIL.Image import Image as PILImage
     from .elements.element import Element, ElementBase
+    from .styles.typing import StyleSpec
     from .typing import XY, BindCallback, EventCallback, Key, BindTarget, Bindable, Layout, Bool, HasValue
     from .typing import TkContainer, GrabAnywhere, Top
 

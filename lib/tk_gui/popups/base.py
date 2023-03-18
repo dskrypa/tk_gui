@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Union, Collection, Mapping, Callable, Any
 from tk_gui.caching import cached_property
 from tk_gui.elements import Button, Text, Image, Multiline
 from tk_gui.event_handling.futures import TkFuture
-from tk_gui.styles import Style, StyleSpec
+from tk_gui.styles import Style
 from tk_gui.utils import max_line_len
 from tk_gui.views.base import WindowInitializer
 from tk_gui.window import Window
@@ -22,6 +22,7 @@ from tk_gui.window import Window
 if TYPE_CHECKING:
     from tkinter import Event
     from tk_gui.event_handling import BindMap
+    from tk_gui.styles.typing import StyleSpec
     from tk_gui.typing import XY, Layout, Bool, ImageType
 
 __all__ = ['Popup', 'BasicPopup', 'AnyPopup']

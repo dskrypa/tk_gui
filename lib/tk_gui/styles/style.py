@@ -11,59 +11,26 @@ from collections import namedtuple
 from itertools import count
 from tkinter.font import Font as TkFont
 from tkinter.ttk import Style as TtkStyle
-from typing import TYPE_CHECKING, Union, Optional, Literal, Type, Mapping, Iterator, Any, Generic, TypeVar, Iterable
+from typing import TYPE_CHECKING, Union, Optional, Literal, Type, Iterator, Generic, TypeVar
 from typing import overload
 
 from tk_gui.caching import ClearableCachedPropertyMixin, cached_property
 from tk_gui.enums import StyleState
 
 if TYPE_CHECKING:
-    from tk_gui.typing import XY, Bool
+    from tk_gui.typing import XY, Bool, OptInt, OptStr
+    from .typing import StateName, FontValues, Font, OptStrVals, OptIntVals, StyleStateVal, RawStateValues, LayerValues
+    from .typing import StyleOptions, StyleSpec, FinalValue
 
-__all__ = ['Style', 'StyleSpec', 'STATE_NAMES', 'StyleLayer', 'Layer', 'StyleState', 'Font']
+__all__ = ['Style', 'STATE_NAMES', 'StyleLayer', 'Layer', 'StyleState']
 # log = logging.getLogger(__name__)
 
 _NotSet = object()
 DEFAULT_FONT = ('Helvetica', 10)
 STATE_NAMES = ('default', 'disabled', 'invalid', 'active', 'highlight')
 
-# region Typing
-
-StateName = Literal['default', 'disabled', 'invalid', 'active', 'highlight']
-StyleAttr = Literal[
-    'font', 'tk_font', 'fg', 'bg', 'border_width', 'relief',
-    'frame_color', 'trough_color', 'arrow_color', 'arrow_width', 'bar_width',
-]
-StyleOptions = Mapping[str, Any]
-StyleSpec = Union[str, 'Style', StyleOptions, tuple[str, StyleOptions], None]
-StyleStateVal = Union[StyleState, StateName, Literal[0, 1, 2]]
-Relief = Optional[Literal['raised', 'sunken', 'flat', 'ridge', 'groove', 'solid']]
 T = TypeVar('T')
 T_co = TypeVar('T_co', covariant=True)
-
-OptStr = Optional[str]
-_OptStrTuple = Union[
-    tuple[OptStr], tuple[(OptStr,) * 2], tuple[(OptStr,) * 3], tuple[(OptStr,) * 4], tuple[(OptStr,) * 5]
-]
-OptStrVals = Union[OptStr, Mapping[StyleStateVal, OptStr], _OptStrTuple]
-
-OptInt = Optional[int]
-_OptIntTuple = Union[
-    tuple[OptInt], tuple[(OptInt,) * 2], tuple[(OptInt,) * 3], tuple[(OptInt,) * 4], tuple[(OptInt,) * 5]
-]
-OptIntVals = Union[OptInt, Mapping[StyleStateVal, OptInt], _OptIntTuple]
-
-Font = Union[str, tuple[str, int], tuple[str, int, str, ...], None]
-_FontValsTuple = Union[tuple[Font], tuple[(Font,) * 2], tuple[(Font,) * 3], tuple[(Font,) * 4], tuple[(Font,) * 5]]
-FontValues = Union[Font, Mapping[StyleStateVal, Font], _FontValsTuple]
-
-StyleValue = Union[OptStr, OptInt, Font]
-FinalValue = Union[StyleValue, TkFont]
-RawStateValues = Union[OptStrVals, OptIntVals, FontValues]
-
-LayerValues = Union[FontValues, Mapping[StyleStateVal, StyleValue]]
-
-# endregion
 
 # region State Values
 

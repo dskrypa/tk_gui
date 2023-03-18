@@ -11,12 +11,13 @@ from typing import TYPE_CHECKING, Optional
 
 from ..elements import Text, HorizontalSeparator, Combo, Button, Label
 from ..images.color import pick_fg
-from ..styles import Style, StyleSpec, STATE_NAMES
+from ..styles import Style, STATE_NAMES
 from .base import Popup
 
 if TYPE_CHECKING:
     from tkinter import Event
-    from ..typing import Layout
+    from tk_gui.styles.typing import StyleSpec
+    from tk_gui.typing import Layout
 
 __all__ = ['StylePopup']
 
