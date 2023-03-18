@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 __all__ = ['ClockView']
 
 
-class ClockView(View):
+class ClockView(View, config_name='ClockView', title='Clock'):
     def __init__(
         self, img_size: XY = None, fg: Color = '#FF0000', bg: Color = '#000000', seconds: bool = True, **kwargs
     ):
@@ -30,7 +30,6 @@ class ClockView(View):
         self._toggle_slim_on_click = '<Button-2>'
         self._clock_kwargs = {'fg': fg, 'bg': bg, 'seconds': seconds}
         kwargs |= {
-            'config_name': self.__class__.__name__,
             'exit_on_esc': True,
             'grab_anywhere': True,
             'no_title_bar': True,
@@ -38,7 +37,6 @@ class ClockView(View):
             'style': Style(bg=bg),
             'alpha_channel': 0.8,
         }
-        kwargs.setdefault('title', 'Clock')
         super().__init__(**kwargs)
 
     def get_pre_window_layout(self):

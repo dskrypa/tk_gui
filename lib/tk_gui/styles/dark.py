@@ -34,4 +34,7 @@ DarkGrey10 = Style(
     # slider_bg=(GREY_D_0, GREY_D_0, GREY_D_0, GREY_D_0, GREY_D_0),
     table_alt_fg=BLU_ML_0,
     table_alt_bg=GREY_D_1,
+    scroll_trough_color=BLU_MD_0,
+    scroll_bg=GREY_D_1,
+    scroll_arrow_color=GREY_L_0,
 )

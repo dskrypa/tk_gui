@@ -507,7 +507,9 @@ def _prepare_scroll_bar_style(style: Style | None, direction: str) -> str | None
         troughcolor='trough_color', framecolor='frame_color', bordercolor='frame_color',
         width='bar_width', arrowsize='arrow_width', relief='relief',
     )
+    # log.debug(f'Building scroll bar style={name!r} from {style=} with {kwargs=}')
     ttk_style.configure(name, **kwargs)
+    # TODO: Handle hover color
     if (bg := style.scroll.bg.default) and (ac := style.scroll.arrow_color.default):
         bg_list = [('selected', bg), ('active', ac), ('background', bg), ('!focus', bg)]
         ac_list = [('selected', ac), ('active', bg), ('background', bg), ('!focus', ac)]

@@ -10,6 +10,8 @@ _common = {
     'border_width': 1,
     'link_fg': CYAN_0,
     'link_font': (*DEFAULT_FONT, 'underline'),
+    'scroll_bar_width': 14,     # [ttk default: 12] If < arrow_width, it is automatically set to arrow_width by tk
+    'scroll_arrow_width': 14,   # Note: This should match the bar_width value, otherwise it will look weird
 }
 # Style('SystemDefault', **_common, table_alt_bg='#cccdcf')
 SystemDefault = Style(

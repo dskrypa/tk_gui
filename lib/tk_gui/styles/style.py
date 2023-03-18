@@ -30,7 +30,7 @@ _NotSet = object()
 class Style(ClearableCachedPropertyMixin):
     _count = count()
     _ttk_count = count()
-    _layers: set[str] = set()
+    _layers: set[str] = set()                       # The names of all defined StyleLayerProperties
     _instances: dict[str, Style] = {}
     default_style: Optional[Style] = None
 
@@ -108,7 +108,7 @@ class Style(ClearableCachedPropertyMixin):
             elif key in layer_fields:
                 layers.setdefault('base', {})[key] = val
             else:
-                layer, attr = self._split_config_key(key)
+                layer, attr = self._split_config_key(key)  # attr should be an attribute in StyleLayer
                 layers.setdefault(layer, {})[attr] = val
 
         # log.info(f'{self}: Built layers: {layers!r}', extra={'color': 11})

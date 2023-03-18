@@ -6,7 +6,8 @@ from __future__ import annotations
 
 import logging
 from tkinter import BaseWidget, Misc, Event, TclError, Entry, Text, Tk
-from typing import TYPE_CHECKING, Any, Collection, Literal, Iterator, Mapping
+from tkinter.ttk import Style
+from typing import TYPE_CHECKING, Any, Collection, Literal, Iterator, Mapping, Callable, Sequence
 
 from tk_gui.caching import cached_property
 
@@ -23,7 +24,7 @@ __all__ = [
 ]
 log = logging.getLogger(__name__)
 
-ShowKey = Literal['config', 'event_attrs', 'event', 'element', 'pack_info', 'get_result']
+ShowKey = Literal['config', 'event_attrs', 'event', 'element', 'pack_info', 'get_result', 'ttk_info']
 ShowMap = dict[ShowKey, 'Bool']
 
 
@@ -144,6 +145,7 @@ class WidgetData:
         show_event: Bool = None,
         show_pack_info: Bool = True,
         show_get_result: Bool = True,
+        show_ttk_info: Bool = True,
         hide_event_unset: Bool = True,
     ):
         self.widget = widget
@@ -158,6 +160,7 @@ class WidgetData:
             'element': (element is not None) if show_element is None else show_element,
             'pack_info': show_pack_info,
             'get_result': show_get_result,
+            'ttk_info': show_ttk_info,
         }
 
     @classmethod
@@ -210,9 +213,13 @@ class WidgetData:
         return '???'
 
     @cached_property
+    def _config(self):
+        return self.widget.configure()
+
+    @cached_property
     def config_str(self) -> str:
-        if widget := self.widget:
-            return get_config_str(widget, self.config_keys)
+        if self.widget:
+            return _mapping_repr(self._config, self.config_keys, indent=4)
         return '???'
 
     @cached_property
@@ -220,7 +227,7 @@ class WidgetData:
         data = self.event.__dict__
         if self.hide_event_unset:
             return '<{}>'.format(', '.join(f'{k}={v!r}' for k, v in data.items() if v != '??'))
-        return _mapping_repr(data)
+        return _mapping_repr(data, indent=4)
 
     @cached_property
     def get_result(self) -> str:
@@ -229,6 +236,30 @@ class WidgetData:
                 return repr(widget.get())  # noqa
             except (AttributeError, TclError, TypeError):
                 pass
+        return '???'
+
+    @cached_property
+    def ttk_info(self) -> str:
+        if widget := self.widget:
+            widget_config = self._config
+            try:
+                style_name = widget_config['style'][-1] or widget.winfo_class()
+            except Exception:  # noqa
+                style_name = widget.winfo_class()
+
+            style = Style()
+            try:
+                layout = style.layout(style_name)
+            except TclError:
+                return '???'
+            elements = dict(_get_style_details(style, style_name, layout, indent=8))
+            data = {
+                'style_name': repr(style_name),
+                'style_config': style.configure(style_name),
+                'style_layout': _sequence_repr(layout, indent=8) if layout else layout,
+                'elements': _mapping_repr(elements, val_repr=str, indent=8),
+            }
+            return _mapping_repr(data, val_repr=str, indent=4, sort=False)
         return '???'
 
     def __iter__(self) -> Iterator[str]:
@@ -248,6 +279,8 @@ class WidgetData:
             yield f'    pack_info={self.pack_info!r}'
         if show['get_result']:
             yield f'    get_result={self.get_result}'
+        if show['ttk_info']:
+            yield f'    ttk_info={self.ttk_info}'
         yield '}'
 
     def __str__(self) -> str:
@@ -344,8 +377,6 @@ def dump_ttk_widget_info(widget: BaseWidget):
     https://www.tcl.tk/man/tcl/TkCmd/ttk_style.html
     https://stackoverflow.com/q/45389166/19070573
     """
-    from tkinter.ttk import Style
-
     widget_config = widget.configure()
     try:
         style_name = widget_config['style'][-1] or widget.winfo_class()
@@ -382,6 +413,22 @@ def _print_style_details(style, style_name, layout):
                 _print_style_details(style, style_name, value)
 
 
+def _get_style_details(style, name, layout, indent: int = 0):
+    states = (None, 'active', 'alternate', 'disabled', 'pressed', 'selected', 'readonly')
+    for element_name, data in layout:
+        options = {
+            opt: {state or 'default': style.lookup(name, opt, [state] if state else None) for state in states}
+            for opt in style.element_options(element_name)
+        }
+        options_str = _mapping_repr(options, indent=indent + 8)
+        ele_str = _mapping_repr({'layout': repr(data), 'options': options_str}, indent=indent + 4, val_repr=str)
+        yield element_name, ele_str
+
+        for key, value in data.items():
+            if not isinstance(value, str):
+                yield from _get_style_details(style, name, value, indent)
+
+
 # endregion
 
 
@@ -401,11 +448,28 @@ def get_selection_pos(widget: Entry | Text, raw: Bool = False) -> SelectionPos:
     return (first_line, first_index), (last_line, last_index)
 
 
-def _mapping_repr(data: Mapping, keys: Collection[str] = None, sort: Bool = True) -> str:
+def _mapping_repr(
+    data: Mapping,
+    keys: Collection[str] = None,
+    sort: Bool = True,
+    indent: int = 0,
+    val_repr: Callable[[Any], str] = repr,
+) -> str:
     if keys:
         kv_pairs = (kv for kv in data.items() if kv[0] in keys)
     else:
         kv_pairs = data.items()
     if sort:
         kv_pairs = sorted(kv_pairs)
-    return '{\n' + ',\n'.join(f'        {k!r}: {v!r}' for k, v in kv_pairs) + '\n}'
+
+    inner = ' ' * (indent + 4)
+    outer = ' ' * indent
+    return '{\n' + ',\n'.join(f'{inner}{k!r}: {val_repr(v)}' for k, v in kv_pairs) + f'\n{outer}}}'
+
+
+def _sequence_repr(data: Sequence, sort: Bool = False, indent: int = 0, val_repr: Callable[[Any], str] = repr) -> str:
+    if sort:
+        data = sorted(data)
+    inner = ' ' * (indent + 4)
+    outer = ' ' * indent
+    return '[\n' + ',\n'.join(f'{inner}{val_repr(v)}' for v in data) + f'\n{outer}]'
