@@ -75,7 +75,7 @@ class Window(BindMixin, RowContainer):
     _motion_tracker: MotionTracker = None
     _grab_anywhere_mgr: BindManager | None = None
     _grab_anywhere: GrabAnywhere = False  #: Whether the window should move on mouse click + movement
-    _root: Optional[Top] = None
+    root: Optional[Top] = None
     tk_container: Optional[TkContainer] = None
     widget: Top = None
     is_popup: bool = False                              #: Whether the window is a popup
@@ -219,10 +219,10 @@ class Window(BindMixin, RowContainer):
         :return: Returns itself to allow chaining
         """
         try:
-            root = self._root
+            root = self.root
         except AttributeError:
             self.show()
-            root = self._root
+            root = self.root
 
         if not self._last_run:
             root.after(100, self._init_fix_focus)  # Nothing else seemed to work...
@@ -246,16 +246,16 @@ class Window(BindMixin, RowContainer):
         self._last_interrupt = Interrupt(event, element)
         # log.debug(f'Interrupting {self} due to {event=}', extra={'color': (0, 9)})
         # try:
-        self._root.quit()  # exit the TK main loop, but leave the window open
+        self.root.quit()  # exit the TK main loop, but leave the window open
         # except AttributeError:  # May occur when closing windows out of order
         #     pass
 
     def update(self):
         try:
-            root = self._root
+            root = self.root
         except AttributeError:
             self.show()
-            root = self._root
+            root = self.root
 
         root.update()
 
@@ -280,7 +280,7 @@ class Window(BindMixin, RowContainer):
             with self.window(take_focus=True) as window:
                 window.run()
         """
-        if self._root is None:
+        if self.root is None:
             self.show()
         if take_focus:
             self.take_focus()
@@ -331,22 +331,22 @@ class Window(BindMixin, RowContainer):
 
     @property
     def size(self) -> XY:
-        root = self._root
+        root = self.root
         root.update_idletasks()
         return root.winfo_width(), root.winfo_height()
 
     @size.setter
     def size(self, size: XY):
-        self._root.geometry('{}x{}'.format(*size))
+        self.root.geometry('{}x{}'.format(*size))
 
     @property
     def true_size(self) -> XY:
-        width, height = self._root.geometry().split('+', 1)[0].split('x', 1)
+        width, height = self.root.geometry().split('+', 1)[0].split('x', 1)
         return int(width), int(height)
 
     @cached_property
     def title_bar_height(self) -> int:
-        root = self._root
+        root = self.root
         return root.winfo_rooty() - root.winfo_y()
 
     @cached_property
@@ -364,12 +364,12 @@ class Window(BindMixin, RowContainer):
         return windll.user32.GetSystemMetrics(5)  # 5 = SM_CXBORDER
 
     def set_min_size(self, width: int, height: int):
-        root = self._root
+        root = self.root
         root.minsize(width, height)
         root.update_idletasks()
 
     def set_max_size(self, width: int, height: int):
-        root = self._root
+        root = self.root
         root.maxsize(width, height)
         root.update_idletasks()
 
@@ -410,7 +410,7 @@ class Window(BindMixin, RowContainer):
         elif not (monitor := self._get_monitor(True)):
             return
 
-        root = self._root
+        root = self.root
         root.update_idletasks()
 
         width, height = root.winfo_reqwidth(), root.winfo_reqheight()
@@ -427,7 +427,7 @@ class Window(BindMixin, RowContainer):
         self.size = (width, height)
 
     def resize_scroll_region(self, size: Optional[XY] = None):
-        outer, inner = self._root, self.tk_container
+        outer, inner = self.root, self.tk_container
         if outer != inner:
             outer.resize_scroll_region(size)
         else:
@@ -437,7 +437,7 @@ class Window(BindMixin, RowContainer):
 
     @property
     def _true_size_and_pos(self) -> tuple[int, int, int, int]:
-        root = self._root
+        root = self.root
         size, x, y = root.geometry().split('+', 2)
         w, h = size.split('x', 1)
         return int(w), int(h), int(x), int(y)
@@ -451,12 +451,12 @@ class Window(BindMixin, RowContainer):
 
     @property
     def position(self) -> XY:
-        root = self._root
+        root = self.root
         return root.winfo_x(), root.winfo_y()
 
     @position.setter
     def position(self, pos: XY):
-        root = self._root
+        root = self.root
         try:
             root.geometry('+{}+{}'.format(*pos))
             root.update_idletasks()
@@ -465,7 +465,7 @@ class Window(BindMixin, RowContainer):
 
     @property
     def true_position(self) -> XY:
-        x, y = self._root.geometry().rsplit('+', 2)[1:]
+        x, y = self.root.geometry().rsplit('+', 2)[1:]
         return int(x), int(y)
 
     @property
@@ -499,27 +499,27 @@ class Window(BindMixin, RowContainer):
 
     @property
     def mouse_position(self) -> XY:
-        return self._root.winfo_pointerxy()
+        return self.root.winfo_pointerxy()
 
     # endregion
 
     # region Window State Methods
 
     def hide(self):
-        self._root.withdraw()
+        self.root.withdraw()
 
     def un_hide(self):
-        self._root.deiconify()
+        self.root.deiconify()
 
     def minimize(self):
-        self._root.iconify()
+        self.root.iconify()
 
     def maximize(self):
-        self._root.state('zoomed')
-        # self._root.attributes('-fullscreen', True)  # May be needed on Windows
+        self.root.state('zoomed')
+        # self.root.attributes('-fullscreen', True)  # May be needed on Windows
 
     def normal(self):
-        root = self._root
+        root = self.root
         if (state := root.state()) == 'iconic':
             root.deiconify()
         elif state == 'zoomed':
@@ -528,10 +528,10 @@ class Window(BindMixin, RowContainer):
 
     @property
     def is_maximized(self) -> bool:
-        return self._root.state() == 'zoomed'
+        return self.root.state() == 'zoomed'
 
     def bring_to_front(self):
-        root = self._root
+        root = self.root
         if ON_WINDOWS:
             root.wm_attributes('-topmost', 0)
             root.wm_attributes('-topmost', 1)
@@ -541,26 +541,26 @@ class Window(BindMixin, RowContainer):
             root.lift()
 
     def send_to_back(self):
-        self._root.lower()
+        self.root.lower()
 
     def disable(self):
-        self._root.attributes('-disabled', 1)
+        self.root.attributes('-disabled', 1)
 
     def enable(self):
-        self._root.attributes('-disabled', 0)
+        self.root.attributes('-disabled', 0)
 
     def take_focus(self):
-        self._root.focus_force()
+        self.root.focus_force()
 
     @property
     def has_focus(self) -> bool:
         try:
-            focus_widget = self._root.focus_get()
+            focus_widget = self.root.focus_get()
         except KeyError:
             focus_widget = None
         if focus_widget is None:  # focus_get may also return None
             return False
-        return get_root_widget(focus_widget) == self._root
+        return get_root_widget(focus_widget) == self.root
 
     # endregion
 
@@ -568,26 +568,26 @@ class Window(BindMixin, RowContainer):
 
     def set_alpha(self, alpha: float):
         try:
-            self._root.attributes('-alpha', alpha)
+            self.root.attributes('-alpha', alpha)
         except (TclError, RuntimeError):
             log.debug(f'Error setting window alpha color to {alpha!r}:', exc_info=True)
 
     def set_title(self, title: str):
-        self._root.wm_title(title)
+        self.root.wm_title(title)
 
     def disable_title_bar(self):
         self.no_title_bar = True
         try:
             if ON_LINUX:
-                self._root.wm_attributes('-type', 'dock')
+                self.root.wm_attributes('-type', 'dock')
             else:
-                self._root.wm_overrideredirect(True)
+                self.root.wm_overrideredirect(True)
         except (TclError, RuntimeError):
             log.warning('Error while disabling title bar:', exc_info=True)
 
     def enable_title_bar(self):
         self.no_title_bar = False
-        root = self._root
+        root = self.root
         root.wm_title(self.title)
         root.tk.call('wm', 'iconphoto', root._w, PhotoImage(data=self.icon))  # noqa
         try:
@@ -605,7 +605,7 @@ class Window(BindMixin, RowContainer):
             self.disable_title_bar()
 
     def make_modal(self):
-        root = self._root
+        root = self.root
         try:  # Apparently this does not work on macs...
             root.transient()
             root.grab_set()
@@ -620,7 +620,7 @@ class Window(BindMixin, RowContainer):
     @keep_on_top.setter
     def keep_on_top(self, value: Bool):
         self._keep_on_top = bool(value)
-        if (root := self._root) is not None:
+        if (root := self.root) is not None:
             if value and not ON_WINDOWS:
                 root.lift()  # Bring the window to the front first
             # if value:  # Bring the window to the front first
@@ -636,7 +636,7 @@ class Window(BindMixin, RowContainer):
             element.apply_style()
 
     def _update_idle_tasks(self):
-        self._root.update_idletasks()
+        self.root.update_idletasks()
 
     # endregion
 
@@ -648,11 +648,11 @@ class Window(BindMixin, RowContainer):
         x_config, y_config = self.x_config, self.y_config
         if not (y_config.scroll or x_config.scroll):
             pad_x, pad_y = self.margins
-            self.widget = self._root = self.tk_container = root = Toplevel(padx=pad_x, pady=pad_y, **kwargs)
+            self.widget = self.root = self.tk_container = root = Toplevel(padx=pad_x, pady=pad_y, **kwargs)
             return root
 
         kwargs['inner_kwargs'] = kwargs.copy()  # noqa
-        self.widget = self._root = root = ScrollableToplevel(
+        self.widget = self.root = root = ScrollableToplevel(
             x_config=x_config, y_config=y_config, style=style, pad=self.margins, **kwargs
         )
         self.tk_container = root.inner_widget
@@ -709,7 +709,7 @@ class Window(BindMixin, RowContainer):
 
     def show(self):
         self._ensure_tk_is_initialized()
-        if self._root is not None:
+        if self.root is not None:
             log.warning('Attempted to show window after it was already shown', stack_info=True)
             return
 
@@ -750,7 +750,7 @@ class Window(BindMixin, RowContainer):
     def _init_fix_focus(self):
         if (widget := self.__focus_widget) is None:
             return
-        if self._root.focus_get() != widget:
+        if self.root.focus_get() != widget:
             log.debug(f'Setting focus on {widget}')
             widget.focus_set()
 
@@ -765,7 +765,7 @@ class Window(BindMixin, RowContainer):
 
     @property
     def was_shown(self) -> bool:
-        return self._root is not None
+        return self.root is not None
 
     # endregion
 
@@ -780,7 +780,7 @@ class Window(BindMixin, RowContainer):
         if not value:
             self._grab_anywhere = False
             if bind_mgr := self._grab_anywhere_mgr:
-                bind_mgr.unbind_all(self._root)
+                bind_mgr.unbind_all(self.root)
             return
 
         old_value = self._grab_anywhere
@@ -796,7 +796,7 @@ class Window(BindMixin, RowContainer):
             else:
                 raise ValueError(f'Unexpected grab_anywhere {value=}')
 
-        if old_value != self._grab_anywhere and (root := self._root):
+        if old_value != self._grab_anywhere and (root := self.root):
             if bind_mgr := self._grab_anywhere_mgr:
                 bind_mgr.unbind_all(root)
             self._init_grab_anywhere()
@@ -809,7 +809,7 @@ class Window(BindMixin, RowContainer):
             f'<{prefix}ButtonRelease-1>': self._end_grab_anywhere,
         }
         self._grab_anywhere_mgr = bind_mgr = BindManager(event_cb_map)
-        bind_mgr.bind_all(self._root)
+        bind_mgr.bind_all(self.root)
 
     def _begin_grab_anywhere(self, event: Event):
         widget: BaseWidget = event.widget
@@ -838,7 +838,7 @@ class Window(BindMixin, RowContainer):
 
     @property
     def _bind_widget(self) -> BaseWidget | None:
-        return self._root
+        return self.root
 
     def apply_binds(self):
         """Called by :meth:`.show` to apply all registered callback bindings"""
@@ -877,13 +877,13 @@ class Window(BindMixin, RowContainer):
             if cb is None:
                 raise TypeError(f'Invalid {cb=} for {bind_event=}')
             # log.debug(f'Binding event={tk_event!r} for {cb=} with {add=}')
-            func_id = self._root.bind(tk_event, cb, add=add)
+            func_id = self.root.bind(tk_event, cb, add=add)
             log.debug(f'Bound event={tk_event!r} for {cb=} with {add=} -> {func_id=}')
         else:
             if tk_event not in self._bound_for_events:
                 method = getattr(self, window_method_name)
                 # log.debug(f'Binding event={tk_event!r} to {method=} with {add=}')
-                func_id = self._root.bind(tk_event, method, add=add)
+                func_id = self.root.bind(tk_event, method, add=add)
                 log.debug(f'Bound event={tk_event!r} to method={window_method_name} with {add=} -> {func_id=}')
                 self._bound_for_events.add(tk_event)
             if cb is not None:
@@ -925,7 +925,7 @@ class Window(BindMixin, RowContainer):
         return False
 
     @_tk_event_handler('<Configure>', True)
-    @delayed_event_handler(widget_attr='_root')
+    @delayed_event_handler(widget_attr='root')
     def _handle_motion_stopped(self, event: Event):
         # log.debug(f'Motion stopped: {event=}')
         with self.config as config:
@@ -1022,7 +1022,7 @@ class Window(BindMixin, RowContainer):
         else:
             # log.debug('Closing')
             close_func(*args, **kwargs)
-            self._root = None
+            self.root = None
             for close_cb in self.close_cbs:
                 # log.debug(f'Calling {close_cb=}')
                 close_cb()

@@ -59,7 +59,7 @@ class PopupMixin(ABC):
         else:
             # TODO: Does this even work?
             log.debug(f'Enqueueing threaded popup={self!r}')
-            result = TkFuture.submit(parent._root, self._run).result()
+            result = TkFuture.submit(parent.root, self._run).result()
             log.debug(f'Got threaded popup={self!r} {result=}')
 
         if self.return_focus and (parent := self.parent):

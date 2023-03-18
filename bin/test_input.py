@@ -72,7 +72,7 @@ class GuiInputTest(Command):
         bar = ProgressBar(100)
         window = Window([[Text('Processing...')], [bar]], 'Progress Test', exit_on_esc=True)
         for _ in bar(range(99)):
-            window._root.after(50, window.interrupt)
+            window.root.after(50, window.interrupt)
             window.run()
             # time.sleep(0.3)
 
@@ -190,7 +190,7 @@ class ProgressView(View, title='Progress Bar Test View'):
     @button_handler('run')
     def run_progress_test(self, event, key=None):
         for _ in self.progress_bar(range(99), True):
-            # window._root.after(50, window.interrupt)
+            # window.root.after(50, window.interrupt)
             time.sleep(0.3)
 
 

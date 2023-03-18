@@ -388,10 +388,10 @@ class Menu(CustomEventResultsMixin, ContainerMixin, ElementBase, metaclass=MenuM
         tk_top_level.configure(menu=menu)  # Only Tk and Toplevel support menu bars
 
     def pack_into(self, row: Row):
-        self._init_widget(row.window._root)
+        self._init_widget(row.window.root)
 
     def grid_into(self, parent: HasFrame, row: int, column: int, **kwargs):
-        self._init_widget(parent.window._root)
+        self._init_widget(parent.window.root)
 
     # endregion
 
