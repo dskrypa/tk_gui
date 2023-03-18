@@ -10,7 +10,7 @@ import logging
 import tkinter as tk
 from os import environ
 from time import monotonic
-from tkinter import Tk, Toplevel, PhotoImage, TclError, Event, CallWrapper, Frame, BaseWidget
+from tkinter import Tk, Toplevel, PhotoImage, TclError, Event, CallWrapper, BaseWidget
 from tkinter.ttk import Sizegrip, Scrollbar, Treeview
 from typing import TYPE_CHECKING, Optional, Union, Any, Iterable, Callable, Iterator, overload
 from weakref import finalize, WeakSet
@@ -76,7 +76,7 @@ class Window(BindMixin, RowContainer):
     _grab_anywhere_mgr: BindManager | None = None
     _grab_anywhere: GrabAnywhere = False  #: Whether the window should move on mouse click + movement
     _root: Optional[Top] = None
-    root: Optional[TkContainer] = None
+    tk_container: Optional[TkContainer] = None
     widget: Top = None
     is_popup: bool = False                              #: Whether the window is a popup
     closed: bool = False
@@ -165,10 +165,10 @@ class Window(BindMixin, RowContainer):
     ):
         self._instances.add(self)
         self.title = title or ProgramMetadata('').name.replace('_', ' ').title()
-        cfg = extract_kwargs(kwargs, {'size', 'position'})
-        self._config = (config_name or title, config_path, cfg if config is None else (config | cfg))
         self._min_size = min_size
 
+        cfg = extract_kwargs(kwargs, {'size', 'position'})
+        self._config = (config_name or title, config_path, cfg if config is None else (config | cfg))
         for key, val in extract_kwargs(kwargs, _INIT_OVERRIDE_KEYS).items():
             setattr(self, key, val)  # This needs to happen before touching self.config to have is_popup set
 
@@ -189,10 +189,6 @@ class Window(BindMixin, RowContainer):
         # self.kill_others_on_close = kill_others_on_close
         if show and self.rows:
             self.show()
-
-    @property
-    def tk_container(self) -> Union[Toplevel, Frame]:
-        return self.root
 
     @property
     def window(self) -> Window:
@@ -421,8 +417,6 @@ class Window(BindMixin, RowContainer):
         work_area = monitor.work_area
         max_width = work_area.width - 100
         max_height = work_area.height - 50
-        # max_width = monitor.width - 100
-        # max_height = monitor.height - 130
         if width < max_width and height < max_height:
             return
 
@@ -433,7 +427,7 @@ class Window(BindMixin, RowContainer):
         self.size = (width, height)
 
     def resize_scroll_region(self, size: Optional[XY] = None):
-        outer, inner = self._root, self.root
+        outer, inner = self._root, self.tk_container
         if outer != inner:
             outer.resize_scroll_region(size)
         else:
@@ -654,14 +648,14 @@ class Window(BindMixin, RowContainer):
         x_config, y_config = self.x_config, self.y_config
         if not (y_config.scroll or x_config.scroll):
             pad_x, pad_y = self.margins
-            self.widget = self._root = self.root = root = Toplevel(padx=pad_x, pady=pad_y, **kwargs)
+            self.widget = self._root = self.tk_container = root = Toplevel(padx=pad_x, pady=pad_y, **kwargs)
             return root
 
         kwargs['inner_kwargs'] = kwargs.copy()  # noqa
         self.widget = self._root = root = ScrollableToplevel(
             x_config=x_config, y_config=y_config, style=style, pad=self.margins, **kwargs
         )
-        self.root = root.inner_widget
+        self.tk_container = root.inner_widget
         return root
 
     def _init_root(self) -> Top:
@@ -703,7 +697,7 @@ class Window(BindMixin, RowContainer):
     def _init_pack_root(self) -> Top:
         outer = self._init_root()
         self.pack_rows()
-        if (inner := self.root) != outer:  # outer is scrollable
+        if (inner := self.tk_container) != outer:  # outer is scrollable
             outer.resize_scroll_region(self._get_init_inner_size(inner))
 
         self._set_init_size()
@@ -969,7 +963,7 @@ class Window(BindMixin, RowContainer):
 
         if menu := self._right_click_menu:
             menu.parent = self  # Needed for style inheritance
-            menu.show(event, self.root)
+            menu.show(event, self.tk_container)
 
     @_tk_event_handler(BindEvent.MENU_RESULT, True)
     def _handle_menu_callback(self, event: Event):

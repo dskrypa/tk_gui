@@ -33,7 +33,7 @@ class RawPopup(BasePopup, ABC):
 
     def _get_root(self):
         if parent := self.parent:
-            return parent.root
+            return parent.tk_container
         else:
             return None
 
