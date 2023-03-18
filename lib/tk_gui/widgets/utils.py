@@ -338,15 +338,15 @@ def dump_ttk_widget_info(widget: BaseWidget):
     """
     from tkinter.ttk import Style
 
-    config = widget.configure()
+    widget_config = widget.configure()
     try:
-        style_name = config['style'][-1] or widget.winfo_class()
+        style_name = widget_config['style'][-1] or widget.winfo_class()
     except Exception:  # noqa
         style_name = widget.winfo_class()
 
     print(f'Ttk info for {widget=}:')
     print('  - Config:')
-    for key, val in sorted(config.items()):
+    for key, val in sorted(widget_config.items()):
         print(f'     - {key}: {val!r}')
 
     style = Style()

@@ -1,5 +1,5 @@
 """
-The GuiState class provides a config dict for shared state between Views, and FILO queues for history / future Views
+The GuiState class provides a ``data`` dict for shared state between Views, and FILO queues for history / future Views
 to be displayed.
 """
 

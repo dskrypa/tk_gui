@@ -103,7 +103,7 @@ class Style(ClearableCachedPropertyMixin):
         layer_keys, layer_fields = self._layers, StyleLayer._fields
         for key, val in kwargs.items():
             if key in layer_keys:
-                # log.info(f'{self}: Full layer config provided: {key}={val!r}', extra={'color': 11})
+                # log.info(f'{self}: Full layer configuration provided: {key}={val!r}', extra={'color': 11})
                 setattr(self, key, val)
             elif key in layer_fields:
                 layers.setdefault('base', {})[key] = val
