@@ -304,6 +304,13 @@ class ComplexScrollable(ScrollableBase, ABC):
         # log.debug(f'{self!r}.update_canvas_size: size=({width}, {height})')
         # TODO: Should the scrollregion update happen after the size change, or should the bbox be manually edited
         #  to have the new size?
+
+        # if width and height:
+        #     bbox = (0, 0, width, height)
+        # else:
+        #     x0, y0, x1, y1 = canvas.bbox('all')
+        #     bbox = (x0, y0, width or x1, height or y1)
+        # canvas.configure(scrollregion=bbox, width=width, height=height)
         canvas.configure(scrollregion=canvas.bbox('all'), width=width, height=height)
         self._last_size = (width, height)
 

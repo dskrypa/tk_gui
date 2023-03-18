@@ -160,7 +160,7 @@ class Box(Sized):
             return self.top <= other.top and self.bottom >= other.bottom
         return self.top < other.top and self.bottom > other.bottom
 
-    def fits_inside(self, other: XY | Box, inclusive: bool = True) -> bool:
+    def fits_inside(self, other: XY | HasSize, inclusive: bool = True) -> bool:
         try:
             width, height = other.size
         except AttributeError:
@@ -173,7 +173,7 @@ class Box(Sized):
     def fits_inside_y(self, height: Y, inclusive: bool = True) -> bool:
         return (height >= self.height) if inclusive else (height > self.height)
 
-    def fits_around(self, other: XY | Box, inclusive: bool = True) -> bool:
+    def fits_around(self, other: XY | HasSize, inclusive: bool = True) -> bool:
         try:
             width, height = other.size
         except AttributeError:
@@ -227,6 +227,13 @@ class Box(Sized):
     def bottom_right(self) -> XY:
         return self.max_xy
 
+    @property
+    def center_pos(self) -> XY:
+        x, y = self.min_xy
+        x += self.width // 2
+        y += self.height // 2
+        return x, y
+
     # endregion
 
     # region Resize
@@ -266,6 +273,7 @@ class Box(Sized):
         return x, y
 
     def center(self, obj: XY | HasSize) -> Box:
+        """Returns a Box that represents the position that would place the given object at the center of this box."""
         try:
             width, height = obj.size
         except AttributeError:  # It was a tuple already
