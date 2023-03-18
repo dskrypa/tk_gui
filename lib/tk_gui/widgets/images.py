@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Union, Optional, Any, Iterator
 
 from PIL.ImageTk import PhotoImage
 
+from tk_gui.geometry import Box
 from .scroll import ComplexScrollable
 from .utils import get_size_and_pos
 
@@ -52,16 +53,28 @@ class ScrollableImage(ComplexScrollable, Frame):
 
     # endregion
 
+    def _get_center_pos(self, size: XY) -> XY:
+        box = self._last_box
+        if box.right:
+            return box.center(size).min_xy
+        else:
+            return 0, 0
+
     def set_image(self, image: TkImage, size: XY):
         self.inner_widget = image
         try:
             del self.__dict__['widgets']  # Clear the cached property
         except KeyError:
             pass
-        width, height = size
-        center_w, center_h = width // 2, height // 2
-        self._inner_id = self.canvas.create_image(center_w, center_h, image=image, anchor='center')
-        log.debug(f'Created image={self._inner_id!r} @ {center_w=}, {center_h=}')
+
+        x, y = self._get_center_pos(size)
+        self._inner_id = self.canvas.create_image(x, y, image=image, anchor='nw')
+
+        # width, height = size
+        # center_w, center_h = width // 2, height // 2
+        # self._inner_id = self.canvas.create_image(center_w, center_h, image=image, anchor='center')
+        # log.debug(f'Created image={self._inner_id!r} @ {center_w=}, {center_h=}')
+        log.debug(f'Created image={self._inner_id!r} @ {x=}, {y=}')
 
     def del_image(self):
         if (inner_id := self._inner_id) is not None:
@@ -85,9 +98,14 @@ class ScrollableImage(ComplexScrollable, Frame):
 
         if force or size != self._last_size:
             self.update_canvas_size(width, height)
-            center_w, center_h = width // 2, height // 2
-            log.debug(f'Moving image={self._inner_id!r} to {center_w=}, {center_h=}')
-            canvas.moveto(self._inner_id, center_w, center_h)
+
+            # center_w, center_h = width // 2, height // 2
+            # log.debug(f'Moving image={self._inner_id!r} to {center_w=}, {center_h=}')
+            # canvas.moveto(self._inner_id, center_w, center_h)
+
+            x, y = self._get_center_pos(size)
+            log.debug(f'Moving image={self._inner_id!r} to {x=}, {y=}')
+            canvas.moveto(self._inner_id, x, y)
         else:
             log.debug(f'No action necessary for {size=} == {self._last_size=}')
 
@@ -102,7 +120,7 @@ class ScrollableImage(ComplexScrollable, Frame):
         # self.canvas.configure(width=width, height=height)
         # self.update_idletasks()
         # self.canvas.update_idletasks()
-        # self.maybe_update_scroll_region()
+        # self.update_scroll_region()
 
     def _widgets(self) -> Iterator[BaseWidget]:
         yield self.inner_widget

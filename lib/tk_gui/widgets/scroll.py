@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Type, Mapping, Union, Optional, Any, Iterator,
 
 from tk_gui.caching import cached_property
 from tk_gui.event_handling.decorators import delayed_event_handler
+from tk_gui.geometry import Box
 from tk_gui.utils import ON_WINDOWS
 from .configuration import AxisConfig
 from .utils import get_parent_or_none, get_root_widget
@@ -187,7 +188,7 @@ class ScrollableListbox(ScrollableWidget, Frame, inner_cls=Listbox):
 class ComplexScrollable(ScrollableBase, ABC):
     _y_bind, _x_bind = ('<MouseWheel>', '<Shift-MouseWheel>') if ON_WINDOWS else ('<4>', '<5>')
     canvas: Canvas
-    _last_scroll_region: tuple[int, int, int, int] = ()
+    _last_box: Box = Box(0, 0, 0, 0)
     _last_size: XY = ()
     _x_config: AxisConfig
     _y_config: AxisConfig
@@ -250,6 +251,20 @@ class ComplexScrollable(ScrollableBase, ABC):
 
     # endregion
 
+    @cached_property
+    def bar_height_x(self) -> int:
+        try:
+            return self.scroll_bar_x.winfo_reqheight()
+        except AttributeError:
+            return 0
+
+    @cached_property
+    def bar_width_y(self) -> int:
+        try:
+            return self.scroll_bar_y.winfo_reqwidth()
+        except AttributeError:
+            return 0
+
     # region Scroll Methods
 
     def scroll_y(self, event: Event):
@@ -300,7 +315,7 @@ class ComplexScrollable(ScrollableBase, ABC):
             self.update_canvas_size(width, height)
 
     def update_canvas_size(self, width: int = None, height: int = None):
-        canvas = self.canvas
+        # canvas = self.canvas
         # log.debug(f'{self!r}.update_canvas_size: size=({width}, {height})')
         # TODO: Should the scrollregion update happen after the size change, or should the bbox be manually edited
         #  to have the new size?
@@ -311,7 +326,8 @@ class ComplexScrollable(ScrollableBase, ABC):
         #     x0, y0, x1, y1 = canvas.bbox('all')
         #     bbox = (x0, y0, width or x1, height or y1)
         # canvas.configure(scrollregion=bbox, width=width, height=height)
-        canvas.configure(scrollregion=canvas.bbox('all'), width=width, height=height)
+        # canvas.configure(scrollregion=canvas.bbox('all'), width=width, height=height)
+        self.update_scroll_region(True, width=width, height=height)
         self._last_size = (width, height)
 
     @delayed_event_handler(delay_ms=75)
@@ -332,15 +348,16 @@ class ComplexScrollable(ScrollableBase, ABC):
 
     @delayed_event_handler(delay_ms=75)
     def _maybe_update_scroll_region(self, event: Event = None):
-        self.maybe_update_scroll_region()
+        self.update_scroll_region()
 
-    def maybe_update_scroll_region(self):
+    def update_scroll_region(self, force: bool = False, **kwargs):
         canvas = self.canvas
         bbox = canvas.bbox('all')  # top left (x, y), bottom right (x, y) I think ==>> last 2 => (width, height)
-        if self._last_scroll_region != bbox:
-            # log.debug(f'Updating scroll region to {bbox=} != {self._last_scroll_region=} for {self}')
-            canvas.configure(scrollregion=bbox)
-            self._last_scroll_region = bbox
+        box = Box(*bbox)
+        if force or self._last_box != box:
+            # log.debug(f'Updating scroll region to {bbox=} != {self._last_box=} for {self}')
+            canvas.configure(scrollregion=bbox, **kwargs)
+            self._last_box = box
         # else:
         #     log.debug(f'{self!r}: Skipping scroll region update ({bbox=})')
 
