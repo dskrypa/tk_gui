@@ -79,8 +79,6 @@ class WindowInitializer(HandlesEvents, ABC):
             self.title = title
         if config_name:
             self.config_name = config_name
-        elif not self.config_name and self.title:
-            self.config_name = self.title
         if config_path:
             self.config_path = config_path
         if config_defaults is not None:

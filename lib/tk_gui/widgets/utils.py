@@ -145,7 +145,7 @@ class WidgetData:
         show_event: Bool = None,
         show_pack_info: Bool = True,
         show_get_result: Bool = True,
-        show_ttk_info: Bool = True,
+        show_ttk_info: Bool = False,
         hide_event_unset: Bool = True,
     ):
         self.widget = widget

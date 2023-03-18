@@ -174,7 +174,7 @@ class Window(BindMixin, RowContainer):
             raise TypeError(
                 f'Invalid config arg combo - cannot combine {config=} with non-None {config_name=} or {config_path=}'
             )
-        self._config = (config_name or title, config_path, {} if config is None else config)
+        self._config = (config_name, config_path, {} if config is None else config)
 
         for key, val in extract_kwargs(kwargs, _INIT_OVERRIDE_KEYS).items():
             setattr(self, key, val)  # This needs to happen before touching self.config to have is_popup set
@@ -460,7 +460,7 @@ class Window(BindMixin, RowContainer):
             # log.debug(f'  > Final {centered=}')
         else:
             centered = monitor.work_area.center(win_rect)
-            # log.debug(f'Centered {win_rect=} within {work_area=} => {centered=}')
+            # log.debug(f'Centered {win_rect=} within {monitor.work_area=} => {centered=}')
         self.position = centered.position
 
     @property
@@ -1076,6 +1076,7 @@ class WindowInitializer:
         if pos := self.position:
             self.window.position = pos
         else:
+            root.update_idletasks()
             self.window.move_to_center()
 
     def _get_init_inner_size(self, inner: TkContainer) -> Optional[XY]:
