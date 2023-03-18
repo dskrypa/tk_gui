@@ -20,7 +20,7 @@ from PIL import ImageGrab
 
 from .assets import PYTHON_LOGO
 from .caching import cached_property
-from .config import WindowConfig, WindowConfigProperty
+from .config import GuiConfig, WindowConfigProperty
 from .elements.menu import Menu
 from .enums import BindTargets, Anchor, Justify, Side, BindEvent, CallbackAction
 from .event_handling import BindMixin, BindMapping, BindMap, BindManager
@@ -40,7 +40,7 @@ if TYPE_CHECKING:
     from .elements.element import Element, ElementBase
     from .styles.typing import StyleSpec
     from .typing import XY, BindCallback, EventCallback, Key, BindTarget, Bindable, Layout, Bool, HasValue
-    from .typing import TkContainer, GrabAnywhere, Top
+    from .typing import TkContainer, GrabAnywhere, Top, PathLike
     from .widgets.configuration import AxisConfig
 
 __all__ = ['Window']
@@ -59,7 +59,7 @@ _INIT_CFG_FIELDS = frozenset({
 
 class Window(BindMixin, RowContainer):
     # region Class Attrs
-    config: WindowConfig = WindowConfigProperty()
+    config: GuiConfig = WindowConfigProperty()
     tk_load_profile: Bool = False
     __hidden_root = None
     _tk_event_handlers: dict[str, str] = {}
@@ -100,40 +100,45 @@ class Window(BindMixin, RowContainer):
         layout: Layout = None,
         title: str = None,
         *,
-        style: StyleSpec = None,
-        size: XY = None,
+        show: Bool = True,
+        # Init-only params
         min_size: XY = (200, 50),
+        size: XY = None,
         position: XY = None,
+        margins: XY = (10, 5),  # x, y
         resizable: Bool = True,
-        keep_on_top: Bool = False,
         can_minimize: Bool = True,
+        scaling: float = None,
         transparent_color: str = None,
         alpha_channel: float = None,
+        # Misc params
+        keep_on_top: Bool = False,
         icon: bytes = None,
         modal: Bool = False,
         no_title_bar: Bool = False,
-        margins: XY = (10, 5),  # x, y
+        # Style-related params
+        style: StyleSpec = None,
         anchor_elements: Union[str, Anchor] = None,
         text_justification: Union[str, Justify] = None,
         element_side: Union[str, Side] = None,
         element_padding: XY = None,
         element_size: XY = None,
+        # Bind-related params
         binds: BindMapping = None,
         exit_on_esc: Bool = False,
+        close_cbs: Iterable[Callable] = None,
+        right_click_menu: Menu = None,
+        grab_anywhere: GrabAnywhere = False,
+        # Scroll params
         scroll_y: Bool = False,
         scroll_x: Bool = False,
         scroll_y_div: float = 2,
         scroll_x_div: float = 1,
-        close_cbs: Iterable[Callable] = None,
-        right_click_menu: Menu = None,
-        scaling: float = None,
-        grab_anywhere: GrabAnywhere = False,
+        # Config params
         is_popup: Bool = False,
         config_name: str = None,                            #: Name used in config files (defaults to title)
-        config_path: Union[str, Path] = None,
-        config: dict[str, Any] = None,
-        show: Bool = True,
-        # kill_others_on_close: Bool = False,
+        config_path: PathLike = None,
+        config: dict[str, Any] | GuiConfig = None,
     ):
         ...
 
@@ -146,24 +151,31 @@ class Window(BindMixin, RowContainer):
         layout: Layout = None,
         title: str = None,
         *,
+        # Bind-related params
         binds: BindMapping = None,
         exit_on_esc: Bool = False,
         close_cbs: Iterable[Callable] = None,
         right_click_menu: Menu = None,
         grab_anywhere: GrabAnywhere = False,
+        # Config params
         config_name: str = None,
-        config_path: Union[str, Path] = None,
-        config: dict[str, Any] = None,
+        config_path: PathLike = None,
+        config: dict[str, Any] | GuiConfig = None,
+        # Other params
         style: StyleSpec = None,
         show: Bool = True,
         **kwargs,
-        # kill_others_on_close: Bool = False,
     ):
         self._instances.add(self)
         self.title = title or ProgramMetadata('').name.replace('_', ' ').title()
         self._init_config = InitConfig(**extract_kwargs(kwargs, _INIT_CFG_FIELDS))
 
+        if isinstance(config, GuiConfig) and (config_name or config_path):
+            raise TypeError(
+                f'Invalid config arg combo - cannot combine {config=} with non-None {config_name=} or {config_path=}'
+            )
         self._config = (config_name or title, config_path, {} if config is None else config)
+
         for key, val in extract_kwargs(kwargs, _INIT_OVERRIDE_KEYS).items():
             setattr(self, key, val)  # This needs to happen before touching self.config to have is_popup set
 
@@ -969,6 +981,8 @@ class WindowInitializer:
     def __init__(self, init_config: InitConfig, window: Window):
         self.init_config = init_config
         self.window = window
+        self.size: XY | None = init_config.size or window.config.size
+        self.position: XY | None = init_config.position or window.config.position
 
     def initialize_window(self) -> Top:
         root = self._init_root_widget()
@@ -980,10 +994,7 @@ class WindowInitializer:
 
     @cached_property
     def monitor(self) -> Optional[Monitor]:
-        try:
-            x, y = self.init_config.position
-        except TypeError:
-            x, y = self.window.position
+        x, y = self.position or self.window.position
         if not (monitor := monitor_manager.get_monitor(x, y)):
             log.debug(f'Could not find monitor for pos={x, y}')
         return monitor
@@ -1001,14 +1012,13 @@ class WindowInitializer:
         return root
 
     def _init_root_scrollable(self, x_config: AxisConfig, y_config: AxisConfig) -> ScrollableToplevel:
-        window = self.window
-        style = window.style
+        style = self.window.style
         kwargs = style.get_map(background='bg')
         kwargs['inner_kwargs'] = kwargs.copy()  # noqa
         root = ScrollableToplevel(
             x_config=x_config, y_config=y_config, style=style, pad=self.init_config.margins, **kwargs
         )
-        window.tk_container = root.inner_widget
+        self.window.tk_container = root.inner_widget
         return root
 
     def _init_root_normal(self) -> Toplevel:
@@ -1063,13 +1073,13 @@ class WindowInitializer:
             self.window.set_min_size(*min_size)
         if size := self._get_init_outer_size(root):
             self.window.size = size
-        if pos := self.init_config.position:
+        if pos := self.position:
             self.window.position = pos
         else:
             self.window.move_to_center()
 
     def _get_init_inner_size(self, inner: TkContainer) -> Optional[XY]:
-        if size := self.init_config.size:
+        if size := self.size:
             return size
 
         y_div = self.window.y_config.size_div
@@ -1087,7 +1097,7 @@ class WindowInitializer:
         return width, height
 
     def _get_init_outer_size(self, root: Top) -> Optional[XY]:
-        if size := self.init_config.size:
+        if size := self.size:
             return size
         elif not (monitor := self.monitor):
             return None

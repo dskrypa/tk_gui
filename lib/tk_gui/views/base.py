@@ -12,12 +12,13 @@ from time import monotonic
 from typing import TYPE_CHECKING, Any, Union
 
 from tk_gui.caching import cached_property
+from tk_gui.config import GuiConfigProperty
 from tk_gui.event_handling import HandlesEvents, BindMap
 from tk_gui.monitors import Monitor, monitor_manager
 from tk_gui.window import Window
 
 if TYPE_CHECKING:
-    from tk_gui.typing import Layout, Key
+    from tk_gui.typing import Layout, Key, PathLike
 
 __all__ = ['WindowInitializer']
 log = logging.getLogger(__name__)
@@ -28,13 +29,45 @@ _NotSet = object()
 class WindowInitializer(HandlesEvents, ABC):
     parent: Window | None = None
     title: str | None = None
+    is_popup: bool = False
 
-    def __init_subclass__(cls, title: str = None, **kwargs):
+    config = GuiConfigProperty()
+    config_name: str = None
+    config_path: PathLike = None
+    config_defaults: dict[str, Any] = None
+
+    def __init_subclass__(
+        cls,
+        title: str = None,
+        config_name: str = None,
+        config_path: PathLike = None,
+        config_defaults: dict[str, Any] = None,
+        is_popup: bool = None,
+        **kwargs,
+    ):
         super().__init_subclass__(**kwargs)
         if title:
             cls.title = title
+        if config_name:
+            cls.config_name = config_name
+        if config_path:
+            cls.config_path = config_path
+        if config_defaults is not None:
+            cls.config_defaults = config_defaults
+        if is_popup is not None:
+            cls.is_popup = is_popup
 
-    def __init__(self, parent: Union[WindowInitializer, Window] = _NotSet, *, title: str = None, **kwargs):
+    def __init__(
+        self,
+        parent: Union[WindowInitializer, Window] = _NotSet,
+        *,
+        title: str = None,
+        config_name: str = None,
+        config_path: PathLike = None,
+        config_defaults: dict[str, Any] = None,
+        is_popup: bool = None,
+        **kwargs,
+    ):
         if parent is _NotSet:
             try:
                 self.parent = Window.get_active_windows(sort_by_last_focus=True)[0]
@@ -44,6 +77,16 @@ class WindowInitializer(HandlesEvents, ABC):
             self.parent = parent.window if isinstance(parent, WindowInitializer) else parent
         if title is not None:
             self.title = title
+        if config_name:
+            self.config_name = config_name
+        elif not self.config_name and self.title:
+            self.config_name = self.title
+        if config_path:
+            self.config_path = config_path
+        if config_defaults is not None:
+            self.config_defaults = config_defaults
+        if is_popup is not None:
+            self.is_popup = is_popup
         self.window_kwargs = kwargs
 
     def __repr__(self) -> str:
@@ -84,7 +127,14 @@ class WindowInitializer(HandlesEvents, ABC):
         return []
 
     def init_window(self) -> Window:
-        return Window(self.get_pre_window_layout(), title=self.title, binds=self.bind_map, **self.window_kwargs)
+        return Window(
+            self.get_pre_window_layout(),
+            title=self.title,
+            binds=self.bind_map,
+            config=self.config,
+            is_popup=self.is_popup,
+            **self.window_kwargs,
+        )
 
     @cached_property
     def window(self) -> Window:

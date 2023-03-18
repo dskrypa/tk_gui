@@ -165,3 +165,28 @@ class SupportsBind(Protocol):
     @abstractmethod
     def unbind(self, event_pat: Bindable, func_id: str = None):
         pass
+
+
+@runtime_checkable
+class ConfigContainer(Protocol):
+    __slots__ = ()
+
+    @property
+    @abstractmethod
+    def config_name(self) -> str | None:
+        pass
+
+    @property
+    @abstractmethod
+    def config_path(self) -> PathLike | None:
+        pass
+
+    @property
+    @abstractmethod
+    def config_defaults(self) -> dict[str, Any] | None:
+        pass
+
+    @property
+    @abstractmethod
+    def is_popup(self) -> bool:
+        pass

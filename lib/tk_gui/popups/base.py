@@ -92,7 +92,7 @@ class BasePopup(PopupMixin, ABC):
         return f'<{self.__class__.__name__}[title={self.title!r}]>'
 
 
-class Popup(PopupMixin, WindowInitializer):
+class Popup(PopupMixin, WindowInitializer, is_popup=True):
     def __init__(
         self,
         layout: Layout = (),
@@ -111,16 +111,6 @@ class Popup(PopupMixin, WindowInitializer):
             self.return_focus = return_focus
         self._bind_esc = bind_esc
         self.layout = layout
-
-    @property
-    def window_kwargs(self) -> dict[str, Any]:
-        kwargs = self._window_kwargs
-        kwargs['is_popup'] = True
-        return kwargs
-
-    @window_kwargs.setter
-    def window_kwargs(self, value: dict[str, Any]):
-        self._window_kwargs = value
 
     def _get_bind_map(self) -> BindMap:
         bind_map = super()._get_bind_map()
@@ -159,7 +149,7 @@ class BasicPopup(Popup):
         **kwargs,
     ):
         if buttons and button:
-            raise ValueError('Use "button" or "buttons", not both')
+            raise TypeError('Use "button" or "buttons", not both')
         elif not buttons and not button:
             button = 'OK'
         super().__init__(**kwargs)

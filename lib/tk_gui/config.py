@@ -15,9 +15,10 @@ from typing import TYPE_CHECKING, Any, Type, Union, Optional, Callable, TypeVar,
 from .__version__ import __title__
 
 if TYPE_CHECKING:
+    from .typing import ConfigContainer, PathLike
     from .window import Window
 
-__all__ = ['WindowConfig', 'WindowConfigProperty']
+__all__ = ['GuiConfig', 'GuiConfigProperty', 'WindowConfigProperty']
 log = logging.getLogger(__name__)
 
 _NotSet = object()
@@ -46,7 +47,7 @@ class ConfigItem(Generic[T]):
         if popup_dependent and depends_on:
             raise ValueError('depends_on cannot be combined with popup_dependent')
 
-    def __set_name__(self, owner: Type[WindowConfig], name: str):
+    def __set_name__(self, owner: Type[GuiConfig], name: str):
         self.name = name
 
     def __repr__(self) -> str:
@@ -55,7 +56,7 @@ class ConfigItem(Generic[T]):
             f'<{self.__class__.__name__}[{name=}, {default=}, type={self.type!r}, {popup_dependent=}, {depends_on=}]>'
         )
 
-    def get(self, instance: WindowConfig) -> Optional[T]:
+    def get(self, instance: GuiConfig) -> Optional[T]:
         try:
             value = instance._get(self.name, type=self.type)
         except KeyError:
@@ -67,20 +68,20 @@ class ConfigItem(Generic[T]):
             return self.default
         return value
 
-    def __get__(self, instance: Optional[WindowConfig], owner: Type[WindowConfig]) -> Union[T, None, ConfigItem]:
+    def __get__(self, instance: Optional[GuiConfig], owner: Type[GuiConfig]) -> Union[T, None, ConfigItem]:
         if instance is None:
             return self
         return self.get(instance)
 
-    def __set__(self, instance: WindowConfig, value: T):
+    def __set__(self, instance: GuiConfig, value: T):
         if value is not _NotSet and self.get(instance) != value:
             instance[self.name] = value
 
-    def __delete__(self, instance: WindowConfig):
+    def __delete__(self, instance: GuiConfig):
         del instance[self.name]
 
 
-class WindowConfig:
+class GuiConfig:
     auto_save = ConfigItem((True, False), bool, popup_dependent=True)
     style = ConfigItem(None, str)
     remember_size = ConfigItem((True, False), bool, popup_dependent=True)
@@ -91,7 +92,7 @@ class WindowConfig:
     def __init__(
         self,
         name: Optional[str],
-        path: Union[str, Path] = None,
+        path: PathLike = None,
         defaults: dict[str, Any] = None,
         is_popup: bool = False,
     ):
@@ -109,9 +110,10 @@ class WindowConfig:
         except ValueError:
             path = self.path.as_posix()
 
-        # cfg_str = ', '.join(f'{k}={self.get(k)!r}' for k in ('auto_save', 'style'))
         cfg_str = ', '.join(f'{k}={getattr(self, k)!r}' for k in ('auto_save', 'style', 'is_popup'))
         return f'<{self.__class__.__name__}({self.name!r}, {path!r})[{cfg_str}]>'
+
+    # region Data
 
     @property
     def _data(self) -> dict[str, dict[str, Any]]:
@@ -147,6 +149,10 @@ class WindowConfig:
     @property
     def file_defaults(self) -> dict[str, Any]:
         return self._get_section(DEFAULT_SECTION)
+
+    # endregion
+
+    # region Get Methods
 
     def __getitem__(self, key: str):
         try:
@@ -188,6 +194,10 @@ class WindowConfig:
         except KeyError:
             return None
 
+    # endregion
+
+    # region Set / Modify Methods
+
     def update(self, data: Mapping[str, Any], ignore_none: bool = False, ignore_empty: bool = False):
         with self:
             for key, val in data.items():
@@ -215,7 +225,11 @@ class WindowConfig:
         if self.auto_save:
             self.save()
 
-    def __enter__(self) -> WindowConfig:
+    # endregion
+
+    # region Context Manager / Save
+
+    def __enter__(self) -> GuiConfig:
         self._in_cm = True
         return self
 
@@ -227,20 +241,19 @@ class WindowConfig:
     def save(self, force: bool = False):
         if self._in_cm or self.name is None:
             return
-        all_data = self._all_data
-        if not all_data or not (self._changed or force):
+        elif not (all_data := self._all_data) or not (self._changed or force):
             return
 
         changed = ', '.join(sorted(self._changed))
-        suffix = f' for keys={changed}' if changed else ''
-        log.debug(f'Saving state to {self.path}{suffix}')
-        path = self.path
-        if not path.parent.exists():
+        log.debug(f'Saving state to {self.path}' + (f' for keys={changed}' if changed else ''))
+        if not (path := self.path).parent.exists():
             path.parent.mkdir(parents=True, exist_ok=True)
         with path.open('w', encoding='utf-8') as f:
             json.dump(all_data, f, indent=4, sort_keys=True)
 
         self._changed = set()
+
+    # endregion
 
 
 class WindowConfigProperty:
@@ -249,21 +262,43 @@ class WindowConfigProperty:
     def __set_name__(self, owner: Type[Window], name: str):
         self.name = name
 
-    def __get__(self, window: Optional[Window], window_cls: Type[Window]) -> WindowConfig:
+    def __get__(self, window: Optional[Window], window_cls: Type[Window]) -> GuiConfig:
         try:
             return window.__dict__[self.name]
         except KeyError:
             pass
+
         try:
             name, path, defaults = window._config
         except TypeError:
             name = path = defaults = None
+        else:
+            if isinstance(defaults, GuiConfig):
+                name, path = defaults.name, defaults.path
+                defaults = defaults.defaults.copy()
 
-        window.__dict__[self.name] = config = WindowConfig(name, path, defaults, window.is_popup)
+        window.__dict__[self.name] = config = GuiConfig(name, path, defaults, window.is_popup)
         return config
 
 
-def normalize_path(path: Union[str, Path, None]) -> Path:
+class GuiConfigProperty:
+    __slots__ = ('name',)
+
+    def __set_name__(self, owner: Type[ConfigContainer], name: str):
+        self.name = name
+
+    def __get__(self, inst: Optional[ConfigContainer], cls: Type[ConfigContainer]) -> GuiConfig:
+        try:
+            return inst.__dict__[self.name]
+        except KeyError:
+            pass
+
+        config = GuiConfig(inst.config_name, inst.config_path, inst.config_defaults, inst.is_popup)
+        inst.__dict__[self.name] = config
+        return config
+
+
+def normalize_path(path: Union[PathLike, None]) -> Path:
     if path is None:
         return Path(DEFAULT_PATH).expanduser()
 

@@ -50,13 +50,12 @@ class ImagePopup(Popup):
         kwargs.setdefault('bind_esc', True)
         kwargs.setdefault('keep_on_top', False)
         kwargs.setdefault('can_minimize', True)
+        # TODO: Init may be setting smaller images a few % larger than 100% unnecessarily?
+        self.image = self.src_image = SourceImage.from_image(image)
         super().__init__(title=title or 'Image', **kwargs)
         if text:
             self.text = text
             self.text_above_img = text_above_img
-        # TODO: Init may be setting smaller images a few % larger than 100% unnecessarily?
-        self.src_image = SourceImage.from_image(image)
-        self.image = self.src_image
 
     # region Title
 
