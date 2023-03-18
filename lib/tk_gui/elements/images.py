@@ -10,7 +10,7 @@ import logging
 from abc import ABC, abstractmethod
 from inspect import Signature
 from tkinter import Label, TclError, Event
-from typing import TYPE_CHECKING, Optional, Any, Union
+from typing import TYPE_CHECKING, Optional, Any, Union, Callable
 
 from PIL.Image import Resampling
 from PIL.ImageSequence import Iterator as FrameIterator
@@ -19,11 +19,14 @@ from PIL.ImageTk import PhotoImage
 from tk_gui.enums import Anchor
 from tk_gui.images import ImageWrapper, SourceImage, ResizedImage, FrameCycle, PhotoImageCycle, Spinner
 from tk_gui.images.clock import SevenSegmentDisplay, ClockCycle
-from tk_gui.styles import Style, StyleSpec
+from tk_gui.styles import Style
+from tk_gui.widgets.configuration import AxisConfig
+from tk_gui.widgets.images import ScrollableImage as ScrollableImageWidget
 from .element import Element
 
 if TYPE_CHECKING:
     from tk_gui.pseudo_elements import Row
+    from tk_gui.styles.typing import StyleSpec
     from tk_gui.typing import XY, BindTarget, ImageType, Bool, TkContainer, HasFrame
 
 __all__ = ['Image', 'Animation', 'SpinnerImage', 'ClockImage']
@@ -113,9 +116,47 @@ class BaseImage(Element, ABC, base_style_layer='image'):
     # endregion
 
 
-class Image(BaseImage):
+class SrcImageMixin:
+    widget: Label | ScrollableImageWidget
+    resize: Callable
+    size: XY
     _src_image: SourceImage = None
     _resize_kwargs: dict[str, bool | Resampling | None]
+
+    def init_src_image(
+        self,
+        image: ImageType | ImageWrapper = None,
+        use_cache: bool = False,
+        keep_ratio: bool = True,
+        resample: Resampling | None = Resampling.LANCZOS,
+    ):
+        self._resize_kwargs = {'use_cache': use_cache, 'keep_ratio': keep_ratio, 'resample': resample}
+        self.image = image
+
+    # region Image Data
+
+    @property
+    def image(self) -> Optional[SourceImage]:
+        return self._src_image
+
+    @image.setter
+    def image(self, data: ImageType | ImageWrapper):
+        self._src_image = SourceImage.from_image(data)
+        if self.widget is not None:
+            self.resize(*self.size)
+
+    # endregion
+
+    def target_size(self, width: int, height: int) -> XY:
+        return self._src_image.target_size((width, height), keep_ratio=self._resize_kwargs['keep_ratio'])
+
+    def update(self, image: ImageType | ImageWrapper, size: XY = None):
+        if size:
+            self.size = size
+        self.image = image
+
+
+class Image(SrcImageMixin, BaseImage):
     popup_title: str = None
 
     def __init__(
@@ -141,8 +182,7 @@ class Image(BaseImage):
         if (cb_provided := callback is not None) or popup:
             kwargs['bind_clicks'] = True
         Element.__init__(self, **kwargs)
-        self._resize_kwargs = {'use_cache': use_cache, 'keep_ratio': keep_ratio, 'resample': resample}
-        self.image = image
+        self.init_src_image(image, use_cache=use_cache, keep_ratio=keep_ratio, resample=resample)
         if popup:
             if cb_provided:
                 raise TypeError(f"Only one of 'popup' xor 'callback' may be provided for {self.__class__.__name__}")
@@ -153,20 +193,6 @@ class Image(BaseImage):
         if anchor_image:
             self.anchor_image = Anchor(anchor_image)
 
-    # region Image Data
-
-    @property
-    def image(self) -> Optional[SourceImage]:
-        return self._src_image
-
-    @image.setter
-    def image(self, data: ImageType | ImageWrapper):
-        self._src_image = SourceImage.from_image(data)
-        if self.widget is not None:
-            self.resize(*self.size)
-
-    # endregion
-
     # region Widget Init & Packing
 
     def pack_into(self, row: Row):
@@ -174,14 +200,6 @@ class Image(BaseImage):
         self._pack_into(row, resized.as_tk_image(), *resized.size)
 
     # endregion
-
-    def target_size(self, width: int, height: int) -> XY:
-        return self._src_image.target_size((width, height), keep_ratio=self._resize_kwargs['keep_ratio'])
-
-    def update(self, image: ImageType | ImageWrapper, size: XY = None):
-        if size:
-            self.size = size
-        self.image = image
 
     def resize(self, width: int, height: int) -> ResizedImage:
         resized = self._src_image.as_size((width, height), **self._resize_kwargs)
@@ -197,6 +215,75 @@ class Image(BaseImage):
 
 
 # endregion
+
+
+# region Scrollable Image
+
+
+class ScrollableImage(SrcImageMixin, Element, base_style_layer='image'):
+    widget: ScrollableImageWidget = None
+
+    def __init__(
+        self,
+        image: ImageType | ImageWrapper = None,
+        *,
+        use_cache: bool = False,
+        keep_ratio: bool = True,
+        resample: Resampling | None = Resampling.LANCZOS,
+        **kwargs,
+    ):
+        kwargs.setdefault('scroll_x', True)
+        kwargs.setdefault('scroll_y', True)
+        self.x_config = AxisConfig.from_kwargs('x', kwargs)
+        self.y_config = AxisConfig.from_kwargs('y', kwargs)
+        kwargs.setdefault('pad', (0, 0))
+        Element.__init__(self, **kwargs)
+        self.init_src_image(image, use_cache=use_cache, keep_ratio=keep_ratio, resample=resample)
+
+    # region Widget Init & Packing
+
+    @property
+    def style_config(self) -> dict[str, Any]:
+        return {
+            **self.style.get_map('image', bd='border_width', background='bg', relief='relief'),
+            **self._style_config,
+        }
+
+    def _init_widget(self, tk_container: TkContainer):
+        pass
+
+    def grid_into(self, parent: HasFrame, row: int, column: int, **kwargs):
+        raise RuntimeError('Grid is not currently supported for images')
+
+    def pack_into(self, row: Row):
+        resized = self._src_image.as_size(self.size, **self._resize_kwargs)
+        width, height = size = resized.size
+        # log.debug(f'Packing {resized=} into row with {width=}, {height=}')
+        kwargs = {
+            'width': width,
+            'height': height,
+            'takefocus': int(self.allow_focus),
+            'x_config': self.x_config,
+            'y_config': self.y_config,
+            'style': self.style,
+            **self.style_config,
+        }
+        self.size = size
+        self.widget = ScrollableImageWidget(resized.as_tk_image(), parent=row.frame, **kwargs)
+        self.pack_widget()
+
+    # endregion
+
+    def resize(self, width: int, height: int) -> ResizedImage:
+        resized = self._src_image.as_size((width, height), **self._resize_kwargs)
+        self.size = size = resized.size
+        # log.debug(f'resize: {size=}, {self}')
+        self.widget.replace_image(resized.as_tk_image(), size)
+        return resized
+
+
+# endregion
+
 
 # region Animated Images
 
