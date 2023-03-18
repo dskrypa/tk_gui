@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import tkinter as tk
+from dataclasses import dataclass
 from os import environ
 from time import monotonic
 from tkinter import Tk, Toplevel, PhotoImage, TclError, Event, CallWrapper, BaseWidget
@@ -31,7 +32,7 @@ from .pseudo_elements.row_container import RowContainer
 from .styles import Style
 from .utils import ON_LINUX, ON_WINDOWS, ProgramMetadata, extract_kwargs
 from .widgets.scroll import ScrollableToplevel
-from .widgets.utils import log_event_widget_data, get_root_widget  # noqa
+from .widgets.utils import log_event_widget_data, get_root_widget, get_req_size  # noqa
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -40,6 +41,7 @@ if TYPE_CHECKING:
     from .styles.typing import StyleSpec
     from .typing import XY, BindCallback, EventCallback, Key, BindTarget, Bindable, Layout, Bool, HasValue
     from .typing import TkContainer, GrabAnywhere, Top
+    from .widgets.configuration import AxisConfig
 
 __all__ = ['Window']
 log = logging.getLogger(__name__)
@@ -48,9 +50,10 @@ _GRAB_ANYWHERE_IGNORE = (
     Sizegrip, Scrollbar, Treeview,
     tk.Scale, tk.Scrollbar, tk.Entry, tk.Text, tk.PanedWindow, tk.Listbox, tk.OptionMenu, tk.Button,
 )
-_INIT_OVERRIDE_KEYS = frozenset({
-    'is_popup', 'resizable', 'keep_on_top', 'can_minimize', 'transparent_color', 'alpha_channel', 'no_title_bar',
-    'modal', 'scaling', 'margins', 'icon',
+_INIT_OVERRIDE_KEYS = frozenset({'is_popup', 'keep_on_top', 'no_title_bar', 'modal', 'icon'})
+_INIT_CFG_FIELDS = frozenset({
+    'min_size', 'size', 'position', 'margins', 'resizable', 'can_minimize', 'scaling',
+    'transparent_color', 'alpha_channel',
 })
 
 
@@ -81,14 +84,8 @@ class Window(BindMixin, RowContainer):
     is_popup: bool = False                              #: Whether the window is a popup
     closed: bool = False
     icon: bytes = PYTHON_LOGO
-    resizable: bool = True
-    can_minimize: bool = True
-    transparent_color: str = None
-    alpha_channel: float = None
     no_title_bar: bool = False
     modal: bool = False
-    scaling: float = None
-    margins: XY = (10, 5)  # x, y
     # endregion
     # region Pure Instance Attrs
     _finalizer: finalize
@@ -149,7 +146,6 @@ class Window(BindMixin, RowContainer):
         layout: Layout = None,
         title: str = None,
         *,
-        min_size: XY = (200, 50),
         binds: BindMapping = None,
         exit_on_esc: Bool = False,
         close_cbs: Iterable[Callable] = None,
@@ -165,10 +161,9 @@ class Window(BindMixin, RowContainer):
     ):
         self._instances.add(self)
         self.title = title or ProgramMetadata('').name.replace('_', ' ').title()
-        self._min_size = min_size
+        self._init_config = InitConfig(**extract_kwargs(kwargs, _INIT_CFG_FIELDS))
 
-        cfg = extract_kwargs(kwargs, {'size', 'position'})
-        self._config = (config_name or title, config_path, cfg if config is None else (config | cfg))
+        self._config = (config_name or title, config_path, {} if config is None else config)
         for key, val in extract_kwargs(kwargs, _INIT_OVERRIDE_KEYS).items():
             setattr(self, key, val)  # This needs to happen before touching self.config to have is_popup set
 
@@ -252,12 +247,10 @@ class Window(BindMixin, RowContainer):
 
     def update(self):
         try:
-            root = self.root
+            self.root.update()
         except AttributeError:
             self.show()
-            root = self.root
-
-        root.update()
+            self.root.update()
 
     def read(self, timeout: int) -> tuple[Optional[Key], dict[Key, Any], Optional[Event]]:
         self.run(timeout)
@@ -387,45 +380,6 @@ class Window(BindMixin, RowContainer):
         vis_bw = self.visible_border_width
         return Rectangle.from_pos_and_size(x, y, width + (2 * vis_bw), height)
 
-    def _get_monitor(self, init: bool = False) -> Optional[Monitor]:
-        if init:
-            try:
-                x, y = self.config.position
-            except TypeError:
-                x, y = self.position
-        else:
-            x, y = self.position
-
-        if not (monitor := monitor_manager.get_monitor(x, y)):
-            log.debug(f'Could not find monitor for pos={x, y}')
-        return monitor
-
-    def _set_init_size(self):
-        if min_size := self._min_size:
-            self.set_min_size(*min_size)
-
-        if size := self.config.size:
-            self.size = size
-            return
-        elif not (monitor := self._get_monitor(True)):
-            return
-
-        root = self.root
-        root.update_idletasks()
-
-        width, height = root.winfo_reqwidth(), root.winfo_reqheight()
-        work_area = monitor.work_area
-        max_width = work_area.width - 100
-        max_height = work_area.height - 50
-        if width < max_width and height < max_height:
-            return
-
-        if width > max_width:
-            width = max_width
-        if height > max_height:
-            height = max_height
-        self.size = (width, height)
-
     def resize_scroll_region(self, size: Optional[XY] = None):
         outer, inner = self.root, self.tk_container
         if outer != inner:
@@ -461,7 +415,7 @@ class Window(BindMixin, RowContainer):
             root.geometry('+{}+{}'.format(*pos))
             root.update_idletasks()
         except AttributeError:  # root has not been created yet
-            self.config.position = pos
+            self._init_config.position = pos
 
     @property
     def true_position(self) -> XY:
@@ -564,13 +518,7 @@ class Window(BindMixin, RowContainer):
 
     # endregion
 
-    # region Config / Update Methods
-
-    def set_alpha(self, alpha: float):
-        try:
-            self.root.attributes('-alpha', alpha)
-        except (TclError, RuntimeError):
-            log.debug(f'Error setting window alpha color to {alpha!r}:', exc_info=True)
+    # region Title Bar
 
     def set_title(self, title: str):
         self.root.wm_title(title)
@@ -603,6 +551,16 @@ class Window(BindMixin, RowContainer):
             self.enable_title_bar()
         else:
             self.disable_title_bar()
+
+    # endregion
+
+    # region Config / Update Methods
+
+    def set_alpha(self, alpha: float):
+        try:
+            self.root.attributes('-alpha', alpha)
+        except (TclError, RuntimeError):
+            log.debug(f'Error setting window alpha color to {alpha!r}:', exc_info=True)
 
     def make_modal(self):
         root = self.root
@@ -642,93 +600,14 @@ class Window(BindMixin, RowContainer):
 
     # region Show Window Methods
 
-    def _init_root_widget(self) -> Top:
-        style = self.style
-        kwargs = style.get_map(background='bg')
-        x_config, y_config = self.x_config, self.y_config
-        if not (y_config.scroll or x_config.scroll):
-            pad_x, pad_y = self.margins
-            self.widget = self.root = self.tk_container = root = Toplevel(padx=pad_x, pady=pad_y, **kwargs)
-            return root
-
-        kwargs['inner_kwargs'] = kwargs.copy()  # noqa
-        self.widget = self.root = root = ScrollableToplevel(
-            x_config=x_config, y_config=y_config, style=style, pad=self.margins, **kwargs
-        )
-        self.tk_container = root.inner_widget
-        return root
-
-    def _init_root(self) -> Top:
-        root = self._init_root_widget()
-        self._finalizer = finalize(self, self._close, root)
-        self.set_alpha(0)  # Hide window while building it
-        if not self.resizable:
-            root.resizable(False, False)
-        if not self.can_minimize:
-            root.attributes('-toolwindow', 1)
-        if self._keep_on_top:
-            root.attributes('-topmost', 1)
-        if self.transparent_color is not None:
-            try:
-                root.attributes('-transparentcolor', self.transparent_color)
-            except (TclError, RuntimeError):
-                log.error('Transparent window color not supported on this platform (Windows only)')
-        if (scaling := self.scaling) is not None:
-            root.tk.call('tk', 'scaling', scaling)
-        return root
-
-    def _get_init_inner_size(self, inner: TkContainer) -> Optional[XY]:
-        if size := self.config.size:
-            return size
-        y_div = self.y_config.size_div
-        if y_div <= 1 or not (monitor := self._get_monitor(True)):
-            return None
-
-        inner.update_idletasks()
-        width = self.x_config.target_size(inner)
-        height = inner.winfo_reqheight()
-        max_outer_height = monitor.work_area.height - 50
-        max_inner_height = max_outer_height - 50
-        if height > max_outer_height / 3:
-            height = min(max_inner_height, height // y_div)
-
-        return width, height
-
-    def _init_pack_root(self) -> Top:
-        outer = self._init_root()
-        self.pack_rows()
-        if (inner := self.tk_container) != outer:  # outer is scrollable
-            outer.resize_scroll_region(self._get_init_inner_size(inner))
-
-        self._set_init_size()
-        if pos := self.config.position:
-            self.position = pos
-        else:
-            self.move_to_center()
-        return outer
-
     def show(self):
         self._ensure_tk_is_initialized()
         if self.root is not None:
             log.warning('Attempted to show window after it was already shown', stack_info=True)
             return
 
-        root = self._init_pack_root()
-        if self.no_title_bar:
-            self.disable_title_bar()
-        else:
-            self.enable_title_bar()
-
-        self.set_alpha(1 if self.alpha_channel is None else self.alpha_channel)
-        if self.no_title_bar:
-            root.focus_force()
-        if self.modal:
-            self.make_modal()
-
-        root.protocol('WM_DESTROY_WINDOW', self.close)
-        root.protocol('WM_DELETE_WINDOW', self.close)
-        self.apply_binds()
-        root.update_idletasks()
+        root = WindowInitializer(self._init_config, self).initialize_window()
+        self._finalizer = finalize(self, self._close, root)
 
     @classmethod
     def _init_hidden_root(cls):
@@ -989,11 +868,9 @@ class Window(BindMixin, RowContainer):
     # region Cleanup Methods
 
     @classmethod
-    def _close(cls, root: Toplevel):
+    def _close(cls, root: Top):
         # TODO: If closed out of order, make sure to exit
         log.debug(f'Closing: {root}')
-        # log.debug('  Quitting...')
-        # log.debug(f'  Quitting: {root}')
         root.quit()
         # log.debug('  Updating...')
         try:
@@ -1033,7 +910,6 @@ class Window(BindMixin, RowContainer):
     def __close_hidden_root(cls):
         # log.debug('Closing hidden Tk root')
         try:
-            # if cls.__hidden_finalizer.detach():  # noqa
             cls.__hidden_root.destroy()
             cls.__hidden_root = None
         except AttributeError:
@@ -1071,6 +947,170 @@ class Window(BindMixin, RowContainer):
             windows.sort(key=lambda w: w._last_focus, reverse=True)
 
         return windows
+
+
+# region Initialization
+
+
+@dataclass
+class InitConfig:
+    min_size: XY = (200, 50)
+    size: XY = None
+    position: XY = None
+    margins: XY = (10, 5)  # Padding values for the outer [Scrollable]Toplevel
+    resizable: Bool = True
+    can_minimize: Bool = True
+    transparent_color: str = None
+    alpha_channel: float = None
+    scaling: float = None
+
+
+class WindowInitializer:
+    def __init__(self, init_config: InitConfig, window: Window):
+        self.init_config = init_config
+        self.window = window
+
+    def initialize_window(self) -> Top:
+        root = self._init_root_widget()
+        self._configure_root(root)
+        self.window.pack_rows()
+        self._set_init_size_and_pos(root)
+        self._finalize_root(root, self.init_config.alpha_channel)
+        return root
+
+    @cached_property
+    def monitor(self) -> Optional[Monitor]:
+        try:
+            x, y = self.init_config.position
+        except TypeError:
+            x, y = self.window.position
+        if not (monitor := monitor_manager.get_monitor(x, y)):
+            log.debug(f'Could not find monitor for pos={x, y}')
+        return monitor
+
+    # region Initialize Widget
+
+    def _init_root_widget(self) -> Top:
+        window = self.window
+        x_config, y_config = window.x_config, window.y_config
+        if y_config.scroll or x_config.scroll:
+            root = self._init_root_scrollable(x_config, y_config)
+        else:
+            root = self._init_root_normal()
+        window.widget = window.root = root
+        return root
+
+    def _init_root_scrollable(self, x_config: AxisConfig, y_config: AxisConfig) -> ScrollableToplevel:
+        window = self.window
+        style = window.style
+        kwargs = style.get_map(background='bg')
+        kwargs['inner_kwargs'] = kwargs.copy()  # noqa
+        root = ScrollableToplevel(
+            x_config=x_config, y_config=y_config, style=style, pad=self.init_config.margins, **kwargs
+        )
+        window.tk_container = root.inner_widget
+        return root
+
+    def _init_root_normal(self) -> Toplevel:
+        window = self.window
+        pad_x, pad_y = self.init_config.margins
+        window.tk_container = root = Toplevel(padx=pad_x, pady=pad_y, **window.style.get_map(background='bg'))
+        return root
+
+    # endregion
+
+    def _configure_root(self, root: Top):
+        window, init_config = self.window, self.init_config
+        window.set_alpha(0)  # Hide window while building it
+        if not init_config.resizable:
+            root.resizable(False, False)
+        if not init_config.can_minimize:
+            root.attributes('-toolwindow', 1)
+        if window._keep_on_top:
+            root.attributes('-topmost', 1)
+        if (transparent_color := init_config.transparent_color) is not None:
+            try:
+                root.attributes('-transparentcolor', transparent_color)
+            except (TclError, RuntimeError):
+                log.error('Transparent window color not supported on this platform (Windows only)')
+        if (scaling := init_config.scaling) is not None:
+            root.tk.call('tk', 'scaling', scaling)
+
+    def _finalize_root(self, root: Top, alpha_channel: float = None):
+        window = self.window
+        if window.no_title_bar:
+            window.disable_title_bar()
+        else:
+            window.enable_title_bar()
+
+        window.set_alpha(1 if alpha_channel is None else alpha_channel)
+        if window.no_title_bar:
+            root.focus_force()
+        if window.modal:
+            window.make_modal()
+
+        root.protocol('WM_DESTROY_WINDOW', window.close)
+        root.protocol('WM_DELETE_WINDOW', window.close)
+        window.apply_binds()
+        root.update_idletasks()
+
+    # region Size & Position
+
+    def _set_init_size_and_pos(self, root: Top):
+        if (inner := self.window.tk_container) != root:  # root is scrollable
+            root.resize_scroll_region(self._get_init_inner_size(inner))
+        if min_size := self.init_config.min_size:
+            self.window.set_min_size(*min_size)
+        if size := self._get_init_outer_size(root):
+            self.window.size = size
+        if pos := self.init_config.position:
+            self.window.position = pos
+        else:
+            self.window.move_to_center()
+
+    def _get_init_inner_size(self, inner: TkContainer) -> Optional[XY]:
+        if size := self.init_config.size:
+            return size
+
+        y_div = self.window.y_config.size_div
+        if y_div <= 1 or not (monitor := self.monitor):
+            return None
+
+        max_outer_height = monitor.work_area.height - 50
+
+        inner.update_idletasks()
+        width = self.window.x_config.target_size(inner)
+        if (height := inner.winfo_reqheight()) > max_outer_height / 3:
+            max_inner_height = max_outer_height - 50
+            height = min(max_inner_height, height // y_div)
+
+        return width, height
+
+    def _get_init_outer_size(self, root: Top) -> Optional[XY]:
+        if size := self.init_config.size:
+            return size
+        elif not (monitor := self.monitor):
+            return None
+
+        work_area = monitor.work_area
+        max_width = work_area.width - 100
+        max_height = work_area.height - 50
+
+        root.update_idletasks()
+        width, height = get_req_size(root)
+        if width < max_width and height < max_height:
+            return None
+
+        if width > max_width:
+            width = max_width
+        if height > max_height:
+            height = max_height
+        return width, height
+
+    # endregion
+
+
+# endregion
 
 
 def _normalize_bind_event(event_pat: Bindable) -> Bindable:

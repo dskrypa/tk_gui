@@ -12,14 +12,14 @@ from tk_gui.caching import cached_property
 
 if TYPE_CHECKING:
     from tk_gui.elements import Element
-    from tk_gui.typing import Bool, SelectionPos, Top
+    from tk_gui.typing import Bool, SelectionPos, Top, XY
     from tk_gui.window import Window
 
 __all__ = [
     'get_parent_or_none', 'get_root_widget', 'get_widget_ancestor', 'find_descendants',
     'unbind', 'get_bound_events', 'log_bound_events',
     'get_config_str', 'log_config_str', 'WidgetData', 'log_event_widget_data', 'log_widget_data',
-    'get_selection_pos', 'get_size_and_pos',
+    'get_selection_pos', 'get_size_and_pos', 'get_req_size',
 ]
 log = logging.getLogger(__name__)
 
@@ -311,6 +311,14 @@ def get_size_and_pos(widget: Misc) -> tuple[int, int, int, int]:
     size, x, y = widget.winfo_geometry().split('+', 2)
     w, h = size.split('x', 1)
     return int(w), int(h), int(x), int(y)
+
+
+def get_req_size(widget: Misc) -> XY:
+    w_id: str = widget._w  # noqa
+    call = widget.tk.call
+    width = int(call('winfo', 'reqwidth', w_id))
+    height = int(call('winfo', 'reqheight', w_id))
+    return width, height
 
 
 # endregion
