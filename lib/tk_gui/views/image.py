@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, TypeVar, ParamSpec, Iterator
 from tk_gui.caching import cached_property
 from tk_gui.elements import InfoBar, ScrollableImage
 from tk_gui.elements.menu import MenuProperty, Menu, MenuGroup, MenuItem, CloseWindow
-from tk_gui.event_handling import event_handler, delayed_event_handler
+from tk_gui.event_handling import EventState, event_handler, delayed_event_handler
 from tk_gui.geometry import Box
 from tk_gui.images.wrapper import ImageWrapper, SourceImage, ResizedImage
 from tk_gui.popups.about import AboutPopup
@@ -72,19 +72,25 @@ class ImageDir:
     def index(self, path: Path) -> int:
         return self._image_paths.index(path)
 
-    def get_prev_index(self, path: Path) -> int | None:
+    def get_prev_index(self, path: Path, delta: int = 1) -> int | None:
         try:
-            index = self.index(path) - 1
+            current_index = self.index(path)
         except IndexError:
             return None
-        return None if index < 0 else index
+        if current_index == 0:
+            return None
+        dst_index = current_index - delta
+        return dst_index if dst_index >= 0 else 0
 
-    def get_next_index(self, path: Path) -> int | None:
+    def get_next_index(self, path: Path, delta: int = 1) -> int | None:
         try:
-            index = self.index(path) + 1
+            current_index = self.index(path)
         except IndexError:
             return None
-        return None if index >= len(self._image_paths) else index
+        if (last_index := len(self._image_paths) - 1) == current_index:
+            return None
+        dst_index = current_index + delta
+        return dst_index if dst_index <= last_index else last_index
 
     # endregion
 
@@ -135,20 +141,25 @@ class ActiveImage:
     def get_info_bar_data(self) -> dict[str, str]:
         image = self.image
         mod_time, file_b, raw_b = self._file_info
+        width, height = image.size
         return {
-            'size': f'{image.size_str} x {image.bits_per_pixel} BPP',
+            'size': f'{width} x {height} x {image.bits_per_pixel} BPP',
             'dir_pos': f'{self.dir_index}/{len(self.image_dir)}',
             'size_pct': f'{image.size_percent:.0%}',
             'size_bytes': f'{file_b} / {raw_b}',
             'mod_time': mod_time,
         }
 
-    def resize(self, size: XY) -> ResizedImage:
+    def resize(self, size: XY | None) -> ResizedImage:
         self.image = image = self.src_image.as_size(size)
         return image
 
     def scale_percent(self, percent: float) -> ResizedImage:
         return self.resize(self.image.scale_percent(percent))
+
+    def resize_to_fit_inside(self, size: XY) -> ResizedImage:
+        fit_size = self.src_image.box.fit_inside_size(size)
+        return self.resize(fit_size)
 
 
 class ImageView(View):
@@ -231,12 +242,12 @@ class ImageView(View):
         src_image = self.active_image.src_image
         return f'<{self.__class__.__name__}[title={self._title!r}, {src_image=}]>'
 
-    def init_window(self):
-        from tk_gui.event_handling import ClickHighlighter
-        window = super().init_window()
-        kwargs = {'window': window, 'show_config': True, 'show_pack_info': True}
-        ClickHighlighter(level=0, log_event=True, log_event_kwargs=kwargs).register(window)
-        return window
+    # def init_window(self):
+    #     from tk_gui.event_handling import ClickHighlighter
+    #     window = super().init_window()
+    #     kwargs = {'window': window, 'show_config': True, 'show_pack_info': True}
+    #     ClickHighlighter(level=0, log_event=True, log_event_kwargs=kwargs).register(window)
+    #     return window
 
     # region Layout
 
@@ -257,9 +268,7 @@ class ImageView(View):
     def gui_image(self) -> ScrollableImage:
         style = self.window.style.sub_style(bg='#000000', border_width=0)
         win_box = self._window_box
-        src_image = self.active_image.src_image
-        fit_size = src_image.box.fit_inside_size(win_box.size)
-        image = self.active_image.resize(fit_size)
+        image = self.active_image.resize_to_fit_inside(win_box.size)
         # TODO: There's still some visible initial image position jitter where it shifts up and down 1-2x, which may
         #  also occur to a lesser degree when switching to another image, but nowhere near as noticeable.
         return ScrollableImage(
@@ -320,8 +329,13 @@ class ImageView(View):
 
     def _zoom_image(self, percent: float):
         self._update(self.active_image.scale_percent(percent))
-        # TODO: Add shortcut to reset zoom to 100%, to fit window, to a specified value, etc
         # TODO: Add way to grab image to drag the current view around
+
+    @event_handler('<Home>')
+    def handle_home(self, event: Event):
+        # TODO: Add menu button to do the same?  + to set to a specific value?
+        # TODO: shortcut=End to fit to window?  PgUp/PgDown to increase/decrease zoom?
+        self._update(self.active_image.resize(None))
 
     # endregion
 
@@ -332,18 +346,20 @@ class ImageView(View):
         if path := pick_file_popup(self.active_image.src_image.path.parent, title='Pick Image', parent=self.window):
             self._update_active_image(path)
 
-    @event_handler('<Left>')
+    @event_handler('<Left>', '<Control-Left>')
     def handle_left_arrow(self, event: Event):
+        # TODO: Increment scroll instead if zoomed in?  + add Up/Down handlers for this?
+        delta = 5 if event.state & EventState.Control else 1
         image_dir = self.image_dir
-        if (index := image_dir.get_prev_index(self.active_image.path)) is not None:
+        if (index := image_dir.get_prev_index(self.active_image.path, delta)) is not None:
             self._update_active_image(image_dir[index], image_dir)
         # TODO: Popup dialog to pick next dir or wrap around upon hitting either end
 
-    @event_handler('<Right>')
+    @event_handler('<Right>', '<Control-Right>')
     def handle_right_arrow(self, event: Event):
-        # TODO: Add support for ctrl+left/right to jump by (up to) 5 instead of 1
+        delta = 5 if event.state & EventState.Control else 1
         image_dir = self.image_dir
-        if (index := image_dir.get_next_index(self.active_image.path)) is not None:
+        if (index := image_dir.get_next_index(self.active_image.path, delta)) is not None:
             self._update_active_image(image_dir[index], image_dir)
 
     # endregion
