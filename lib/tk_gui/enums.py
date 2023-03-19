@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 __all__ = [
     'Anchor', 'Justify', 'Side',
     'BindEvent', 'BindTargets', 'CallbackAction',
-    'StyleState', 'ListBoxSelectMode', 'ScrollUnit',
+    'StyleState', 'ListBoxSelectMode', 'ScrollUnit', 'ImageResizeMode',
 ]
 
 # fmt: off
@@ -54,6 +54,9 @@ class MissingMixin:
         return self._value_ is not None  # noqa
 
 
+# region Event Related
+
+
 class BindEvent(MissingMixin, Enum):
     def __new__(cls, tk_event: str):
         # Defined __new__ to avoid juggling dicts for the event names, and to avoid conflicting event names from being
@@ -79,6 +82,12 @@ class BindTargets(MissingMixin, Enum):
 class CallbackAction(MissingMixin, Enum):
     EXIT = 'exit'
     INTERRUPT = 'interrupt'
+
+
+# endregion
+
+
+# region Pack Related
 
 
 class Side(MissingMixin, Enum, aliases={'l': 'LEFT', 'r': 'RIGHT', 't': 'TOP', 'b': 'BOTTOM'}):
@@ -176,6 +185,9 @@ class Anchor(MissingMixin, Enum, aliases=ANCHOR_ALIASES):
             return tkc.NONE
 
 
+# endregion
+
+
 class StyleState(MissingMixin, IntEnum):
     DEFAULT = 0
     DISABLED = 1
@@ -195,3 +207,9 @@ class ScrollUnit(MissingMixin, Enum):
     UNITS = 'units'     # Supports int values
     PAGES = 'pages'     # Supports int values
     PIXELS = 'pixels'   # Supports int and float values
+
+
+class ImageResizeMode(MissingMixin, Enum):
+    NONE = 'none'           # No special handling
+    FIT_INSIDE = 'fit'      # Shrink to fit inside the given size if too large, otherwise take no action
+    FILL = 'fill'           # Shrink if too large, or enlarge if too small

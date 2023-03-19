@@ -18,11 +18,12 @@ from PIL.JpegImagePlugin import RAWMODE
 
 from tk_gui.caching import cached_property
 from tk_gui.constants import IMAGE_MODE_TO_BPP
+from tk_gui.enums import ImageResizeMode
 from tk_gui.geometry import Box, Sized
 from tk_gui.utils import get_user_temp_dir
 
 if TYPE_CHECKING:
-    from tk_gui.typing import XY, ImageType, PathLike, Color
+    from tk_gui.typing import XY, ImageType, PathLike, Color, ImgResizeMode
     from .icons import Icons, Icon
 
 __all__ = ['ImageWrapper', 'SourceImage', 'ResizedImage', 'IconSourceImage']
@@ -81,6 +82,15 @@ class ImageWrapper(Sized, ABC):
 
     # endregion
 
+    def target_size(self, size: XY, keep_ratio: bool = True, resize_mode: ImgResizeMode = ImageResizeMode.NONE) -> XY:
+        resize_mode = ImageResizeMode(resize_mode)
+        if resize_mode == ImageResizeMode.FIT_INSIDE:
+            return self.fit_inside_size(size, keep_ratio)
+        elif resize_mode == ImageResizeMode.FILL:
+            return self.fill_size(size, keep_ratio)
+        else:
+            return super().target_size(size, keep_ratio)
+
     @cached_property
     def box(self) -> Box:
         return Box.from_pos_and_size(0, 0, *self.size)
@@ -129,8 +139,9 @@ class ImageWrapper(Sized, ABC):
         resample: Resampling = None,
         box: tuple[float, float, float, float] = None,
         reducing_gap: float = None,
+        resize_mode: ImgResizeMode = ImageResizeMode.NONE,
     ) -> PILImage:
-        size = self.target_size(size, keep_ratio)
+        size = self.target_size(size, keep_ratio, resize_mode)
         if not (image := self.pil_image):
             return new_image('RGB', size)
         if image.mode == 'P' and resample not in (None, Resampling.NEAREST):
@@ -217,6 +228,7 @@ class SourceImage(ImageWrapper):
         keep_ratio: bool = True,
         resample: Resampling | None = Resampling.LANCZOS,
         use_cache: bool = False,
+        resize_mode: ImgResizeMode = ImageResizeMode.NONE,
         **kwargs,
     ) -> ResizedImage:
         if not size or size == self.size:
@@ -224,13 +236,13 @@ class SourceImage(ImageWrapper):
 
         if not use_cache:
             path = None
-        elif path := resized_cache.get_cache_path(self, size, keep_ratio):
+        elif path := resized_cache.get_cache_path(self, size, keep_ratio, resize_mode):
             try:
                 return ResizedImage(self, resized_cache[path], path)
             except KeyError:  # It was not cached, but the path can be used to store it in the cache
                 pass
 
-        image = self.get_image_as_size(size, keep_ratio, resample=resample, **kwargs)
+        image = self.get_image_as_size(size, keep_ratio, resample=resample, resize_mode=resize_mode, **kwargs)
         resized_cache[path] = resized = ResizedImage(self, image, path)
         return resized
 
@@ -305,9 +317,11 @@ class ImageCache:
     def cache_dir(self) -> Path:
         return get_user_temp_dir('tk_gui_image_cache')
 
-    def get_cache_path(self, source: SourceImage, size: XY, keep_ratio: bool = True) -> Path | None:
+    def get_cache_path(
+        self, source: SourceImage, size: XY, keep_ratio: bool = True, resize_mode: ImgResizeMode = ImageResizeMode.NONE
+    ) -> Path | None:
         src_w, src_h = source.size
-        dst_w, dst_h = source.target_size(size, keep_ratio)
+        dst_w, dst_h = source.target_size(size, keep_ratio, resize_mode)
         max_w, max_h = self.max_cache_size
         if (
             not (src_hash := source.sha256sum)      # Image is None

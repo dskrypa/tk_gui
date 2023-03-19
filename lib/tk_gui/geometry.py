@@ -38,6 +38,11 @@ class Sized(ABC):
     def size_str(self) -> str:
         return '{}x{}'.format(*self.size)
 
+    @cached_property(block=False)
+    def area(self) -> int:
+        width, height = self.size
+        return width * height
+
     # region Aspect Ratio
 
     @cached_property(block=False)
@@ -104,6 +109,14 @@ class Sized(ABC):
         else:
             return self.target_size(size, keep_ratio)
 
+    def fill_size(self, size: XY, keep_ratio: bool = True) -> XY:
+        out_w, out_h = size
+        src_w, src_h = self.size
+        if src_w >= out_w or src_h >= out_h:
+            return self.fit_inside_size(size, keep_ratio)
+        else:
+            return self.target_size(size, keep_ratio)
+
     def scale_size(self, size: OptXYF, keep_ratio: bool = True) -> XY:
         """
         Scale this object's size to as close to the given target size as possible, optionally respecting aspect ratio.
@@ -135,7 +148,7 @@ class Box(Sized):
         return cls(x, y, x + width, y + height)
 
     @classmethod
-    def from_size_and_pos(cls, width: int, height: int, x: X, y: Y) -> Box:
+    def from_size_and_pos(cls, width: int, height: int, x: X = 0, y: Y = 0) -> Box:
         return cls(x, y, x + width, y + height)
 
     def __repr__(self) -> str:

@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from tkinter import Event, Toplevel, Frame, LabelFrame  # noqa
     from PIL.Image import Image as PILImage  # noqa
     from tk_gui.elements.element import Element, ElementBase  # noqa
-    from tk_gui.enums import BindTargets, BindEvent, ScrollUnit  # noqa
+    from tk_gui.enums import BindTargets, BindEvent, ScrollUnit, ImageResizeMode  # noqa
     from tk_gui.pseudo_elements import Row
     from tk_gui.widgets.scroll import ScrollableToplevel  # noqa
     from tk_gui.window import Window  # noqa
@@ -63,6 +63,7 @@ TkJustify = Literal['left', 'center', 'right']
 TkScrollWhat = Literal['units', 'pages', 'pixels']
 ScrollWhat = Union['ScrollUnit', TkScrollWhat]
 ScrollAmount = TypeVar('ScrollAmount', int, float)
+ImgResizeMode = Union['ImageResizeMode', str]
 
 Top = Union['ScrollableToplevel', 'Toplevel']
 TkContainer = Union['Toplevel', 'Frame', 'LabelFrame']
