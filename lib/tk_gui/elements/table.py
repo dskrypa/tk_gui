@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 from itertools import chain
+from tkinter import TclError
 from tkinter.ttk import Treeview, Style as TtkStyle
 from typing import TYPE_CHECKING, Union, Callable, Literal, Mapping, Any, Iterable
 from unicodedata import normalize
@@ -15,8 +16,9 @@ from unicodedata import normalize
 from wcwidth import wcswidth
 
 from tk_gui.caching import cached_property
+from tk_gui.enums import Anchor
 from tk_gui.widgets.scroll import ScrollableTreeview
-from .element import Element
+from .element import Element, Interactive
 
 if TYPE_CHECKING:
     from tkinter import BaseWidget
@@ -27,17 +29,27 @@ if TYPE_CHECKING:
 __all__ = ['TableColumn', 'Table']
 log = logging.getLogger(__name__)
 
-SelectMode = Literal['none', 'browse', 'extended']
+SelectMode = Literal['none', 'browse', 'extended']  # browse = select only 1, extended = select multiple rows
 XGROUND_DEFAULT_HIGHLIGHT_COLOR_MAP = {'foreground': 'SystemHighlightText', 'background': 'SystemHighlight'}
 _Width = Union[float, Mapping[Any, Mapping[str, Any]], Iterable[Union[Mapping[str, Any], Any]]]
 FormatFunc = Callable[[Any], str]
 
+TableRow = dict[str, Union[str, int]]
+TableRows = list[TableRow]
+
 
 class TableColumn:
-    __slots__ = ('key', 'title', '_width', 'show', 'fmt_func')
+    __slots__ = ('key', 'title', '_width', 'show', 'fmt_func', 'anchor_header', 'anchor_values')
 
     def __init__(
-        self, key: str, title: str = None, width: _Width = None, show: bool = True, fmt_func: FormatFunc = None
+        self,
+        key: str,
+        title: str = None,
+        width: _Width = None,
+        show: bool = True,
+        fmt_func: FormatFunc = None,
+        anchor_header: Anchor | str = None,
+        anchor_values: Anchor | str = None,
     ):
         self.key = key
         self.title = str(title or key)
@@ -45,6 +57,8 @@ class TableColumn:
         self.show = show
         self.fmt_func = fmt_func
         self.width = width
+        self.anchor_header = Anchor(anchor_header) if anchor_header else Anchor.MID_CENTER
+        self.anchor_values = Anchor(anchor_values) if anchor_values else Anchor.MID_LEFT
 
     @property
     def width(self) -> int:
@@ -57,6 +71,9 @@ class TableColumn:
         except Exception:
             log.error(f'Error calculating width for column={self.key!r}', exc_info=True)
             raise
+
+    def width_for(self, char_width: int) -> int:
+        return self.width * char_width + 10
 
     def _calc_width(self, width: _Width) -> int:
         try:
@@ -97,14 +114,15 @@ class TableColumn:
             raise
 
 
-class Table(Element, base_style_layer='table'):
+class Table(Interactive, base_style_layer='table'):
     widget: Union[Treeview, ScrollableTreeview]
+    tree_view: Treeview
     columns: dict[str, TableColumn]
 
     def __init__(
         self,
         *columns: TableColumn,
-        data: list[dict[str, Union[str, int]]],
+        data: TableRows,
         rows: int = None,
         show_row_nums: bool = False,
         row_height: int = None,
@@ -128,11 +146,41 @@ class Table(Element, base_style_layer='table'):
         self.scroll_y = scroll_y
         self._tree_ids = []
 
+    @property
+    def value(self) -> TableRows:
+        try:
+            selection = self.tree_view.selection()
+        except TclError:
+            return []
+        if selection:
+            rows = self.data
+            return [rows[int(i)] for i in selection]
+        return []
+
     @classmethod
     def from_data(cls, data: list[dict[str, Union[str, int]]], **kwargs) -> Table:
         keys = {k: None for k in chain.from_iterable(data)}  # dict retains key order, but set does not
         columns = [TableColumn(key, key.replace('_', ' ').title(), data) for key in keys]
         return cls(*columns, data=data, **kwargs)
+
+    def set_focus_on_row(self, n: int):
+        tree_view = self.tree_view
+        child_id = tree_view.get_children()[n]
+        tree_view.selection_set(child_id)
+        tree_view.focus(child_id)
+
+    def take_focus(self, force: bool = False):
+        if force:
+            self.tree_view.focus_force()
+        else:
+            self.tree_view.focus_set()
+        self.set_focus_on_row(0)
+
+    def enable(self):
+        pass
+
+    def disable(self):
+        pass
 
     def _ttk_style(self) -> tuple[str, TtkStyle]:
         style = self.style
@@ -168,14 +216,17 @@ class Table(Element, base_style_layer='table'):
         }
         if self.scroll_y or self.scroll_x:
             self.widget = outer = ScrollableTreeview(tk_container, self.scroll_y, self.scroll_x, style, **kwargs)
-            tree_view = outer.inner_widget
+            self.tree_view = tree_view = outer.inner_widget
         else:
-            self.widget = tree_view = Treeview(tk_container, **kwargs)
+            self.widget = self.tree_view = tree_view = Treeview(tk_container, **kwargs)
 
         char_width = style.char_width('table')
-        for column in columns.values():
-            tree_view.heading(column.key, text=column.title)
-            tree_view.column(column.key, width=column.width * char_width + 10, minwidth=10, stretch=False)
+        for col in columns.values():
+            tree_view.heading(col.key, text=col.title, anchor=col.anchor_header.value)
+            # tree_view.column(col.key, width=col.width * char_width + 10, minwidth=10, stretch=False)
+            tree_view.column(
+                col.key, width=col.width_for(char_width), minwidth=10, stretch=False, anchor=col.anchor_values.value
+            )
 
         for i, row in enumerate(self.data):
             values = (val for key, val in row.items() if columns[key].show)
