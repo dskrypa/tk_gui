@@ -18,6 +18,7 @@ Notes:
 from __future__ import annotations
 
 import logging
+from enum import IntFlag
 from functools import partial
 from time import monotonic
 from tkinter import TclError, BaseWidget, Misc, Event
@@ -29,8 +30,24 @@ if TYPE_CHECKING:
     from tk_gui.elements.element import ElementBase, Element
     from tk_gui.typing import Color, SupportsBind, Bool, XY
 
-__all__ = ['ClickHighlighter', 'Interrupt', 'MotionTracker']
+__all__ = ['EventState', 'ClickHighlighter', 'Interrupt', 'MotionTracker']
 log = logging.getLogger(__name__)
+
+
+class EventState(IntFlag):
+    Shift = 1
+    Lock = 2
+    Control = 4
+    Mod1 = 8
+    Mod2 = 16
+    Mod3 = 32
+    Mod4 = 64
+    Mod5 = 128
+    Button1 = 256
+    Button2 = 512
+    Button3 = 1024
+    Button4 = 2048
+    Button5 = 4096
 
 
 class Interrupt:
