@@ -207,11 +207,12 @@ class Image(SrcImageMixin, BaseImage):
         return resized
 
     def _handle_open_popup(self, event: Event = None):
-        from tk_gui.popups.image import ImagePopup
+        # from tk_gui.popups.image import ImagePopup
+        from tk_gui.views.image import ImageView
 
         src_image = self._src_image
-        title = self.popup_title or (src_image.path.name if src_image.path else None)
-        ImagePopup(src_image, title, parent=self.window).run()
+        # ImagePopup(src_image, self.popup_title or getattr(src_image.path, 'name', None), parent=self.window).run()
+        ImageView(src_image, self.popup_title, parent=self.window, is_popup=True, standalone=True).run()
 
 
 # endregion

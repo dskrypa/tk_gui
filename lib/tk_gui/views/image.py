@@ -48,7 +48,7 @@ class ImageDir:
             raise TypeError(f'Invalid image dir={path.as_posix()!r} - not a directory')
         self.path = path
 
-    @cached_property
+    @cached_property(block=False)
     def _image_paths(self) -> list[Path]:
         ok_suffixes = self._SUFFIXES
         image_paths = [p for p in self.path.iterdir() if p.is_file() and p.suffix.lower() in ok_suffixes]
@@ -105,16 +105,14 @@ class ActiveImage:
         log.debug(f'Initialized ActiveImage with {image=}')
         if standalone:
             self.image_dir = None
-        elif image_dir is None:
-            self.image_dir = ImageDir(self.src_image.path.parent)
         else:
-            self.image_dir = image_dir
+            self.image_dir = ImageDir(self.src_image.path.parent) if image_dir is None else image_dir
 
-    @cached_property
+    @cached_property(block=False)
     def path(self) -> Path:
         return self.src_image.path
 
-    @cached_property
+    @cached_property(block=False)
     def file_name(self) -> str:
         if path := self.src_image.path:
             return path.name
@@ -125,7 +123,7 @@ class ActiveImage:
         suffix = '' if self.image.size_percent == 1 else f' (Zoom: {self.image.size_str})'
         return prefix, suffix
 
-    @cached_property
+    @cached_property(block=False)
     def _file_info(self) -> tuple[str, str, str]:
         try:
             stat_results = self.src_image.path.stat()
@@ -136,7 +134,7 @@ class ActiveImage:
             mod_time = datetime.fromtimestamp(stat_results.st_mtime).isoformat(' ', 'seconds')
         return mod_time, readable_bytes(size_b), readable_bytes(self.src_image.raw_size)
 
-    @cached_property
+    @cached_property(block=False)
     def dir_index(self) -> int:
         return self.image_dir.index(self.path) + 1
 
@@ -168,12 +166,14 @@ class ImageView(View):
     menu = MenuProperty(MenuBar)
     _last_size: XY = None
     active_image: ActiveImage
+    standalone: bool = False
 
     def __init__(self, image: ImageType | ImageWrapper, title: str = None, standalone: bool = False, **kwargs):
         kwargs.setdefault('margins', (0, 0))
         kwargs.setdefault('exit_on_esc', True)
         kwargs.setdefault('config_name', self.__class__.__name__)
         super().__init__(title=title or 'Image View', **kwargs)
+        self.standalone = standalone
         self.active_image = ActiveImage(SourceImage.from_image(image), standalone=standalone)
         self.window_kwargs['show'] = 2
         if size := self._new_window_size():
@@ -253,7 +253,8 @@ class ImageView(View):
     # region Layout
 
     def get_post_window_layout(self) -> Layout:
-        yield [self.menu]
+        if not self.standalone:
+            yield [self.menu]
         yield [self.gui_image]
         yield [self.info_bar]
 

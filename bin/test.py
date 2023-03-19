@@ -84,7 +84,7 @@ class GuiTest(Command):
             layout.append(row[:-1])
 
         config = {'remember_size': False, 'remember_position': False}
-        Window(layout, 'Icon Test', size=(300, 500), exit_on_esc=True, scroll_y=True, config=config).run()
+        Window(layout, 'Icon Test', exit_on_esc=True, scroll_y=True, config=config).run()
 
     @action(default=True)
     def window(self):
