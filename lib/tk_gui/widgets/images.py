@@ -16,7 +16,7 @@ from .utils import get_size_and_pos
 
 if TYPE_CHECKING:
     from tk_gui.styles import Style
-    from tk_gui.typing import Bool, XY
+    from tk_gui.typing import XY
 
 __all__ = ['ScrollableImage']
 log = logging.getLogger(__name__)
@@ -27,6 +27,7 @@ TkImage = Union[TkBaseImage, PhotoImage]
 class ScrollableImage(ComplexScrollable, Frame):
     inner_widget: TkImage
     _inner_id: int | None = None
+    _last_img_box = Box(0, 0, 0, 0)
 
     # region Initialization
 
@@ -53,12 +54,21 @@ class ScrollableImage(ComplexScrollable, Frame):
 
     # endregion
 
-    def _get_center_pos(self, size: XY) -> XY:
-        box = self._last_box
-        if box.right:
-            return box.center(size).min_xy
-        else:
-            return 0, 0
+    def get_boxes(self):
+        return {
+            'frame': Box.from_size_and_pos(*get_size_and_pos(self)),
+            'canvas': Box.from_size_and_pos(*get_size_and_pos(self.canvas)),
+            'bar_x': Box.from_size_and_pos(*get_size_and_pos(self.scroll_bar_x)),
+            'bar_y': Box.from_size_and_pos(*get_size_and_pos(self.scroll_bar_y)),
+            'image': self._last_img_box,
+        }
+
+    def _center_image_box(self, size: XY) -> Box:
+        if self._inner_id is None:
+            return Box.from_pos_and_size(0, 0, *size)
+
+        canvas_box = Box.from_size_and_pos(*get_size_and_pos(self.canvas))
+        return canvas_box.center(self._last_img_box)
 
     def set_image(self, image: TkImage, size: XY):
         self.inner_widget = image
@@ -67,14 +77,12 @@ class ScrollableImage(ComplexScrollable, Frame):
         except KeyError:
             pass
 
-        x, y = self._get_center_pos(size)
+        self._last_img_box = img_box = self._center_image_box(size)
+        x, y = img_box.min_xy
+        # Note: Using anchor=center was not working as intended.  Using anchor=nw + a calculated position seems to
+        # produce more consistent results.
         self._inner_id = self.canvas.create_image(x, y, image=image, anchor='nw')
-
-        # width, height = size
-        # center_w, center_h = width // 2, height // 2
-        # self._inner_id = self.canvas.create_image(center_w, center_h, image=image, anchor='center')
-        # log.debug(f'Created image={self._inner_id!r} @ {center_w=}, {center_h=}')
-        log.debug(f'Created image={self._inner_id!r} @ {x=}, {y=}')
+        log.debug(f'Created image={self._inner_id!r} @ {img_box}')
 
     def del_image(self):
         if (inner_id := self._inner_id) is not None:
@@ -86,41 +94,19 @@ class ScrollableImage(ComplexScrollable, Frame):
         self.del_image()
         self.set_image(image, size)
 
-    def resize_scroll_region(self, size: XY | None, *, force: Bool = False):
-        # if not self.auto_resize and not force:
-        #     return
-        canvas = self.canvas
-        try:
-            width, height = size
-        except TypeError:
-            width, height, x, y = get_size_and_pos(canvas)
-            size = (width, height)
-
-        if force or size != self._last_size:
-            self.update_canvas_size(width, height)
-
-            # center_w, center_h = width // 2, height // 2
-            # log.debug(f'Moving image={self._inner_id!r} to {center_w=}, {center_h=}')
-            # canvas.moveto(self._inner_id, center_w, center_h)
-
-            x, y = self._get_center_pos(size)
-            log.debug(f'Moving image={self._inner_id!r} to {x=}, {y=}')
-            canvas.moveto(self._inner_id, x, y)
-        else:
-            log.debug(f'No action necessary for {size=} == {self._last_size=}')
+    def update_scroll_region(self, force: bool = False, **kwargs):
+        super().update_scroll_region(force, **kwargs)
+        img_box = self._center_image_box(self._last_img_box.size)
+        # if force or self._last_img_box != img_box:
+        if self._last_img_box != img_box:
+            self._last_img_box = img_box
+            # log.debug(f'[{force=}] Moving image={self._inner_id!r} to center={img_box}')
+            log.debug(f'Moving image={self._inner_id!r} to center={img_box}')
+            self.canvas.moveto(self._inner_id, *img_box.min_xy)
 
     def resize(self, width: int = None, height: int = None):
         self.configure(width=width, height=height)
         self.update_canvas_size(width=width, height=height)
-
-        # center_w, center_h = width // 2, height // 2
-        # log.debug(f'Moving image={self._inner_id!r} to {center_w=}, {center_h=}')
-        # self.canvas.moveto(self._inner_id, center_w, center_h)
-
-        # self.canvas.configure(width=width, height=height)
-        # self.update_idletasks()
-        # self.canvas.update_idletasks()
-        # self.update_scroll_region()
 
     def _widgets(self) -> Iterator[BaseWidget]:
         yield self.inner_widget

@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, TypeVar, ParamSpec, Iterator
 
 from tk_gui.caching import cached_property
-from tk_gui.elements import Image, ScrollFrame, InfoBar, ScrollableImage
+from tk_gui.elements import InfoBar, ScrollableImage
 from tk_gui.elements.menu import MenuProperty, Menu, MenuGroup, MenuItem, CloseWindow
 from tk_gui.event_handling import event_handler, delayed_event_handler
 from tk_gui.geometry import Box
@@ -37,33 +37,6 @@ class MenuBar(Menu):
         CloseWindow()
     with MenuGroup('Help'):
         MenuItem('About', AboutPopup)
-
-
-# class ImageScrollFrame(ScrollFrame):
-#     def __init__(self, image: Image, **kwargs):
-#         kwargs.setdefault('pad', (0, 0))
-#         kwargs.setdefault('anchor', 'c')
-#         kwargs.setdefault('side', 't')
-#         kwargs.setdefault('scroll_y', True)
-#         kwargs.setdefault('scroll_x', True)
-#         kwargs.setdefault('scroll_y_amount', 1)
-#         kwargs.setdefault('style', {'bg': '#000000', 'border_width': 0})
-#         super().__init__(**kwargs)
-#         self.__image = image
-#
-#     @cached_property
-#     def spacers(self) -> tuple[Image, Image]:
-#         kwargs = {'style': self.style, 'size': (1, 1), 'pad': (0, 0), 'keep_ratio': False}
-#         return Image(None, side='left', **kwargs), Image(None, side='right', **kwargs)
-#
-#     def get_custom_layout(self) -> Layout:
-#         # TODO: Top/bottom spacers, or implement something using Canvas's create_image properly...
-#         yield [*self.spacers, self.__image]
-#
-#     def update_spacer_width(self, width: int):
-#         left, right = self.spacers
-#         left.resize(width, 1)
-#         right.resize(width, 1)
 
 
 class ImageDir:
@@ -224,7 +197,7 @@ class ImageView(View):
     @cached_property
     def _width_offset(self) -> int:
         style = self.window.style
-        # scroll_y_width = self.gui_image.widget.scroll_bar_y.winfo_reqwidth()  #
+        # scroll_y_width = self.gui_image.widget.scroll_bar_y.winfo_reqwidth()  # usually 12->15 / 14->17
         scroll = style.get_map('scroll', aw='arrow_width', bw='bar_width', bd='border_width')
         scroll_width = max(scroll.get('aw', 12), scroll.get('bw', 12))
         scroll_y_width = scroll_width + (2 * scroll.get('bd', 1)) + 1
@@ -261,10 +234,7 @@ class ImageView(View):
     def init_window(self):
         from tk_gui.event_handling import ClickHighlighter
         window = super().init_window()
-        kwargs = {
-            'window': window, 'show_config': True, 'show_pack_info': True,
-            # 'show_ttk_info': True
-        }
+        kwargs = {'window': window, 'show_config': True, 'show_pack_info': True}
         ClickHighlighter(level=0, log_event=True, log_event_kwargs=kwargs).register(window)
         return window
 
@@ -274,7 +244,6 @@ class ImageView(View):
         yield [self.menu]
 
     def get_post_window_layout(self) -> Layout:
-        # yield [self.image_frame]
         yield [self.gui_image]
         yield [self.info_bar]
 
@@ -284,10 +253,6 @@ class ImageView(View):
         data = {key: (val, sizes[key]) for key, val in self.active_image.get_info_bar_data().items()}
         return InfoBar.from_dict(data)
 
-    # @cached_property
-    # def image_frame(self) -> ImageScrollFrame:
-    #     return ImageScrollFrame(self.gui_image)
-
     @cached_property
     def gui_image(self) -> ScrollableImage:
         style = self.window.style.sub_style(bg='#000000', border_width=0)
@@ -295,6 +260,8 @@ class ImageView(View):
         src_image = self.active_image.src_image
         fit_size = src_image.box.fit_inside_size(win_box.size)
         image = self.active_image.resize(fit_size)
+        # TODO: There's still some visible initial image position jitter where it shifts up and down 1-2x, which may
+        #  also occur to a lesser degree when switching to another image, but nowhere near as noticeable.
         return ScrollableImage(
             image, size=win_box.size, pad=(0, 0), anchor='c', side='t', fill='both', expand=True, style=style
         )
@@ -308,7 +275,6 @@ class ImageView(View):
         self._update_size()
 
     def _update_active_image(self, image: ImageType | ImageWrapper, image_dir: ImageDir = None):
-        # TODO: Center on new images
         src_image = SourceImage.from_image(image)
         self.active_image = ActiveImage(src_image, src_image.box.fit_inside_size(self._window_box.size), image_dir)
         self.image_dir = self.active_image.image_dir
@@ -321,15 +287,7 @@ class ImageView(View):
             win_w, win_h = self.window.true_size
             # win_w, win_h = self._window_box.size  # Note: Using this resulted in losing the info bar
 
-        # to_fill = win_w - self.active_image.image.width - self._width_offset
-        # if (spacer_w := to_fill // 2) < 5:
-        #     spacer_w = 1
-        # log.debug(f'Using spacer {spc_w=} from {win_w=}, {self.image.width=}, {to_fill=}')
-        # self.image_frame.update_spacer_width(spacer_w)
-        # self.image_frame.resize_scroll_region((win_w, win_h - self._height_offset))
-
         frame_height = win_h - self._height_offset
-        # TODO: Fix centering
         log.debug(f'Using {frame_height=} from {win_h=}, {self._height_offset=}')
         self.gui_image.widget.resize(win_w, frame_height)
 

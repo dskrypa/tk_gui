@@ -236,7 +236,7 @@ class Box(Sized):
 
     # endregion
 
-    # region Resize
+    # region Resize & Move
 
     def with_size_offset(self, offset: XY | int, anchor_center: bool = False) -> Box:
         try:
@@ -252,6 +252,9 @@ class Box(Sized):
         dx = (x_off if x_off > 0 else -x_off) // 2
         dy = (y_off if y_off > 0 else -y_off) // 2
         return self.from_size_and_pos(width + x_off, height + y_off, x - dx, y - dy)
+
+    def with_pos(self, x: X, y: Y) -> Box:
+        return self.from_pos_and_size(x, y, *self.size)
 
     # endregion
 

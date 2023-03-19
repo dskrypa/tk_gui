@@ -234,11 +234,19 @@ class ScrollableImage(SrcImageMixin, Element, base_style_layer='image'):
     ):
         kwargs.setdefault('scroll_x', True)
         kwargs.setdefault('scroll_y', True)
+        kwargs.setdefault('scroll_x_amount', 1)
+        kwargs.setdefault('scroll_y_amount', 1)
         self.x_config = AxisConfig.from_kwargs('x', kwargs)
         self.y_config = AxisConfig.from_kwargs('y', kwargs)
         kwargs.setdefault('pad', (0, 0))
         Element.__init__(self, **kwargs)
         self.init_src_image(image, use_cache=use_cache, keep_ratio=keep_ratio, resample=resample)
+
+    # def __repr__(self) -> str:
+    #     size = self.size
+    #     box_map = self.widget.get_boxes()
+    #     box_str = '{\n' + ',\n'.join(f'        {k!r}: {v!r}' for k, v in box_map.items()) + '\n    }'
+    #     return f'<{self.__class__.__name__}[id={self.id}, {size=}, boxes={box_str}]>'
 
     # region Widget Init & Packing
 
