@@ -28,20 +28,23 @@ class DelayedEventHandler:
     triggered multiple times within that time span, the timer is reset, and the method is re-registered to be actually
     called ``delay_ms`` milliseconds from then.
     """
-    __slots__ = ('name', 'cb_id_attr', 'widget_attr', 'delay_ms', 'func')
+    __slots__ = ('name', 'cb_id_attr', 'widget_attr', 'delay_ms', 'func', 'window_root')
 
-    def __init__(self, func: BindMethod, widget_attr: str = None, delay_ms: int = 200):
+    def __init__(self, func: BindMethod, widget_attr: str = None, delay_ms: int = 200, window_root: bool = False):
+        if window_root and widget_attr:
+            raise TypeError(f'Invalid param combo - {widget_attr=} is not supported with {window_root=}')
         self.widget_attr = widget_attr
         self.delay_ms = delay_ms
         self.func = func
+        self.window_root = window_root
 
     def __set_name__(self, owner: Type[C], name: str):
         self.name = name
         self.cb_id_attr = f'__{name}_cb_id'
 
     def __repr__(self) -> str:
-        func, widget_attr, delay_ms = self.func, self.delay_ms, self.delay_ms
-        return f'<{self.__class__.__name__}({func=}, {widget_attr=}, {delay_ms=})>'
+        func, widget_attr, delay_ms, window_root = self.func, self.delay_ms, self.delay_ms, self.window_root
+        return f'<{self.__class__.__name__}({func=}, {widget_attr=}, {delay_ms=}, {window_root=})>'
 
     def __get__(self, instance: C, owner: Type[C]) -> DelayedEventHandler | BindCallback:
         if instance is None:
@@ -51,15 +54,43 @@ class DelayedEventHandler:
     def __call__(self, instance: C, *args, **kwargs):
         return self.handle_event(instance, *args, **kwargs)
 
-    def handle_event(self, instance: C, event: Event):
+    def _find_widget_and_cancel(self, instance: C) -> tuple[BaseWidget, Callable[[int | str], Any]]:
         if widget_attr := self.widget_attr:
             widget: BaseWidget = getattr(instance, widget_attr)
-        else:
-            widget: BaseWidget = instance
+            return widget, widget.after_cancel
+        elif self.window_root:
+            widget: BaseWidget = instance.window.root
+            return widget, widget.after_cancel
 
+        try:
+            return instance, instance.after_cancel
+        except AttributeError:
+            pass
+
+        try:
+            widget = instance.widget
+            after_cancel = widget.after_cancel
+        except AttributeError:
+            pass
+        else:
+            self.widget_attr = 'widget'
+            return widget, after_cancel
+
+        try:
+            widget = instance.window.root
+        except AttributeError:
+            pass
+        else:
+            self.window_root = True
+            return widget, widget.after_cancel
+
+        raise TypeError(f'No widget attribute was found in instance with type={instance.__class__.__name__}')
+
+    def handle_event(self, instance: C, event: Event):
+        widget, after_cancel = self._find_widget_and_cancel(instance)
         attrs = instance.__dict__
         if cb_id := attrs.get(self.cb_id_attr):
-            widget.after_cancel(cb_id)
+            after_cancel(cb_id)
 
         attrs[self.cb_id_attr] = widget.after(self.delay_ms, self.handle_callback, instance, event)
 
@@ -69,14 +100,14 @@ class DelayedEventHandler:
 
 
 def delayed_event_handler(
-    func: BindMethod = None, *, widget_attr: str = None, delay_ms: int = 200
+    func: BindMethod = None, *, widget_attr: str = None, delay_ms: int = 200, window_root: bool = False
 ) -> DelayedEventHandler | Callable[[BindMethod], DelayedEventHandler]:
     # TODO: Maybe refactor to just look at a Window attr to determine whether initialization is done or not?
     if func is not None:
-        return DelayedEventHandler(func, widget_attr, delay_ms)
+        return DelayedEventHandler(func, widget_attr, delay_ms, window_root)
 
     def _delayed_event_handler(method: BindMethod) -> DelayedEventHandler:
-        return DelayedEventHandler(method, widget_attr, delay_ms)
+        return DelayedEventHandler(method, widget_attr, delay_ms, window_root)
 
     return _delayed_event_handler
 

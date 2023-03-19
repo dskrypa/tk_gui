@@ -22,7 +22,7 @@ from .view import View
 
 if TYPE_CHECKING:
     from tkinter import Event
-    from tk_gui.typing import XY, Layout, ImageType
+    from tk_gui.typing import XY, Layout, ImageType, OptInt
     from tk_gui.window import Window
 
 __all__ = ['ImageView']
@@ -73,24 +73,21 @@ class ImageDir:
     def index(self, path: Path) -> int:
         return self._image_paths.index(path)
 
-    def get_prev_index(self, path: Path, delta: int = 1) -> int | None:
+    def get_relative_index(self, path: Path, delta: int = 1) -> OptInt:
+        if not delta:
+            return None
         try:
             current_index = self.index(path)
         except IndexError:
             return None
-        if current_index == 0:
-            return None
-        dst_index = current_index - delta
-        return dst_index if dst_index >= 0 else 0
 
-    def get_next_index(self, path: Path, delta: int = 1) -> int | None:
-        try:
-            current_index = self.index(path)
-        except IndexError:
-            return None
-        if (last_index := len(self._image_paths) - 1) == current_index:
-            return None
         dst_index = current_index + delta
+        if delta < 0:
+            if current_index == 0:
+                return None
+            return dst_index if dst_index >= 0 else 0
+        elif (last_index := len(self._image_paths) - 1) == current_index:
+            return None
         return dst_index if dst_index <= last_index else last_index
 
     # endregion
@@ -98,13 +95,17 @@ class ImageDir:
 
 class ActiveImage:
     src_image: SourceImage
-    image_dir: ImageDir = None
+    image_dir: ImageDir | None = None
 
-    def __init__(self, image: ImageType | ImageWrapper, new_size: XY = None, image_dir: ImageDir = None):
+    def __init__(
+        self, image: ImageType | ImageWrapper, new_size: XY = None, image_dir: ImageDir = None, standalone: bool = False
+    ):
         self.src_image = SourceImage.from_image(image)
         self.image = image = self.src_image.as_size(new_size)
         log.debug(f'Initialized ActiveImage with {image=}')
-        if image_dir is None:
+        if standalone:
+            self.image_dir = None
+        elif image_dir is None:
             self.image_dir = ImageDir(self.src_image.path.parent)
         else:
             self.image_dir = image_dir
@@ -145,7 +146,7 @@ class ActiveImage:
         width, height = image.size
         return {
             'size': f'{width} x {height} x {image.bits_per_pixel} BPP',
-            'dir_pos': f'{self.dir_index}/{len(self.image_dir)}',
+            'dir_pos': f'{self.dir_index}/{len(self.image_dir)}' if self.image_dir else '1/1',
             'size_pct': f'{image.size_percent:.0%}',
             'size_bytes': f'{file_b} / {raw_b}',
             'mod_time': mod_time,
@@ -167,15 +168,14 @@ class ImageView(View):
     menu = MenuProperty(MenuBar)
     _last_size: XY = None
     active_image: ActiveImage
-    image_dir: ImageDir
 
-    def __init__(self, image: ImageType | ImageWrapper, title: str = None, **kwargs):
+    def __init__(self, image: ImageType | ImageWrapper, title: str = None, standalone: bool = False, **kwargs):
         kwargs.setdefault('margins', (0, 0))
         kwargs.setdefault('exit_on_esc', True)
         kwargs.setdefault('config_name', self.__class__.__name__)
         super().__init__(title=title or 'Image View', **kwargs)
-        self.active_image = ActiveImage(SourceImage.from_image(image))
-        self.image_dir = self.active_image.image_dir
+        self.active_image = ActiveImage(SourceImage.from_image(image), standalone=standalone)
+        self.window_kwargs['show'] = 2
         if size := self._new_window_size():
             self.window_kwargs['size'] = size
 
@@ -252,10 +252,8 @@ class ImageView(View):
 
     # region Layout
 
-    def get_pre_window_layout(self) -> Layout:
-        yield [self.menu]
-
     def get_post_window_layout(self) -> Layout:
+        yield [self.menu]
         yield [self.gui_image]
         yield [self.info_bar]
 
@@ -289,7 +287,6 @@ class ImageView(View):
     def _update_active_image(self, image: ImageType | ImageWrapper, image_dir: ImageDir = None):
         src_image = SourceImage.from_image(image)
         self.active_image = ActiveImage(src_image, src_image.box.fit_inside_size(self._window_box.size), image_dir)
-        self.image_dir = self.active_image.image_dir
         self._update(self.active_image.image)
 
     def _update_size(self, size: XY = None):
@@ -306,11 +303,6 @@ class ImageView(View):
 
     # region Event Handling
 
-    @cached_property
-    def _widget(self):
-        # Needed for delayed_event_handler
-        return self.window.root
-
     @event_handler('SIZE_CHANGED')
     def handle_size_changed(self, event: Event, size: XY):
         # TODO: If image is <100% and the window is expanded to be able to show it closer to full size, resize image
@@ -323,7 +315,7 @@ class ImageView(View):
     # region Zoom
 
     @event_handler('<Control-MouseWheel>')
-    @delayed_event_handler(delay_ms=75, widget_attr='_widget')
+    @delayed_event_handler(delay_ms=75)
     def handle_shift_scroll(self, event: Event):
         log.debug(f'handle_shift_scroll: {event=}')
         if event.num == 5 or event.delta < 0:  # Zoom out
@@ -350,20 +342,16 @@ class ImageView(View):
         if path := pick_file_popup(self.active_image.src_image.path.parent, title='Pick Image', parent=self.window):
             self._update_active_image(path)
 
-    @event_handler('<Left>', '<Control-Left>')
-    def handle_left_arrow(self, event: Event):
+    @event_handler('<Left>', '<Control-Left>', '<Right>', '<Control-Right>')
+    def handle_arrow_key_press(self, event: Event):
+        if (image_dir := self.active_image.image_dir) is None:
+            return
         # TODO: If zoomed in, increment scroll instead?  + add Up/Down handlers for this?
-        delta = 5 if event.state & EventState.Control else 1
-        image_dir = self.image_dir
-        if (index := image_dir.get_prev_index(self.active_image.path, delta)) is not None:
-            self._update_active_image(image_dir[index], image_dir)
         # TODO: Popup dialog to pick next dir or wrap around upon hitting either end
-
-    @event_handler('<Right>', '<Control-Right>')
-    def handle_right_arrow(self, event: Event):
         delta = 5 if event.state & EventState.Control else 1
-        image_dir = self.image_dir
-        if (index := image_dir.get_next_index(self.active_image.path, delta)) is not None:
+        if event.keysym == 'Left':
+            delta = -delta
+        if (index := image_dir.get_relative_index(self.active_image.path, delta)) is not None:
             self._update_active_image(image_dir[index], image_dir)
 
     # endregion

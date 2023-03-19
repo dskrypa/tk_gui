@@ -194,7 +194,7 @@ class Window(BindMixin, RowContainer):
         if grab_anywhere:
             self.grab_anywhere = grab_anywhere
         # self.kill_others_on_close = kill_others_on_close
-        if show and self.rows:
+        if show and (self.rows or (isinstance(show, int) and show > 1)):
             self.show()
 
     @property
