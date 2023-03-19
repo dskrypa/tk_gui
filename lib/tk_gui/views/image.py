@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, TypeVar, ParamSpec, Iterator
 from tk_gui.caching import cached_property
 from tk_gui.elements import InfoBar, ScrollableImage
 from tk_gui.elements.menu import MenuProperty, Menu, MenuGroup, MenuItem, CloseWindow
+from tk_gui.enums import ImageResizeMode
 from tk_gui.event_handling import EventState, event_handler, delayed_event_handler
 from tk_gui.geometry import Box
 from tk_gui.images.wrapper import ImageWrapper, SourceImage, ResizedImage
@@ -22,7 +23,7 @@ from .view import View
 
 if TYPE_CHECKING:
     from tkinter import Event
-    from tk_gui.typing import XY, Layout, ImageType, OptInt
+    from tk_gui.typing import XY, Layout, ImageType, OptInt, ImgResizeMode
     from tk_gui.window import Window
 
 __all__ = ['ImageView']
@@ -150,21 +151,17 @@ class ActiveImage:
             'mod_time': mod_time,
         }
 
-    def resize(self, size: XY | None) -> ResizedImage:
-        self.image = image = self.src_image.as_size(size)
+    def resize(self, size: XY | None, resize_mode: ImgResizeMode = ImageResizeMode.NONE) -> ResizedImage:
+        self.image = image = self.src_image.as_size(size, resize_mode=resize_mode)
         return image
 
     def scale_percent(self, percent: float) -> ResizedImage:
         return self.resize(self.image.scale_percent(percent))
 
-    def resize_to_fit_inside(self, size: XY) -> ResizedImage:
-        fit_size = self.src_image.box.fit_inside_size(size)
-        return self.resize(fit_size)
-
 
 class ImageView(View):
     menu = MenuProperty(MenuBar)
-    _last_size: XY = None
+    _last_size: XY = (0, 0)
     active_image: ActiveImage
     standalone: bool = False
 
@@ -274,30 +271,33 @@ class ImageView(View):
         window.update()
         # By waiting until after the window has been shown before rendering the image, it avoids some initial jitter
         # while tk Configure events are triggered due to the window being rendered.
-        self._update(self.active_image.resize_to_fit_inside(self._window_box.size))
+        self._update(self.active_image.resize(self._window_box.size, ImageResizeMode.FIT_INSIDE), True)
         return window
 
     # endregion
 
-    def _update(self, image: ResizedImage):
+    # region Image Methods
+
+    def update_active_image(self, image: ImageType | ImageWrapper, image_dir: ImageDir = None):
+        src_image = SourceImage.from_image(image)
+        self.active_image = ActiveImage(src_image, src_image.fit_inside_size(self._window_box.size), image_dir)
+        self._update(self.active_image.image)
+
+    def resize_image(self, size: XY | None, resize_mode: ImgResizeMode = ImageResizeMode.NONE):
+        self._update(self.active_image.resize(size, resize_mode))
+
+    # endregion
+
+    def _update(self, image: ResizedImage, frame: bool = False):
         self.gui_image.update(image, image.size)
         self.window.set_title(self.title)
         self.info_bar.update(self.active_image.get_info_bar_data())
-        self._update_size()
+        if frame:
+            self._update_frame_size(self.window.true_size)
 
-    def _update_active_image(self, image: ImageType | ImageWrapper, image_dir: ImageDir = None):
-        src_image = SourceImage.from_image(image)
-        self.active_image = ActiveImage(src_image, src_image.box.fit_inside_size(self._window_box.size), image_dir)
-        self._update(self.active_image.image)
-
-    def _update_size(self, size: XY = None):
-        try:
-            win_w, win_h = size
-        except TypeError:
-            win_w, win_h = self.window.true_size
-            self._last_size = (win_w, win_h)
-            # win_w, win_h = self._window_box.size  # Note: Using this resulted in losing the info bar
-
+    def _update_frame_size(self, size: XY):
+        win_w, win_h = size
+        self._last_size = size
         frame_height = win_h - self._height_offset
         # log.debug(f'Using {frame_height=} from {win_h=}, {self._height_offset=}')
         self.gui_image.update_frame_size(win_w, frame_height)
@@ -306,10 +306,14 @@ class ImageView(View):
 
     @event_handler('SIZE_CHANGED')
     def handle_size_changed(self, event: Event, size: XY):
-        # TODO: If image is <100% and the window is expanded to be able to show it closer to full size, resize image
-        if self._last_size != size:
-            self._last_size = size
-            self._update_size(size)
+        if (last_size := self._last_size) == size:
+            return
+        grew = Box.from_size_and_pos(*last_size).area < Box.from_size_and_pos(*size).area
+        self._last_size = size
+        self._update_frame_size(size)
+        if grew and self.active_image.image.size_percent < 1:
+            self.window.update_idle_tasks()
+            self.resize_image(size, ImageResizeMode.FIT_INSIDE)
 
     # endregion
 
@@ -318,9 +322,8 @@ class ImageView(View):
     @event_handler('<Control-MouseWheel>')
     @delayed_event_handler(delay_ms=75)
     def handle_shift_scroll(self, event: Event):
-        log.debug(f'handle_shift_scroll: {event=}')
         if event.num == 5 or event.delta < 0:  # Zoom out
-            self._zoom_image(0.9)  # TODO: Use more consistent steps
+            self._zoom_image(0.9)  # TODO: Use more consistent steps?
         elif event.num == 4 or event.delta > 0:  # Zoom in
             self._zoom_image(1.1)
 
@@ -328,11 +331,15 @@ class ImageView(View):
         self._update(self.active_image.scale_percent(percent))
         # TODO: Add way to grab image to drag the current view around
 
-    @event_handler('<Home>')
-    def handle_home(self, event: Event):
+    @event_handler('<Home>', '<End>', '<Prior>', '<Next>')
+    def handle_zoom_key_press(self, event: Event):
         # TODO: Add menu button to do the same?  + to set to a specific value?
-        # TODO: shortcut=End to fit to window?  PgUp/PgDown to increase/decrease zoom?
-        self._update(self.active_image.resize(None))
+        if (key := event.keysym) == 'Home':
+            self.resize_image(None)
+        elif key == 'End':
+            self.resize_image(self._window_box.size, ImageResizeMode.FILL)
+        elif key in ('Prior', 'Next'):  # PageUp / PageDown
+            self._zoom_image(1.1 if key == 'Prior' else 0.9)
 
     # endregion
 
@@ -341,7 +348,7 @@ class ImageView(View):
     @menu['File']['Open'].callback
     def open_file(self, event):
         if path := pick_file_popup(self.active_image.src_image.path.parent, title='Pick Image', parent=self.window):
-            self._update_active_image(path)
+            self.update_active_image(path)
 
     @event_handler('<Left>', '<Control-Left>', '<Right>', '<Control-Right>')
     def handle_arrow_key_press(self, event: Event):
@@ -353,6 +360,6 @@ class ImageView(View):
         if event.keysym == 'Left':
             delta = -delta
         if (index := image_dir.get_relative_index(self.active_image.path, delta)) is not None:
-            self._update_active_image(image_dir[index], image_dir)
+            self.update_active_image(image_dir[index], image_dir)
 
     # endregion

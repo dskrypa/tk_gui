@@ -96,6 +96,7 @@ class ScrollableImage(ComplexScrollable, Frame):
     def replace_image(self, image: TkImage, size: XY):
         self.del_image()
         self.set_image(image, size)
+        self.update_scroll_region()
 
     def update_scroll_region(self, force: bool = False, **kwargs):
         super().update_scroll_region(force, **kwargs)
