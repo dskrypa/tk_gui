@@ -9,8 +9,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, TypeVar, ParamSpec, Iterator
 
+from PIL.Image import registered_extensions
+
 from tk_gui.caching import cached_property
-from tk_gui.elements import InfoBar, ScrollableImage
+from tk_gui.elements import InfoBar, ScrollableImage, Text, Frame, Button
+from tk_gui.elements.table import Table, TableColumn
 from tk_gui.elements.menu import MenuProperty, Menu, MenuGroup, MenuItem, CloseWindow
 from tk_gui.enums import ImageResizeMode
 from tk_gui.event_handling import EventState, event_handler, delayed_event_handler
@@ -42,12 +45,16 @@ class MenuBar(Menu):
 
 
 class ImageDir:
-    _SUFFIXES = {'.png', '.jpg', '.jpeg', '.bmp', '.webp', '.svg'}  # TODO: Support more; support gif, etc
+    # _SUFFIXES = {'.png', '.jpg', '.jpeg', '.bmp', '.webp', '.svg'}
+    _SUFFIXES = set(registered_extensions())
 
     def __init__(self, path: Path):
         if not path.is_dir():
             raise TypeError(f'Invalid image dir={path.as_posix()!r} - not a directory')
         self.path = path
+
+    def __repr__(self) -> str:
+        return f'<{self.__class__.__name__}({self.path.as_posix()!r})>'
 
     @cached_property(block=False)
     def _image_paths(self) -> list[Path]:
@@ -157,6 +164,77 @@ class ActiveImage:
 
     def scale_percent(self, percent: float) -> ResizedImage:
         return self.resize(self.image.scale_percent(percent))
+
+
+class DirPicker(View, is_popup=True):
+    name_key, count_key = 'Folder', 'Image Files'
+    submitted = go_to_parent = False
+
+    def __init__(self, image_dir: ImageDir, title: str = None, **kwargs):
+        log.debug(f'Initializing {self.__class__.__name__} for {image_dir=}')
+        kwargs.setdefault('margins', (0, 0))
+        kwargs.setdefault('exit_on_esc', True)
+        super().__init__(title=title or 'Browse Subfolders', **kwargs)
+        self.image_dir: ImageDir = image_dir
+
+    def get_pre_window_layout(self) -> Layout:
+        yield [Text('End of folder reached.  Do you want to continue in another folder?')]
+        yield [Text('You are in folder:')]
+        path_str = self.image_dir.path.as_posix()
+        yield [Text(path_str, use_input_style=True, size=(len(path_str) + 5, 1))]
+        buttons = [[Button('Use Folder', key='submit', bind_enter=True, side='t')], [Button('Cancel', side='t')]]
+        yield [self.table, Frame(buttons, anchor='n')]
+        yield [Text('-> or space', size=(12, 1)), Text('= enter the folder')]
+        yield [Text('<-', size=(12, 1)), Text('= previous folder level (..)')]
+
+    def _dirs(self) -> Iterator[str, int | str]:
+        for path in sorted(self.image_dir.path.parent.iterdir()):
+            if path.is_dir():
+                try:
+                    yield path.name, len(ImageDir(path))
+                except PermissionError:
+                    pass
+
+    @cached_property(block=False)
+    def table(self) -> Table:
+        nk, ck = self.name_key, self.count_key
+        rows = [{nk: '.', ck: len(self.image_dir)}, {nk: '..', ck: '?'}, *({nk: n, ck: c} for n, c in self._dirs())]
+        columns = (TableColumn(nk, width=rows), TableColumn(ck, anchor_values='e', width=rows))
+        return Table(*columns, data=rows, key='table', select_mode='browse', focus=True)
+
+    def get_results(self) -> Path | None:
+        results = super().get_results()
+        img_dir_path = self.image_dir.path
+        if self.go_to_parent:
+            return self._go_to_parent(img_dir_path)
+        elif not (self.submitted or results['submit']):
+            return None
+        try:
+            dir_name = results['table'][0][self.name_key]
+        except (IndexError, KeyError):
+            return None
+        else:
+            if dir_name == '.':
+                return img_dir_path
+            elif dir_name == '..':
+                return self._go_to_parent(img_dir_path)
+            return img_dir_path.parent.joinpath(dir_name)
+
+    def _go_to_parent(self, img_dir_path: Path) -> Path | None:  # noqa
+        if img_dir_path == img_dir_path.parent:
+            log.warning(f'No valid parent directory exists for {img_dir_path.as_posix()}')
+            return None
+        return DirPicker(ImageDir(img_dir_path.parent)).run()  # noqa
+
+    @event_handler('<space>', '<Right>')
+    def handle_submit(self, event: Event):
+        self.submitted = True
+        self.window.interrupt(event)
+
+    @event_handler('<Left>')
+    def handle_parent_dir(self, event: Event):
+        self.go_to_parent = True
+        self.window.interrupt(event)
 
 
 class ImageView(View):
@@ -355,11 +433,23 @@ class ImageView(View):
         if (image_dir := self.active_image.image_dir) is None:
             return
         # TODO: If zoomed in, increment scroll instead?  + add Up/Down handlers for this?
-        # TODO: Popup dialog to pick next dir or wrap around upon hitting either end
         delta = 5 if event.state & EventState.Control else 1
         if event.keysym == 'Left':
             delta = -delta
         if (index := image_dir.get_relative_index(self.active_image.path, delta)) is not None:
             self.update_active_image(image_dir[index], image_dir)
+        else:
+            path: Path | None = DirPicker(image_dir).run()  # noqa
+            log.debug(f'Selected {path=}')
+            if not path:
+                return
+            new_img_dir = ImageDir(path)
+            try:
+                img_path = new_img_dir[0]
+            except IndexError:
+                log.warning(f'Selected directory={path.as_posix()!r} has no images')
+            else:
+                log.debug(f'Moving to new directory={path.as_posix()!r}')
+                self.update_active_image(img_path, new_img_dir)
 
     # endregion

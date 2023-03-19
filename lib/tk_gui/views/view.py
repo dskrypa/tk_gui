@@ -88,8 +88,8 @@ class View(WindowInitializer, ABC):
 
     # region Run Methods
 
-    def run(self) -> dict[Key, Any]:
-        with self.finalize_window()(take_focus=True) as window:
+    def run(self, take_focus: bool = True) -> dict[Key, Any]:
+        with self.finalize_window()(take_focus=take_focus) as window:
             window.run()
             return self.get_results()
 
