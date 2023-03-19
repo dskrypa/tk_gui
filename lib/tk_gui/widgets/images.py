@@ -85,11 +85,11 @@ class ScrollableImage(ComplexScrollable, Frame):
         # Note: Using anchor=center was not working as intended.  Using anchor=nw + a calculated position seems to
         # produce more consistent results.
         self._inner_id = self.canvas.create_image(x, y, image=image, anchor='nw')
-        log.debug(f'Created image={self._inner_id!r} @ {img_box}')
+        # log.debug(f'Created image={self._inner_id!r} @ {img_box}')
 
     def del_image(self):
         if (inner_id := self._inner_id) is not None:
-            log.debug(f'Deleting image={inner_id!r}')
+            # log.debug(f'Deleting image={inner_id!r}')
             self.canvas.delete(inner_id)
             self._inner_id = None
 
@@ -104,7 +104,7 @@ class ScrollableImage(ComplexScrollable, Frame):
         if self._last_img_box != img_box:
             self._last_img_box = img_box
             # log.debug(f'[{force=}] Moving image={self._inner_id!r} to center={img_box}')
-            log.debug(f'Moving image={self._inner_id!r} to center={img_box}')
+            # log.debug(f'Moving image={self._inner_id!r} to center={img_box}')
             self.canvas.moveto(self._inner_id, *img_box.min_xy)
 
     def resize(self, width: int = None, height: int = None, force: bool = False):

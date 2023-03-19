@@ -301,7 +301,7 @@ class ImageView(View):
             # win_w, win_h = self._window_box.size  # Note: Using this resulted in losing the info bar
 
         frame_height = win_h - self._height_offset
-        log.debug(f'Using {frame_height=} from {win_h=}, {self._height_offset=}')
+        # log.debug(f'Using {frame_height=} from {win_h=}, {self._height_offset=}')
         self.gui_image.update_frame_size(win_w, frame_height)
 
     # region Event Handling
