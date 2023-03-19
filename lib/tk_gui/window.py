@@ -67,7 +67,7 @@ class Window(BindMixin, RowContainer):
     _instances: WeakSet[Window] = WeakSet()
     # endregion
     # region Instance Attrs (with defaults)
-    __focus_widget: Optional[BaseWidget] = None
+    __focus_ele: Optional[ElementBase] = None
     _config: tuple[str, Union[str, Path, None], Optional[dict[str, Any]]] = None
     _keep_on_top: bool = False
     _last_interrupt: Interrupt = Interrupt(time=0)
@@ -639,19 +639,19 @@ class Window(BindMixin, RowContainer):
             cls._init_hidden_root()
 
     def _init_fix_focus(self):
-        if (widget := self.__focus_widget) is None:
+        if (element := self.__focus_ele) is None:
             return
-        if self.root.focus_get() != widget:
-            log.debug(f'Setting focus on {widget}')
-            widget.focus_set()
+        focus_id: str = self.root.focus_get()._w  # noqa
+        ele_id: str = element.widget._w  # noqa
+        if not focus_id.startswith(ele_id):
+            log.debug(f'Setting focus on {element}')
+            element.take_focus()
 
-    def maybe_set_focus(self, element: Element, widget: BaseWidget = None) -> bool:
-        if self.__focus_widget is not None:
+    def maybe_set_focus(self, element: Element) -> bool:
+        if self.__focus_ele is not None:
             return False
-        if widget is None:
-            widget = element.widget
-        widget.focus_set()
-        self.__focus_widget = widget
+        element.take_focus()
+        self.__focus_ele = element
         return True
 
     @property

@@ -192,6 +192,12 @@ class ElementBase(ClearableCachedPropertyMixin, ABC):
 
         return config_func(**kwargs)
 
+    def take_focus(self, force: bool = False):
+        if force:
+            self.widget.focus_force()
+        else:
+            self.widget.focus_set()
+
     # region Style Methods / Attributes
 
     @property
@@ -322,7 +328,7 @@ class Element(BindMixin, ElementBase, ABC):
 
         self._pack_widget(widget, expand, fill, kwargs)
         if focus:
-            self.parent.window.maybe_set_focus(self, widget)
+            self.parent.window.maybe_set_focus(self)
 
     def _pack_widget(self, widget: Widget, expand: bool, fill: TkFill, kwargs: dict[str, Any]):
         if expand is None:
