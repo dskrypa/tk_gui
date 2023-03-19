@@ -25,6 +25,7 @@ TkImage = Union[TkBaseImage, PhotoImage]
 
 
 class ScrollableImage(ComplexScrollable, Frame):
+    __initializing: bool = True
     inner_widget: TkImage
     _inner_id: int | None = None
     _last_img_box = Box(0, 0, 0, 0)
@@ -46,6 +47,7 @@ class ScrollableImage(ComplexScrollable, Frame):
         self.__size = size = (width, height)
         super().__init__(parent, width=width, height=height, padx=padx, pady=pady, verify=verify, **kwargs)
         self.set_image(image, size)
+        self.__initializing = False
 
     def init_canvas_kwargs(self, style: Style = None) -> dict[str, Any]:
         kwargs = super().init_canvas_kwargs(style)
@@ -64,11 +66,12 @@ class ScrollableImage(ComplexScrollable, Frame):
         }
 
     def _center_image_box(self, size: XY) -> Box:
-        if self._inner_id is None:
+        if self.__initializing:
             return Box.from_pos_and_size(0, 0, *size)
 
         canvas_box = Box.from_size_and_pos(*get_size_and_pos(self.canvas))
-        return canvas_box.center(self._last_img_box)
+        # log.debug(f'Centering image within {canvas_box=}')
+        return canvas_box.center(size)
 
     def set_image(self, image: TkImage, size: XY):
         self.inner_widget = image
@@ -104,9 +107,13 @@ class ScrollableImage(ComplexScrollable, Frame):
             log.debug(f'Moving image={self._inner_id!r} to center={img_box}')
             self.canvas.moveto(self._inner_id, *img_box.min_xy)
 
-    def resize(self, width: int = None, height: int = None):
-        self.configure(width=width, height=height)
-        self.update_canvas_size(width=width, height=height)
+    def resize(self, width: int = None, height: int = None, force: bool = False):
+        size = (width, height)
+        if force or self._last_size != size:
+            self.configure(width=width, height=height)
+            self.update_canvas_size(width=width, height=height, force=force)
+        else:
+            self.update_scroll_region()
 
     def _widgets(self) -> Iterator[BaseWidget]:
         yield self.inner_widget

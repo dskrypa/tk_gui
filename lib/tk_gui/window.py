@@ -264,6 +264,9 @@ class Window(BindMixin, RowContainer):
             self.show()
             self.root.update()
 
+    def update_idle_tasks(self):
+        self.root.update_idletasks()
+
     def read(self, timeout: int) -> tuple[Optional[Key], dict[Key, Any], Optional[Event]]:
         self.run(timeout)
         interrupt = self._last_interrupt
@@ -604,9 +607,6 @@ class Window(BindMixin, RowContainer):
         self.style = Style.get_style(style)
         for element in self.all_elements():
             element.apply_style()
-
-    def _update_idle_tasks(self):
-        self.root.update_idletasks()
 
     # endregion
 

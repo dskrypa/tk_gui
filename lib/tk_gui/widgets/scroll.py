@@ -314,7 +314,7 @@ class ComplexScrollable(ScrollableBase, ABC):
         if force or size != self._last_size:
             self.update_canvas_size(width, height)
 
-    def update_canvas_size(self, width: int = None, height: int = None):
+    def update_canvas_size(self, width: int = None, height: int = None, force: bool = False):
         # canvas = self.canvas
         # log.debug(f'{self!r}.update_canvas_size: size=({width}, {height})')
         # TODO: Should the scrollregion update happen after the size change, or should the bbox be manually edited
@@ -327,8 +327,10 @@ class ComplexScrollable(ScrollableBase, ABC):
         #     bbox = (x0, y0, width or x1, height or y1)
         # canvas.configure(scrollregion=bbox, width=width, height=height)
         # canvas.configure(scrollregion=canvas.bbox('all'), width=width, height=height)
-        self.update_scroll_region(True, width=width, height=height)
-        self._last_size = (width, height)
+        size = (width, height)
+        if force or self._last_size != size:
+            self.update_scroll_region(True, width=width, height=height)
+            self._last_size = size
 
     @delayed_event_handler(delay_ms=75)
     def _maybe_fill_region(self, event: Event = None):

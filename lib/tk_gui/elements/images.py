@@ -282,6 +282,18 @@ class ScrollableImage(SrcImageMixin, Element, base_style_layer='image'):
 
     # endregion
 
+    def update(self, image: ImageType | ImageWrapper, size: XY = None):
+        if size:
+            self.size = size
+        if size and self.widget is not None and isinstance(image, ResizedImage) and image.size == size:
+            self._src_image = SourceImage.from_image(image)
+            self.widget.replace_image(image.as_tk_image(), size)
+        else:
+            self.image = image
+
+    def update_frame_size(self, width: int, height: int):
+        self.widget.resize(width, height)
+
     def resize(self, width: int, height: int) -> ResizedImage:
         resized = self._src_image.as_size((width, height), **self._resize_kwargs)
         self.size = size = resized.size

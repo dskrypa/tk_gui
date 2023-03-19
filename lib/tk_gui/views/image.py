@@ -22,7 +22,8 @@ from .view import View
 
 if TYPE_CHECKING:
     from tkinter import Event
-    from ..typing import XY, Layout, ImageType
+    from tk_gui.typing import XY, Layout, ImageType
+    from tk_gui.window import Window
 
 __all__ = ['ImageView']
 log = logging.getLogger(__name__)
@@ -267,13 +268,15 @@ class ImageView(View):
     @cached_property
     def gui_image(self) -> ScrollableImage:
         style = self.window.style.sub_style(bg='#000000', border_width=0)
-        win_box = self._window_box
-        image = self.active_image.resize_to_fit_inside(win_box.size)
-        # TODO: There's still some visible initial image position jitter where it shifts up and down 1-2x, which may
-        #  also occur to a lesser degree when switching to another image, but nowhere near as noticeable.
-        return ScrollableImage(
-            image, size=win_box.size, pad=(0, 0), anchor='c', side='t', fill='both', expand=True, style=style
-        )
+        return ScrollableImage(None, size=self._window_box.size, pad=(0, 0), anchor='c', style=style)
+
+    def finalize_window(self) -> Window:
+        window = super().finalize_window()
+        window.update()
+        # By waiting until after the window has been shown before rendering the image, it avoids some initial jitter
+        # while tk Configure events are triggered due to the window being rendered.
+        self._update(self.active_image.resize_to_fit_inside(self._window_box.size))
+        return window
 
     # endregion
 
@@ -294,11 +297,12 @@ class ImageView(View):
             win_w, win_h = size
         except TypeError:
             win_w, win_h = self.window.true_size
+            self._last_size = (win_w, win_h)
             # win_w, win_h = self._window_box.size  # Note: Using this resulted in losing the info bar
 
         frame_height = win_h - self._height_offset
         log.debug(f'Using {frame_height=} from {win_h=}, {self._height_offset=}')
-        self.gui_image.widget.resize(win_w, frame_height)
+        self.gui_image.update_frame_size(win_w, frame_height)
 
     # region Event Handling
 
@@ -348,7 +352,7 @@ class ImageView(View):
 
     @event_handler('<Left>', '<Control-Left>')
     def handle_left_arrow(self, event: Event):
-        # TODO: Increment scroll instead if zoomed in?  + add Up/Down handlers for this?
+        # TODO: If zoomed in, increment scroll instead?  + add Up/Down handlers for this?
         delta = 5 if event.state & EventState.Control else 1
         image_dir = self.image_dir
         if (index := image_dir.get_prev_index(self.active_image.path, delta)) is not None:

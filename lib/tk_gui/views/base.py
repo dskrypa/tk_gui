@@ -150,7 +150,7 @@ class WindowInitializer(HandlesEvents, ABC):
         if layout := self.get_post_window_layout():
             window.add_rows(layout, pack=window.was_shown)
             try:
-                window._update_idle_tasks()
+                window.update_idle_tasks()
             except AttributeError:  # There was no init layout, so .show() was not called in Window.__init__
                 window.show()
             else:  # The scroll region only needs to be updated if the window was already shown
