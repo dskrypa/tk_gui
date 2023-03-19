@@ -287,7 +287,7 @@ class ResizedImage(ImageWrapper):
 
     @cached_property
     def width_percent(self) -> float:
-        return self.size[0] / self.source.size[1]
+        return self.size[0] / self.source.size[0]
 
     @cached_property
     def height_percent(self) -> float:
