@@ -39,7 +39,7 @@ class GuiTest(Command):
     color = Option('-c', help='The initial color to display when action=pick_color')
 
     def _init_command_(self):
-        logging.getLogger('PIL.PngImagePlugin').setLevel(50)
+        logging.getLogger('PIL').setLevel(50)
         try:
             from ds_tools.logging import init_logging
         except ImportError:
