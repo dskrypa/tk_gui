@@ -46,9 +46,9 @@ class MonitorInfo(Structure):
         self.flags = 0x01  # MONITORINFOF_PRIMARY
 
     @classmethod
-    def for_handle(cls, handle) -> MonitorInfo:
+    def for_handle(cls, handle: int) -> MonitorInfo:
         self = cls()
-        if not windll.user32.GetMonitorInfoW(handle, byref(self)):
+        if not windll.user32.GetMonitorInfoW(HMONITOR(handle), byref(self)):
             raise WinError()
         return self
 
@@ -74,7 +74,7 @@ def get_all_monitor_info(
 ) -> list[MonitorInfo]:
     handles = []
 
-    def _callback(handle: HMONITOR, dev_ctx_handle: HDC, rect: LPRECT, data: LPARAM):
+    def _callback(handle: int, dev_ctx_handle: HDC, rect: LPRECT, data: LPARAM):
         handles.append(handle)
         return True  # continue enumeration
 
@@ -90,7 +90,7 @@ def get_all_monitor_info(
         if restore and old_awareness != dpi_awareness:
             windll.shcore.SetProcessDpiAwareness(old_awareness)
 
-    return [MonitorInfo.for_handle(hmonitor) for hmonitor in handles]
+    return [MonitorInfo.for_handle(handle) for handle in handles]
 
 
 def get_dpi_awareness() -> ProcessDPIAwareness:
