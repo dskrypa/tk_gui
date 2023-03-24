@@ -196,7 +196,7 @@ class Row(RowBase[E]):
             fill = anchor.abs_fill_axis if expand else tkc.NONE
         return anchor, expand, fill
 
-    def pack(self, debug: Bool = False):
+    def pack(self, parent_rc: RowContainer, debug: Bool = False):
         # log.debug(f'Packing row {self.num} in {self.parent=} {self.parent.tk_container=}')
         if bg := self.style.base.bg.default:
             kwargs = {'background': bg}
@@ -205,6 +205,7 @@ class Row(RowBase[E]):
         self.frame = frame = Frame(self.parent.tk_container, **kwargs)
         self.pack_elements(debug)
 
+        # TODO: Should fill default to x, and expand default to True?
         anchor, expand, fill = self._anchor_expand_and_fill()
         # anchor = self.anchor
         # if (expand := self.expand) is None:

@@ -59,6 +59,10 @@ class Spacer(ElementBase):
 
 
 class InfoBar(RowFrame):
+    """
+    An info bar, intended to be at the bottom of a window.
+    May be included directly in a layout as a row (i.e., it does not need to be wrapped inside another row).
+    """
     element_map: dict[str, Text]
 
     def __init__(

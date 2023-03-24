@@ -10,7 +10,7 @@ import logging
 from abc import ABC, abstractmethod
 from itertools import count
 from tkinter import BaseWidget
-from typing import TYPE_CHECKING, Optional, Union, Any, Iterator, Type, Generic, overload
+from typing import TYPE_CHECKING, Optional, Union, Any, Iterator, Type, Generic, Protocol, overload, runtime_checkable
 
 from tk_gui.caching import cached_property
 from tk_gui.enums import Anchor, Justify, Side
@@ -113,6 +113,9 @@ class RowContainer(Generic[E], ABC):
             if isinstance(raw_row, row_cls):
                 log.debug(f'Found pre-built row={raw_row!s}', extra={'color': 11})
                 yield raw_row
+            elif isinstance(raw_row, RowBase) and isinstance(raw_row, Packable):
+                log.debug(f'Found pre-built packable base row={raw_row!s}', extra={'color': 11})
+                yield raw_row
             else:
                 yield row_cls(self, raw_row)
 
@@ -124,18 +127,18 @@ class RowContainer(Generic[E], ABC):
             n_rows = len(self.rows)
             for i, row in enumerate(self._add_rows(layout), n_rows):
                 log.debug(f'Packing row {i} / {n_rows}')
-                row.pack(debug)
+                row.pack(self, debug)
                 if update:
                     update_idletasks()
         elif update:
             update_idletasks = self.widget.update_idletasks
             for row in self._add_rows(layout):
-                row.pack(debug)
+                row.pack(self, debug)
                 update_idletasks()
         else:
             added = [row for row in self._add_rows(layout)]
             for row in added:
-                row.pack()
+                row.pack(self)
 
     def _add_rows(self, layout: Layout[E]):
         rows = self.rows
@@ -264,10 +267,10 @@ class RowContainer(Generic[E], ABC):
             n_rows = len(self.rows)
             for i, row in enumerate(self.rows):
                 log.debug(f'Packing row {i} / {n_rows}')
-                row.pack(debug)
+                row.pack(self, debug)
         else:
             for row in self.rows:
-                row.pack()
+                row.pack(self)
 
     def grid_rows(self):
         for r, row in enumerate(self.rows):
@@ -276,3 +279,12 @@ class RowContainer(Generic[E], ABC):
 
         self.frame.grid_rowconfigure(1, weight=1)
         self.frame.grid_columnconfigure(1, weight=1)
+
+
+@runtime_checkable
+class Packable(Protocol):
+    __slots__ = ()
+
+    @abstractmethod
+    def pack(self, parent_rc: RowContainer, debug: Bool = False):
+        pass

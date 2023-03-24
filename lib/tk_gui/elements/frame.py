@@ -146,6 +146,7 @@ class RowFrame(FrameMixin, RowBase, Element, ABC, base_style_layer='frame'):
     extends :class:`.RowContainer` to be lighter-weight since a RowContainer would contain at least one more additional
     nested Frame widget.
     """
+    _parent_rc: RowContainer = None
 
     def __init__(self, **kwargs):
         self.init_frame_from_kwargs(kwargs)
@@ -162,11 +163,27 @@ class RowFrame(FrameMixin, RowBase, Element, ABC, base_style_layer='frame'):
 
     @property
     def parent_rc(self) -> RowContainer:
-        return self.parent.parent_rc  # self.parent is a Row
+        try:
+            return self.parent.parent_rc  # self.parent is a Row
+        except AttributeError:
+            return self._parent_rc
 
     @property
     def frame(self) -> Union[TkFrame, LabelFrame]:
         return self.widget
+
+    def pack(self, parent_rc: RowContainer, debug: Bool = False):
+        # Used if this RowFrame is provided as a row in a layout.  Not used if this RowFrame is provided IN a row.
+        self._parent_rc = parent_rc
+        self.parent = parent_rc
+        if key := self._key:
+            parent_rc.window.register_element(key, self)
+        self._init_widget(parent_rc.frame)
+        self.pack_widget()
+        self.apply_binds()
+        if tooltip := self.tooltip_text:
+            self.add_tooltip(tooltip)
+        self.pack_elements(debug)
 
     def pack_rows(self, debug: Bool = False):
         self.pack_elements(debug)

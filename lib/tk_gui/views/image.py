@@ -331,7 +331,7 @@ class ImageView(View):
         if not self.standalone:
             yield [self.menu]
         yield [self.gui_image]
-        yield [self.info_bar]
+        yield self.info_bar
 
     @cached_property
     def info_bar(self) -> InfoBar:
