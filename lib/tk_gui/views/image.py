@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
+from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, TypeVar, ParamSpec, Iterator
 
@@ -15,7 +16,7 @@ from tk_gui.caching import cached_property
 from tk_gui.elements import InfoBar, ScrollableImage, Text, Frame, Button
 from tk_gui.elements.table import Table, TableColumn
 from tk_gui.elements.menu import MenuProperty, Menu, MenuGroup, MenuItem, CloseWindow
-from tk_gui.enums import ImageResizeMode
+from tk_gui.enums import MissingMixin, ImageResizeMode
 from tk_gui.event_handling import EventState, event_handler, delayed_event_handler
 from tk_gui.geometry import Box
 from tk_gui.images.wrapper import ImageWrapper, SourceImage, ResizedImage
@@ -34,6 +35,12 @@ log = logging.getLogger(__name__)
 
 P = ParamSpec('P')
 T = TypeVar('T')
+
+
+class InfoLoc(MissingMixin, Enum):
+    NONE = 'none'
+    TITLE_BAR = 'title_bar'
+    FOOTER = 'footer'
 
 
 class MenuBar(Menu):
@@ -165,9 +172,11 @@ class ActiveImage:
             return path.name
         return ''
 
-    def title_parts(self) -> tuple[str, str]:
-        prefix = f'{self.file_name} - ' if self.file_name else ''
+    def title_parts(self, show_dir: bool = False) -> tuple[str, str]:
+        prefix = f'{self.file_name} \u2014 ' if self.file_name else ''
         suffix = '' if self.image.size_percent == 1 else f' (Zoom: {self.image.size_str})'
+        if show_dir and (img_dir := self.image_dir):
+            suffix += f' (Folder: {img_dir.path.as_posix()})'
         return prefix, suffix
 
     @cached_property(block=False)
@@ -185,17 +194,19 @@ class ActiveImage:
     def dir_index(self) -> int:
         return self.image_dir.index(self.path) + 1
 
-    def get_info_bar_data(self) -> dict[str, str]:
-        image, src_image = self.image, self.src_image
+    def get_info_bar_data(self, show_dir: bool = True) -> dict[str, str]:
+        image, src_image, img_dir = self.image, self.src_image, self.image_dir
         mod_time, file_b, raw_b = self._file_info
-        width, height = src_image.size
-        return {
-            'size': f'{width} x {height} x {src_image.bits_per_pixel} BPP',
-            'dir_pos': f'{self.dir_index}/{len(self.image_dir)}' if self.image_dir else '1/1',
+        data = {
+            'size': f'{src_image.size_str} x {src_image.bits_per_pixel} BPP',
+            'dir_pos': f'{self.dir_index}/{len(img_dir)}' if img_dir else '1/1',
             'size_pct': f'{image.size_percent:.0%}',
             'size_bytes': f'{file_b} / {raw_b}',
             'mod_time': mod_time,
         }
+        if show_dir and img_dir:
+            data['directory'] = img_dir.path.as_posix()
+        return data
 
     def resize(self, size: XY | None, resize_mode: ImgResizeMode = ImageResizeMode.NONE) -> ResizedImage:
         self.image = image = self.src_image.as_size(size, resize_mode=resize_mode)
@@ -301,17 +312,25 @@ class DirPicker(View, is_popup=True):
 
 
 class ImageView(View):
-    # TODO: Show dir
     menu = MenuProperty(MenuBar)
     _last_size: XY = (0, 0)
     active_image: ActiveImage
+    dir_loc: InfoLoc
     standalone: bool = False
 
-    def __init__(self, image: ImageType | ImageWrapper, title: str = None, standalone: bool = False, **kwargs):
+    def __init__(
+        self,
+        image: ImageType | ImageWrapper,
+        title: str = None,
+        standalone: bool = False,
+        dir_loc: InfoLoc | str = InfoLoc.FOOTER,
+        **kwargs,
+    ):
         kwargs.setdefault('margins', (0, 0))
         kwargs.setdefault('exit_on_esc', True)
         kwargs.setdefault('config_name', self.__class__.__name__)
         super().__init__(title=title or 'Image View', **kwargs)
+        self.dir_loc = InfoLoc(dir_loc)
         self.standalone = standalone
         self.active_image = ActiveImage(SourceImage.from_image(image), standalone=standalone)
         self.window_kwargs['show'] = 2
@@ -366,7 +385,7 @@ class ImageView(View):
     @property
     def title(self) -> str:
         try:
-            prefix, suffix = self.active_image.title_parts()
+            prefix, suffix = self.active_image.title_parts(self.dir_loc == InfoLoc.TITLE_BAR and not self.standalone)
         except AttributeError:  # During init with no config_name
             return self._title
         else:
@@ -403,7 +422,9 @@ class ImageView(View):
 
     @cached_property
     def info_bar(self) -> InfoBar:
-        return InfoBar.from_dict(self.active_image.get_info_bar_data())
+        return InfoBar.from_dict(
+            self.active_image.get_info_bar_data(self.dir_loc == InfoLoc.FOOTER and not self.standalone)
+        )
 
     @cached_property
     def gui_image(self) -> ScrollableImage:
@@ -455,7 +476,8 @@ class ImageView(View):
     def _update(self, image: ResizedImage, frame: bool = False):
         self.gui_image.update(image, image.size)
         self.window.set_title(self.title)
-        self.info_bar.update(self.active_image.get_info_bar_data(), auto_resize=True)
+        info_bar_data = self.active_image.get_info_bar_data(self.dir_loc == InfoLoc.FOOTER and not self.standalone)
+        self.info_bar.update(info_bar_data, auto_resize=True)
         if frame:
             # TODO: Why is this still needed with expand=True, fill=both?
             self._update_frame_size(self.window.true_size)
@@ -530,8 +552,6 @@ class ImageView(View):
         else:
             new_img_dir: Path | ImageDir | None = DirPicker(image_dir).run()  # noqa
             log.debug(f'Selected {new_img_dir=}')
-
-            # if new_img_dir is None or new_img_dir == image_dir.path or new_img_dir == image_dir:
             if new_img_dir is None:
                 pass
             elif new_img_dir == image_dir.path or new_img_dir == image_dir:

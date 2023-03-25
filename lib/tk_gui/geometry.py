@@ -36,7 +36,7 @@ class Sized(ABC):
 
     @property
     def size_str(self) -> str:
-        return '{}x{}'.format(*self.size)
+        return '{} x {}'.format(*self.size)
 
     @cached_property(block=False)
     def area(self) -> int:
