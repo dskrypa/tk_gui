@@ -20,7 +20,7 @@ from tk_gui.event_handling import EventState, event_handler, delayed_event_handl
 from tk_gui.geometry import Box
 from tk_gui.images.wrapper import ImageWrapper, SourceImage, ResizedImage
 from tk_gui.popups.about import AboutPopup
-from tk_gui.popups import pick_file_popup
+from tk_gui.popups import pick_file_popup, popup_warning
 from tk_gui.utils import readable_bytes
 from .view import View
 
@@ -46,40 +46,79 @@ class MenuBar(Menu):
 
 class ImageDir:
     # _SUFFIXES = {'.png', '.jpg', '.jpeg', '.bmp', '.webp', '.svg'}
-    _SUFFIXES = set(registered_extensions())
+    _SUFFIXES = set(registered_extensions()) - {'.pdf'}
+    path: Path
 
-    def __init__(self, path: Path):
+    def __new__(cls, image_dir: Path | ImageDir):
+        if isinstance(image_dir, cls):
+            return image_dir
+        return super().__new__(cls)
+
+    def __init__(self, image_dir: Path | ImageDir):
+        if hasattr(self, 'path'):
+            return
+        path = image_dir.path if isinstance(image_dir, ImageDir) else image_dir
         if not path.is_dir():
             raise TypeError(f'Invalid image dir={path.as_posix()!r} - not a directory')
         self.path = path
 
     def __repr__(self) -> str:
-        return f'<{self.__class__.__name__}({self.path.as_posix()!r})>'
+        return f'<{self.__class__.__name__}[images={len(self.image_paths)}]({self.path.as_posix()!r})>'
 
     @cached_property(block=False)
-    def _image_paths(self) -> list[Path]:
+    def _split_contents(self) -> tuple[list[Path], list[Path]]:
         ok_suffixes = self._SUFFIXES
-        image_paths = [p for p in self.path.iterdir() if p.is_file() and p.suffix.lower() in ok_suffixes]
+        image_paths, sub_dirs = [], []
+        for p in self.path.iterdir():
+            if p.is_file():
+                if p.suffix.lower() in ok_suffixes:
+                    image_paths.append(p)
+            elif p.is_dir():
+                sub_dirs.append(p)
+        return image_paths, sub_dirs
+
+    @cached_property(block=False)
+    def image_paths(self) -> list[Path]:
+        image_paths = self._split_contents[0]
         image_paths.sort(key=lambda p: p.name.lower())
         return image_paths
+
+    @cached_property(block=False)
+    def sub_dirs(self) -> list[Path]:
+        return self._split_contents[1]
 
     # region Container Methods
 
     def __len__(self) -> int:
-        return len(self._image_paths)
+        return len(self.image_paths)
 
     def __getitem__(self, item: int) -> Path:
-        return self._image_paths[item]
+        return self.image_paths[item]
 
     def __iter__(self) -> Iterator[Path]:
-        yield from self._image_paths
+        yield from self.image_paths
+
+    def __hash__(self) -> int:
+        return hash(self.__class__) ^ hash(self.path)
+
+    def __eq__(self, other: ImageDir) -> bool:
+        try:
+            return self.path == other.path
+        except AttributeError:
+            return False
+
+    def __lt__(self, other: ImageDir) -> bool:
+        try:
+            return self.path < other.path
+        except AttributeError:
+            return False
 
     # endregion
 
     # region Index Methods
 
     def index(self, path: Path) -> int:
-        return self._image_paths.index(path)
+        return self.image_paths.index(path)
 
     def get_relative_index(self, path: Path, delta: int = 1) -> OptInt:
         if not delta:
@@ -94,7 +133,7 @@ class ImageDir:
             if current_index == 0:
                 return None
             return dst_index if dst_index >= 0 else 0
-        elif (last_index := len(self._image_paths) - 1) == current_index:
+        elif (last_index := len(self.image_paths) - 1) == current_index:
             return None
         return dst_index if dst_index <= last_index else last_index
 
@@ -170,12 +209,13 @@ class DirPicker(View, is_popup=True):
     name_key, count_key = 'Folder', 'Image Files'
     submitted = go_to_parent = False
 
-    def __init__(self, image_dir: ImageDir, title: str = None, **kwargs):
+    def __init__(self, image_dir: ImageDir, title: str = None, last_dir: ImageDir = None, **kwargs):
         log.debug(f'Initializing {self.__class__.__name__} for {image_dir=}')
         kwargs.setdefault('margins', (0, 0))
         kwargs.setdefault('exit_on_esc', True)
         super().__init__(title=title or 'Browse Subfolders', **kwargs)
         self.image_dir: ImageDir = image_dir
+        self.last_dir: ImageDir | None = last_dir
 
     def get_pre_window_layout(self) -> Layout:
         yield [Text('End of folder reached.  Do you want to continue in another folder?')]
@@ -188,7 +228,7 @@ class DirPicker(View, is_popup=True):
         yield [Text('<-', size=(12, 1)), Text('= previous folder level (..)')]
 
     def _dirs(self) -> Iterator[str, int | str]:
-        for path in sorted(self.image_dir.path.parent.iterdir()):
+        for path in sorted(self.image_dir.path.iterdir()):
             if path.is_dir():
                 try:
                     yield path.name, len(ImageDir(path))
@@ -198,46 +238,70 @@ class DirPicker(View, is_popup=True):
     @cached_property(block=False)
     def table(self) -> Table:
         nk, ck = self.name_key, self.count_key
-        rows = [{nk: '.', ck: len(self.image_dir)}, {nk: '..', ck: '?'}, *({nk: n, ck: c} for n, c in self._dirs())]
+        rows = [{nk: '..', ck: '?'}, {nk: '.', ck: len(self.image_dir)}, *({nk: n, ck: c} for n, c in self._dirs())]
         columns = (TableColumn(nk, width=rows), TableColumn(ck, anchor_values='e', width=rows))
-        return Table(*columns, data=rows, key='table', select_mode='browse', focus=True)
-
-    def get_results(self) -> Path | None:
-        results = super().get_results()
-        img_dir_path = self.image_dir.path
-        if self.go_to_parent:
-            return self._go_to_parent(img_dir_path)
-        elif not (self.submitted or results['submit']):
-            return None
-        try:
-            dir_name = results['table'][0][self.name_key]
-        except (IndexError, KeyError):
-            return None
+        if (last_dir := self.last_dir) and last_dir.path != self.image_dir.path.parent:
+            focus_row = (nk, last_dir.path.name)
         else:
-            if dir_name == '.':
-                return img_dir_path
-            elif dir_name == '..':
-                return self._go_to_parent(img_dir_path)
-            return img_dir_path.parent.joinpath(dir_name)
+            focus_row = (nk, '.')
+        return Table(*columns, data=rows, key='table', select_mode='browse', focus=True, init_focus_row=focus_row)
 
-    def _go_to_parent(self, img_dir_path: Path) -> Path | None:  # noqa
-        if img_dir_path == img_dir_path.parent:
-            log.warning(f'No valid parent directory exists for {img_dir_path.as_posix()}')
+    def get_path_selection(self, results=None) -> Path | None:
+        if self.go_to_parent:
+            dir_name = '..'
+        else:
+            table = self.window['table'].value if results is None else results['table']
+            try:
+                dir_name = table[0][self.name_key]
+            except (IndexError, KeyError):
+                return None
+
+        log.debug(f'Selected {dir_name=}')
+        img_dir_path = self.image_dir.path
+        if dir_name == '.':
+            return img_dir_path
+        elif dir_name == '..':
+            if img_dir_path == img_dir_path.parent:
+                popup_warning(f'No valid parent directory exists for {img_dir_path.as_posix()}')
+                log.warning(f'No valid parent directory exists for {img_dir_path.as_posix()}')
+                return None
+            return img_dir_path.parent
+        else:
+            return img_dir_path.joinpath(dir_name)
+
+    def get_results(self) -> Path | ImageDir | None:
+        results = super().get_results()
+        chdir, submitted = self.submitted, results['submit']
+        if not (chdir or submitted):
+            # log.debug('No submission')
             return None
-        return DirPicker(ImageDir(img_dir_path.parent)).run()  # noqa
+        elif not (next_path := self.get_path_selection(results)):
+            # log.debug('No selection')
+            return None
+        elif next_path == self.image_dir.path:
+            # log.debug('Same path')
+            return next_path
+        elif (img_dir := ImageDir(next_path)) or img_dir.sub_dirs:
+            return self._change_dir(img_dir) if chdir else img_dir
+        else:
+            log.warning(f'Directory has no images or subdirectories: {next_path.as_posix()}')
+            popup_warning(f'Directory has no images or subdirectories: {next_path.as_posix()}')
+            return None
 
-    @event_handler('<space>', '<Right>')
-    def handle_submit(self, event: Event):
+    def _change_dir(self, img_dir: Path | ImageDir) -> Path | None:  # noqa
+        self.window.hide()
+        # TODO: Update table in-place instead
+        return DirPicker(ImageDir(img_dir), last_dir=self.image_dir).run()  # noqa
+
+    @event_handler('<space>', '<Right>', '<Left>')
+    def handle_chdir_key(self, event: Event):
+        self.go_to_parent = event.keysym == 'Left'
         self.submitted = True
-        self.window.interrupt(event)
-
-    @event_handler('<Left>')
-    def handle_parent_dir(self, event: Event):
-        self.go_to_parent = True
         self.window.interrupt(event)
 
 
 class ImageView(View):
+    # TODO: Show dir
     menu = MenuProperty(MenuBar)
     _last_size: XY = (0, 0)
     active_image: ActiveImage
@@ -368,14 +432,14 @@ class ImageView(View):
     def resize_image(self, size: XY | None, resize_mode: ImgResizeMode = ImageResizeMode.NONE):
         self._update(self.active_image.resize(size, resize_mode))
 
-    def update_image_dir(self, path: Path):
-        new_img_dir = ImageDir(path)
+    def update_image_dir(self, img_dir: Path | ImageDir):
+        new_img_dir = img_dir if isinstance(img_dir, ImageDir) else ImageDir(img_dir)
         try:
             img_path = new_img_dir[0]
         except IndexError:
-            log.warning(f'Selected directory={path.as_posix()!r} has no images')
+            log.warning(f'Selected directory={new_img_dir.path.as_posix()!r} has no images')
         else:
-            log.debug(f'Moving to new directory={path.as_posix()!r}')
+            log.debug(f'Moving to new directory={new_img_dir.path.as_posix()!r}')
             self.update_active_image(img_path, new_img_dir)
 
     def cycle_around(self):
@@ -464,11 +528,15 @@ class ImageView(View):
         if (index := image_dir.get_relative_index(self.active_image.path, delta)) is not None:
             self.update_active_image(image_dir[index], image_dir)
         else:
-            path: Path | None = DirPicker(image_dir).run()  # noqa
-            log.debug(f'Selected {path=}')
-            if not path or path == image_dir.path:
+            new_img_dir: Path | ImageDir | None = DirPicker(image_dir).run()  # noqa
+            log.debug(f'Selected {new_img_dir=}')
+
+            # if new_img_dir is None or new_img_dir == image_dir.path or new_img_dir == image_dir:
+            if new_img_dir is None:
+                pass
+            elif new_img_dir == image_dir.path or new_img_dir == image_dir:
                 self.cycle_around()
             else:
-                self.update_image_dir(path)
+                self.update_image_dir(new_img_dir)
 
     # endregion
