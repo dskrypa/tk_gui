@@ -61,7 +61,7 @@ class Window(BindMixin, RowContainer):
     # region Class Attrs
     config: GuiConfig = WindowConfigProperty()
     tk_load_profile: Bool = False
-    __hidden_root = None
+    __hidden_root: Tk | None = None
     _tk_event_handlers: dict[str, str] = {}
     _always_bind_events: set[BindEvent] = set()
     _instances: WeakSet[Window] = WeakSet()
@@ -86,9 +86,11 @@ class Window(BindMixin, RowContainer):
     icon: bytes = PYTHON_LOGO
     no_title_bar: bool = False
     modal: bool = False
+    global_cleanup_on_close: bool = True
     # endregion
     # region Pure Instance Attrs
     _finalizer: finalize
+    _child_windows: WeakSet[Window]
     element_map: dict[Key, Element]
     # endregion
 
@@ -101,6 +103,7 @@ class Window(BindMixin, RowContainer):
         title: str = None,
         *,
         show: Bool = True,
+        global_cleanup_on_close: Bool = True,
         # Init-only params
         min_size: XY = (200, 50),
         size: XY = None,
@@ -164,9 +167,11 @@ class Window(BindMixin, RowContainer):
         # Other params
         style: StyleSpec = None,
         show: Bool = True,
+        global_cleanup_on_close: Bool = True,
         **kwargs,
     ):
         self._instances.add(self)
+        self._child_windows = WeakSet()
         self.title = title or ProgramMetadata('').name.replace('_', ' ').title()
         self._init_config = InitConfig(**extract_kwargs(kwargs, _INIT_CFG_FIELDS))
 
@@ -193,7 +198,8 @@ class Window(BindMixin, RowContainer):
             self.binds.add('<Escape>', BindTargets.EXIT)
         if grab_anywhere:
             self.grab_anywhere = grab_anywhere
-        # self.kill_others_on_close = kill_others_on_close
+        if not global_cleanup_on_close:
+            self.global_cleanup_on_close = global_cleanup_on_close
         if show and (self.rows or (isinstance(show, int) and show > 1)):
             self.show()
 
@@ -210,6 +216,29 @@ class Window(BindMixin, RowContainer):
             size = pos = has_focus = None
         cls_name = self.__class__.__name__
         return f'<{cls_name}[{self._id}][{pos=}, {size=}, {has_focus=}, {modal=}, {title_bar=}, {rows=}, {title=}]>'
+
+    def __format__(self, format_spec: str) -> str:
+        if not format_spec:
+            return repr(self)
+        parts = []
+        if 'w' in format_spec:
+            parts.append(f'widget_id={self.root}')
+
+        show = {key: key[0] in format_spec for key in ('pos', 'size', 'focus')}
+        if any(show.values()):
+            try:
+                size, pos = self.true_size_and_pos
+                has_focus = self.has_focus
+            except AttributeError:  # No root
+                size = pos = has_focus = None
+            for key, val in {'pos': pos, 'size': size, 'focus': has_focus}.items():
+                if show[key]:
+                    parts.append(f'{key}={val!r}')
+
+        if 't' in format_spec:
+            parts.append(f'title={self.title!r}')
+
+        return f'<{self.__class__.__name__}[{self._id}][{", ".join(parts)}]>'
 
     # endregion
 
@@ -241,7 +270,9 @@ class Window(BindMixin, RowContainer):
 
         self._last_run = monotonic()
         while not self.closed and self._last_interrupt.time < self._last_run:
+            # log.debug(f'{self:wt}: Running tk event loop', extra={'color': 14})
             root.mainloop()
+            # log.debug(f'{self:wt}: Interrupted tk event loop', extra={'color': 11})
 
         if interrupt_id is not None:
             root.after_cancel(interrupt_id)
@@ -881,42 +912,49 @@ class Window(BindMixin, RowContainer):
 
     @classmethod
     def _close(cls, root: Top):
-        # TODO: If closed out of order, make sure to exit
-        log.debug(f'Closing: {root}')
+        log.debug(f'Closing: {root}', extra={'color': 9})
         root.quit()
-        # log.debug('  Updating...')
         try:
             root.update()  # Needed to actually close the window on Linux if user closed with X
         except Exception:  # noqa
             pass
-        # log.debug('  Destroying...')
         try:
             root.destroy()
             root.update()
         except Exception:  # noqa
             pass
-        # log.debug('  Done')
+        # log.debug(f'  Done closing {root}')
 
     def close(self, event: Event = None):
         self.closed = True
-        # self.interrupt(event)  # Prevent `run` from waiting for an interrupt that will not come if closed out of order
-        # if event and not self.has_focus:
-        #     log.debug(f'Ignoring {event=} for window={self}')
-        #     return
-        # log.debug(f'Closing window={self} due to {event=}')
+        # log.debug(f'Closing window={self:wt} due to {event=}', extra={'color': 13})
         try:
             obj, close_func, args, kwargs = self._finalizer.detach()
         except (TypeError, AttributeError):
             pass
         else:
-            # log.debug('Closing')
+            # log.debug(f'Closing window={self:wt}', extra={'color': 13})
+            self._close_child_windows()
             close_func(*args, **kwargs)
             self.root = None
             for close_cb in self.close_cbs:
                 # log.debug(f'Calling {close_cb=}')
                 close_cb()
-            # if self.kill_others_on_close:
-            #     self.close_all()
+
+            if self.global_cleanup_on_close:
+                cls = self.__class__
+                cls.__hidden_root.after(500, cls.__maybe_close_hidden_root)
+
+    def _close_child_windows(self):
+        for window in tuple(self._child_windows):
+            if window.is_popup and not window.closed:
+                # log.debug(f'{self:wt}: Closing child={window:wt}')
+                window.close()
+
+    @classmethod
+    def __maybe_close_hidden_root(cls):
+        if not cls.get_active_windows():
+            cls.__close_hidden_root()
 
     @classmethod
     def __close_hidden_root(cls):
@@ -927,22 +965,6 @@ class Window(BindMixin, RowContainer):
         except AttributeError:
             pass
 
-    # @classmethod
-    # def close_all(cls):
-    #     instances = tuple(cls.__instances)
-    #     for window in instances:
-    #         window.kill_others_on_close = False  # prevent recursive calls of this method
-    #         window.close()
-    #     # while cls.__instances:
-    #     #     log.debug(f'Windows to close: {len(cls.__instances)}')
-    #     #     try:
-    #     #         window = cls.__instances.pop()
-    #     #     except KeyError:
-    #     #         pass
-    #     #     else:
-    #     #         window.kill_others_on_close = False  # prevent recursive calls of this method
-    #     #         window.close()
-
     # endregion
 
     def get_screenshot(self) -> PILImage:
@@ -951,14 +973,17 @@ class Window(BindMixin, RowContainer):
     @classmethod
     def get_active_windows(cls, is_popup: Bool = None, *, sort_by_last_focus: bool = False) -> list[Window]:
         if is_popup is None:
-            windows = [w for w in cls._instances if not w.closed]
+            windows = [w for w in tuple(cls._instances) if not w.closed]
         else:
-            windows = [w for w in cls._instances if not w.closed and w.is_popup == is_popup]
+            windows = [w for w in tuple(cls._instances) if not w.closed and w.is_popup == is_popup]
 
         if sort_by_last_focus:
             windows.sort(key=lambda w: w._last_focus, reverse=True)
 
         return windows
+
+    def register_child_window(self, window: Window):
+        self._child_windows.add(window)
 
 
 # region Initialization

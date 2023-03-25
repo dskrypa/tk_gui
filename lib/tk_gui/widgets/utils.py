@@ -21,6 +21,7 @@ __all__ = [
     'unbind', 'get_bound_events', 'log_bound_events',
     'get_config_str', 'log_config_str', 'WidgetData', 'log_event_widget_data', 'log_widget_data',
     'get_selection_pos', 'get_size_and_pos', 'get_req_size',
+    'NoWidgetFound',
 ]
 log = logging.getLogger(__name__)
 
@@ -38,7 +39,10 @@ def get_parent_or_none(widget: BaseWidget) -> BaseWidget | None:
     parent_parts = widget._w.split('.!')[:-1]  # noqa
     if len(parent_parts) < 2:
         return None
-    return widget.nametowidget('.!'.join(parent_parts))
+    try:
+        return widget.nametowidget('.!'.join(parent_parts))
+    except KeyError:
+        return None
 
 
 def get_root_widget(widget: BaseWidget | Misc | Top | Tk) -> Top | Tk:
@@ -50,23 +54,29 @@ def get_root_widget(widget: BaseWidget | Misc | Top | Tk) -> Top | Tk:
     root_id = '.!'.join(w_id.split('.!')[:2])
     if root_id == w_id:
         return widget
-    return widget.nametowidget(root_id)
+    try:
+        return widget.nametowidget(root_id)
+    except KeyError as e:
+        raise NoWidgetFound(root_id) from e
 
 
 def get_widget_ancestor(widget: BaseWidget, level: int = 1, permissive: Bool = True) -> BaseWidget:
     if level < 1:
         if permissive:
             return widget
-        raise ValueError(f'Invalid {level=} for {widget=} - must be greater than 0')
+        raise NoWidgetFound(f'Invalid {level=} for {widget=} - must be greater than 0')
 
     parts = widget._w.split('.!')  # noqa
     ancestor_parts = parts[:-level]
     if len(ancestor_parts) < 2:
         if not permissive:
-            raise ValueError(f'Invalid {level=} for {widget=} - it only has {len(parts) - 2} ancestors')
+            raise NoWidgetFound(f'Invalid {level=} for {widget=} - it only has {len(parts) - 2} ancestors')
         ancestor_parts = parts[:2]
 
-    return widget.nametowidget('.!'.join(ancestor_parts))
+    try:
+        return widget.nametowidget('.!'.join(ancestor_parts))
+    except KeyError as e:
+        raise NoWidgetFound('.!'.join(ancestor_parts)) from e
 
 
 # def get_widget_ancestor(widget: BaseWidget, level: int = 1, permissive: Bool = True) -> BaseWidget:
@@ -473,3 +483,7 @@ def _sequence_repr(data: Sequence, sort: Bool = False, indent: int = 0, val_repr
     inner = ' ' * (indent + 4)
     outer = ' ' * indent
     return '[\n' + ',\n'.join(f'{inner}{val_repr(v)}' for v in data) + f'\n{outer}]'
+
+
+class NoWidgetFound(Exception):
+    """Raised when no widget can be found via ``nametowidget``"""

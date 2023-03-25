@@ -161,6 +161,7 @@ class WindowInitializer(HandlesEvents, ABC):
         if parent := self.parent:
             if isinstance(parent, WindowInitializer):
                 parent = parent.window
+            parent.register_child_window(window)
             try:
                 window.move_to_center(parent)
             except AttributeError:

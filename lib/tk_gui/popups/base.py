@@ -64,7 +64,11 @@ class PopupMixin(ABC):
 
         if self.return_focus and (parent := self.parent):
             # log.debug(f'Returning focus to {parent=}')
-            parent.take_focus()
+            try:
+                parent.take_focus()
+            except AttributeError:  # Parent was already closed
+                pass
+
         return result
 
 
