@@ -368,6 +368,24 @@ class ImageView(View):
     def resize_image(self, size: XY | None, resize_mode: ImgResizeMode = ImageResizeMode.NONE):
         self._update(self.active_image.resize(size, resize_mode))
 
+    def update_image_dir(self, path: Path):
+        new_img_dir = ImageDir(path)
+        try:
+            img_path = new_img_dir[0]
+        except IndexError:
+            log.warning(f'Selected directory={path.as_posix()!r} has no images')
+        else:
+            log.debug(f'Moving to new directory={path.as_posix()!r}')
+            self.update_active_image(img_path, new_img_dir)
+
+    def cycle_around(self):
+        if (image_dir := self.active_image.image_dir) is None:
+            return
+        last_index = len(image_dir) - 1
+        img_index = image_dir.index(self.active_image.path)
+        index = last_index if img_index == 0 else 0
+        self.update_active_image(image_dir[index], image_dir)
+
     # endregion
 
     def _update(self, image: ResizedImage, frame: bool = False):
@@ -437,24 +455,20 @@ class ImageView(View):
     def handle_arrow_key_press(self, event: Event):
         if (image_dir := self.active_image.image_dir) is None:
             return
+
         # TODO: If zoomed in, increment scroll instead?  + add Up/Down handlers for this?
         delta = 5 if event.state & EventState.Control else 1
         if event.keysym == 'Left':
             delta = -delta
+
         if (index := image_dir.get_relative_index(self.active_image.path, delta)) is not None:
             self.update_active_image(image_dir[index], image_dir)
         else:
             path: Path | None = DirPicker(image_dir).run()  # noqa
             log.debug(f'Selected {path=}')
-            if not path:
-                return
-            new_img_dir = ImageDir(path)
-            try:
-                img_path = new_img_dir[0]
-            except IndexError:
-                log.warning(f'Selected directory={path.as_posix()!r} has no images')
+            if not path or path == image_dir.path:
+                self.cycle_around()
             else:
-                log.debug(f'Moving to new directory={path.as_posix()!r}')
-                self.update_active_image(img_path, new_img_dir)
+                self.update_image_dir(path)
 
     # endregion
