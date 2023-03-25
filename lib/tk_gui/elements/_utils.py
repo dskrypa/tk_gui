@@ -7,7 +7,10 @@ Tkinter GUI element utils
 from __future__ import annotations
 
 import logging
-from os import startfile
+try:
+    from os import startfile
+except ImportError:  # Non-Windows OS
+    startfile = None
 from pathlib import Path
 from subprocess import Popen
 from typing import Optional, Union

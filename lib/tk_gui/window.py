@@ -1035,7 +1035,10 @@ class WindowInitializer:
         if not init_config.resizable:
             root.resizable(False, False)
         if not init_config.can_minimize:
-            root.attributes('-toolwindow', 1)
+            try:
+                root.attributes('-toolwindow', 1)
+            except (TclError, RuntimeError) as e:
+                log.error(f'Unable to prevent window minimization: {e}')
         if window._keep_on_top:
             root.attributes('-topmost', 1)
         if (transparent_color := init_config.transparent_color) is not None:
