@@ -147,11 +147,11 @@ class ActiveImage:
         return self.image_dir.index(self.path) + 1
 
     def get_info_bar_data(self) -> dict[str, str]:
-        image = self.image
+        image, src_image = self.image, self.src_image
         mod_time, file_b, raw_b = self._file_info
-        width, height = image.size
+        width, height = src_image.size
         return {
-            'size': f'{width} x {height} x {image.bits_per_pixel} BPP',
+            'size': f'{width} x {height} x {src_image.bits_per_pixel} BPP',
             'dir_pos': f'{self.dir_index}/{len(self.image_dir)}' if self.image_dir else '1/1',
             'size_pct': f'{image.size_percent:.0%}',
             'size_bytes': f'{file_b} / {raw_b}',
@@ -306,7 +306,7 @@ class ImageView(View):
         except AttributeError:  # During init with no config_name
             return self._title
         else:
-            return f'{prefix}{self._title}{suffix})'
+            return f'{prefix}{self._title}{suffix}'
 
     @title.setter
     def title(self, value: str):
@@ -327,6 +327,10 @@ class ImageView(View):
 
     # region Layout
 
+    @cached_property(block=False)
+    def _style(self):
+        return self.window.style.sub_style(bg='#000000', border_width=0)
+
     def get_post_window_layout(self) -> Layout:
         if not self.standalone:
             yield [self.menu]
@@ -335,14 +339,14 @@ class ImageView(View):
 
     @cached_property
     def info_bar(self) -> InfoBar:
-        sizes = {'size': (20, 1), 'dir_pos': (8, 1), 'size_pct': (6, 1), 'size_bytes': (20, 1), 'mod_time': (20, 1)}
-        data = {key: (val, sizes[key]) for key, val in self.active_image.get_info_bar_data().items()}
-        return InfoBar.from_dict(data)
+        return InfoBar.from_dict(self.active_image.get_info_bar_data())
 
     @cached_property
     def gui_image(self) -> ScrollableImage:
-        style = self.window.style.sub_style(bg='#000000', border_width=0)
-        return ScrollableImage(None, size=self._window_box.size, pad=(0, 0), anchor='c', style=style)
+        # return ScrollableImage(None, size=self._window_box.size, pad=(0, 0), anchor='c', style=self._style)
+        return ScrollableImage(
+            None, size=self._window_box.size, pad=(0, 0), style=self._style, expand=True, fill='both'
+        )
 
     def finalize_window(self) -> Window:
         window = super().finalize_window()
@@ -369,8 +373,9 @@ class ImageView(View):
     def _update(self, image: ResizedImage, frame: bool = False):
         self.gui_image.update(image, image.size)
         self.window.set_title(self.title)
-        self.info_bar.update(self.active_image.get_info_bar_data())
+        self.info_bar.update(self.active_image.get_info_bar_data(), auto_resize=True)
         if frame:
+            # TODO: Why is this still needed with expand=True, fill=both?
             self._update_frame_size(self.window.true_size)
 
     def _update_frame_size(self, size: XY):
