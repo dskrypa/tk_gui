@@ -130,6 +130,7 @@ class Table(Interactive, base_style_layer='table'):
         select_mode: SelectMode = None,
         scroll_y: bool = True,
         scroll_x: bool = False,
+        init_focus_row: int | tuple[str, str | int] | None = 0,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -145,6 +146,7 @@ class Table(Interactive, base_style_layer='table'):
         self.scroll_x = scroll_x
         self.scroll_y = scroll_y
         self._tree_ids = []
+        self._init_focus_row = init_focus_row
 
     @property
     def value(self) -> TableRows:
@@ -163,6 +165,13 @@ class Table(Interactive, base_style_layer='table'):
         columns = [TableColumn(key, key.replace('_', ' ').title(), data) for key in keys]
         return cls(*columns, data=data, **kwargs)
 
+    def set_focus_on_value(self, key: str, value: Union[str, int]):
+        for i, row in enumerate(self.data):
+            if row[key] == value:
+                self.set_focus_on_row(i)
+                return
+        raise ValueError(f'Unable to find row with {key=} {value=}')
+
     def set_focus_on_row(self, n: int):
         tree_view = self.tree_view
         child_id = tree_view.get_children()[n]
@@ -174,7 +183,12 @@ class Table(Interactive, base_style_layer='table'):
             self.tree_view.focus_force()
         else:
             self.tree_view.focus_set()
-        self.set_focus_on_row(0)
+
+        if (focus_row := self._init_focus_row) is not None:
+            try:
+                self.set_focus_on_value(*focus_row)
+            except TypeError:
+                self.set_focus_on_row(focus_row)
 
     def enable(self):
         pass

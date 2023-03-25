@@ -67,6 +67,7 @@ class PickFile(FilePopup):
 
     def __init__(self, initial_dir: PathLike = None, file_types: FileTypes = None, title: str = None, **kwargs):
         super().__init__(initial_dir, title=title, **kwargs)
+        # TODO: On linux, this seems to be a Tk dialog, not native
         self.file_types = file_types
 
     def _dialog_kwargs(self):

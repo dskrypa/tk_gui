@@ -389,6 +389,7 @@ class Text(TextValueMixin, LinkableMixin, Element):
             'takefocus': int(self.allow_focus),
             **self.style_config,
         }
+        # TODO: On linux, text anchoring within box is equivalent to N instead of C...  Looks bad.
         try:
             kwargs['width'] = self._init_size(kwargs.get('font'))[0]
         except TypeError:
