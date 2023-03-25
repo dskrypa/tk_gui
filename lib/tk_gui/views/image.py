@@ -537,6 +537,16 @@ class ImageView(View):
         if path := pick_file_popup(self.active_image.src_image.path.parent, title='Pick Image', parent=self.window):
             self.update_active_image(path)
 
+    @event_handler(r'<\>')
+    def handle_switch_dir_key_press(self, event: Event):
+        if (image_dir := self.active_image.image_dir) is None:
+            return
+
+        new_img_dir: Path | ImageDir | None = DirPicker(image_dir).run()  # noqa
+        log.debug(f'Selected {new_img_dir=}')
+        if new_img_dir and new_img_dir != image_dir.path and new_img_dir != image_dir:
+            self.update_image_dir(new_img_dir)
+
     @event_handler('<Left>', '<Control-Left>', '<Right>', '<Control-Right>')
     def handle_arrow_key_press(self, event: Event):
         if (image_dir := self.active_image.image_dir) is None:
