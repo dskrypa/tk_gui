@@ -50,11 +50,32 @@ class TextValueMixin(TraceCallbackMixin):
     _value: str
     _move_cursor: bool = False
     _auto_size: bool = True
+    _pad_width: int = 0
 
     def __init_subclass__(cls, move_cursor: bool = False, **kwargs):
         super().__init_subclass__(**kwargs)
         if move_cursor:
             cls._move_cursor = move_cursor
+
+    def init_text_value(
+        self,
+        value: Any = '',
+        strip: Bool = False,
+        justify: _Justify = None,
+        change_cb: TraceCallback = None,
+        auto_size: Bool = True,
+        pad_width: int = 0,
+    ):
+        if strip:
+            self.strip = strip
+        self.value = value
+        self.justify = justify
+        if change_cb:
+            self.var_change_cb = change_cb
+        if pad_width:
+            self._pad_width = pad_width
+        if not auto_size:
+            self._auto_size = auto_size
 
     @property
     def value(self) -> str:
@@ -102,18 +123,28 @@ class TextValueMixin(TraceCallbackMixin):
         except TypeError:
             return 1
 
-    def _init_size(self, font: Font) -> Optional[XY]:
+    def _init_size(self, font: Font, multiline: bool = False) -> Optional[XY]:
         try:
             width, size = self.size
         except TypeError:
             pass
         else:
             return width, size
-        if not self._auto_size or not self._value:
+
+        return self._calc_size(font, multiline) if self._auto_size else None
+
+    def _calc_size(self, font: Font, multiline: bool = False) -> Optional[XY]:
+        if not (text := self._value):
             return None
-        lines = self._value.splitlines()
-        width = max(map(len, lines))
-        height = len(lines)
+
+        if multiline:
+            lines = text.splitlines()
+            width = max(map(len, lines))
+            height = len(lines) + self._pad_width
+        else:
+            width = len(text) + self._pad_width
+            height = 1
+
         if (font and 'bold' in font) or not (self.expand and self.fill in ('x', 'both', True)):
             # TODO: The expand/fill condition seems to only be necessary when the value contains a thin char like
             #  lower-case L
@@ -125,11 +156,13 @@ class LinkableMixin:
     __link: Optional[LinkTarget] = None
     __bound_id: str | None = None
     _tooltip_text: str | None
+    _calc_size: Callable
     add_tooltip: Callable
     pack_widget: Callable
     grid_widget: Callable
     widget: Union[TkLabel, Entry]
     style: Style
+    style_config: dict[str, Any]
     base_style_layer_and_state: tuple[StyleLayer, StyleState]
     size_and_pos: tuple[XY, XY]
     value: str
@@ -212,11 +245,13 @@ class LinkableMixin:
             return
         link.open(event)
 
-    def update(self, value: Any = None, link: _Link = None):
+    def update(self, value: Any = None, link: _Link = None, auto_resize: Bool = False):
         if value is not None:
             self.value = value
         if link is not None:
             self.update_link(link)
+        if auto_resize and (size := self._calc_size(self.style_config.get('font'))):
+            self.widget.configure(width=size[0])
 
     def _init_widget(self, tk_container: TkContainer):
         raise NotImplementedError
@@ -246,23 +281,19 @@ class Label(TextValueMixin, LinkableMixin, Element, base_style_layer='text'):
         anchor_info: _Anchor = None,
         link_bind: str = None,
         auto_size: Bool = True,
+        pad_width: int = 0,
         strip: Bool = False,
         change_cb: TraceCallback = None,
         **kwargs,
     ):
-        self.strip = strip
-        self.value = value
-        self.init_linkable(link, link_bind, kwargs.pop('tooltip', None))
         if justify is anchor_info is None:
             justify = Justify.LEFT
             anchor_info = justify.as_anchor()
+        self.init_text_value(value, strip, justify, change_cb, auto_size, pad_width)
+        self.init_linkable(link, link_bind, kwargs.pop('tooltip', None))
         super().__init__(**kwargs)
-        self.justify = justify
-        if change_cb:
-            self.var_change_cb = change_cb
         if anchor_info:
             self.anchor_info = Anchor(anchor_info)
-        self._auto_size = auto_size
 
     @property
     def pad_kw(self) -> dict[str, int]:
@@ -290,7 +321,7 @@ class Label(TextValueMixin, LinkableMixin, Element, base_style_layer='text'):
             **self.style_config,
         }
         try:
-            kwargs['width'], kwargs['height'] = self._init_size(kwargs.get('font'))
+            kwargs['width'], kwargs['height'] = self._init_size(kwargs.get('font'), True)
         except TypeError:
             pass
 
@@ -311,19 +342,15 @@ class Text(TextValueMixin, LinkableMixin, Element):
         justify: _Justify = None,
         link_bind: str = None,
         auto_size: Bool = True,
+        pad_width: int = 0,
         use_input_style: Bool = False,
         strip: Bool = False,
         change_cb: TraceCallback = None,
         **kwargs,
     ):
-        self.strip = strip
-        self.value = value
+        self.init_text_value(value, strip, justify, change_cb, auto_size, pad_width)
         self.init_linkable(link, link_bind, kwargs.pop('tooltip', None))
         super().__init__(**kwargs)
-        self.justify = justify
-        if change_cb:
-            self.var_change_cb = change_cb
-        self._auto_size = auto_size
         self._use_input_style = use_input_style
 
     @property
@@ -413,18 +440,16 @@ class Input(TextValueMixin, LinkableMixin, InteractiveText, disabled_state='read
         callback: BindTarget = None,                                # Key press callback
         change_cb: TraceCallback = None,                            # Value change callback
         strip: Bool = False,
+        auto_size: Bool = True,
+        pad_width: int = 0,
         **kwargs,
     ):
-        self.strip = strip
-        self.value = value
+        self.init_text_value(value, strip, justify, change_cb, auto_size, pad_width)
         self.init_linkable(link, link_bind, kwargs.pop('tooltip', None))
         super().__init__(**kwargs)
-        self.justify = justify
         self._callback = callback
         if password_char:
             self.password_char = password_char
-        if change_cb:
-            self.var_change_cb = change_cb
 
     @property
     def style_config(self) -> dict[str, Any]:
@@ -447,7 +472,7 @@ class Input(TextValueMixin, LinkableMixin, InteractiveText, disabled_state='read
             **self.style_config,
         }
         try:
-            kwargs['width'] = self.size[0]
+            kwargs['width'] = self._init_size(kwargs.get('font'))[0]
         except TypeError:
             pass
         if self.disabled:
@@ -458,13 +483,20 @@ class Input(TextValueMixin, LinkableMixin, InteractiveText, disabled_state='read
         if (callback := self._callback) is not None:
             entry.bind('<Key>', self.normalize_callback(callback), add=True)
 
-    def update(self, value: Any = None, disabled: Bool = None, password_char: str = None, link: _Link = None):
+    def update(
+        self,
+        value: Any = None,
+        disabled: Bool = None,
+        password_char: str = None,
+        link: _Link = None,
+        auto_resize: Bool = False,
+    ):
         if disabled is not None:
             self._update_state(disabled)
         if password_char is not None:
             self.widget.configure(show=password_char)
             self.password_char = password_char
-        super().update(value, link)
+        super().update(value, link, auto_resize)
 
     # region Update State
 
