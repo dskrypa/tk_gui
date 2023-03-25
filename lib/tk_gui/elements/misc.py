@@ -19,7 +19,7 @@ from .text import Text
 if TYPE_CHECKING:
     from tk_gui.enums import Side
     from tk_gui.pseudo_elements import Row
-    from tk_gui.typing import XY, TkContainer, E, TkSide, TkFill
+    from tk_gui.typing import XY, TkContainer, E, TkSide, TkFill, Bool
 
 __all__ = ['SizeGrip', 'Spacer', 'InfoBar']
 
@@ -72,15 +72,17 @@ class InfoBar(RowFrame):
         self.element_map = element_map
 
     @classmethod
-    def from_dict(cls, data: dict[str, str | tuple[str, XY]], **kwargs) -> InfoBar:
+    def from_dict(cls, data: dict[str, str | tuple[str, XY]], text_pad_width: int = 2, **kwargs) -> InfoBar:
         element_map = {}
         for key, val in data.items():
-            # TODO: Implement/improve auto-sizing for these fields
             if isinstance(val, tuple):
                 val, size = val
             else:
                 size = None
-            element_map[key] = Text(val, size=size, use_input_style=True, justify='c', pad=(1, 0))
+
+            element_map[key] = Text(
+                val, size=size, use_input_style=True, justify='c', pad=(0, 0), pad_width=text_pad_width
+            )
 
         return cls(element_map, **kwargs)
 
@@ -94,7 +96,7 @@ class InfoBar(RowFrame):
     def __setitem__(self, key: str, value: str):
         self.element_map[key].update(value)
 
-    def update(self, data: dict[str, str]):
+    def update(self, data: dict[str, str], auto_resize: Bool = False):
         element_map = self.element_map
         for key, val in data.items():
-            element_map[key].update(val)
+            element_map[key].update(val, auto_resize=auto_resize)
