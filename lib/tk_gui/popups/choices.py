@@ -70,6 +70,24 @@ class ChooseItemPopup(ChoiceMapPopup[K, V]):
             items = {repr_func(i): i for i in items}
         super().__init__(items, **kwargs)
 
+    def get_frame_size(self) -> XY | None:
+        m_width, m_height = self.get_monitor().size
+
+        per_item_width = 20  # TODO: Calculate properly
+        per_item_height = 30  # TODO: Calculate properly
+        items_shown = max(1, min(m_height // per_item_height, len(self.items)))
+        max_line_len = max(map(len, self.items))
+
+        max_frame_width = (m_width - 130) - 150  # TODO: Fix
+        if (frame_width := max_line_len * per_item_width) > max_frame_width:
+            frame_width = max_frame_width
+
+        max_frame_height = (m_height - 130) - 150  # max Window height: - 130
+        if (frame_height := items_shown * per_item_height) > max_frame_height:
+            frame_height = max_frame_height
+
+        return frame_width, frame_height
+
     @classmethod
     def with_auto_prompt(
         cls,
@@ -77,7 +95,7 @@ class ChooseItemPopup(ChoiceMapPopup[K, V]):
         *,
         repr_func: ReprFunc = repr,
         **kwargs,
-    ) -> ChooseItemPopup[K, V]:
+    ) -> ChooseItemPopup:
         items = {repr_func(i): i for i in items}
         return super().with_auto_prompt(items, **kwargs)
 

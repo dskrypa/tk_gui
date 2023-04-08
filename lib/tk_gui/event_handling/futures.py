@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Callable, TypeVar, ParamSpec, Generic
 
 if TYPE_CHECKING:
     from threading import Condition
-    from tkinter import BaseWidget
+    from ..window import Window
 
 __all__ = ['TkFuture', 'run_func_in_future']
 
@@ -22,24 +22,21 @@ T = TypeVar('T')
 class TkFuture(Generic[T], Future):
     _condition: Condition
     _state: str
-    _cb_id: str
-    _widget: BaseWidget
 
     @classmethod
     def submit(
-        cls, widget: BaseWidget, func: Callable[P, T], args: P.args = (), kwargs: P.kwargs = None, after_ms: int = 1
+        cls, window: Window, func: Callable[P, T], args: P.args = (), kwargs: P.kwargs = None, after_ms: int = 1
     ) -> TkFuture[T]:
         self = cls()
         wrapped = partial(run_func_in_future, self, func, args, kwargs)
-        self._widget = widget
-        self._cb_id = widget.after(after_ms, wrapped)
+        window.schedule_task(wrapped, after_ms)
         return self
 
-    def cancel(self) -> bool:
-        with self._condition:
-            if self._state == PENDING:
-                self._widget.after_cancel(self._cb_id)
-            return super().cancel()
+    # def cancel(self) -> bool:
+    #     with self._condition:
+    #         if self._state == PENDING:
+    #             self._widget.after_cancel(self._cb_id)
+    #         return super().cancel()
 
     def result(self, timeout=None) -> T:
         return super().result(timeout)

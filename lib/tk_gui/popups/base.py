@@ -52,17 +52,16 @@ class PopupMixin(ABC):
         raise NotImplementedError
 
     def run(self):
-        if current_thread() == main_thread():
+        if in_main_thread := current_thread() == main_thread():
             result = self._run()
         elif not (parent := self.parent):
             raise RuntimeError(f'Unable to run {self!r} with no parent Window')
         else:
-            # TODO: Does this even work?
-            log.debug(f'Enqueueing threaded popup={self!r}')
-            result = TkFuture.submit(parent.root, self._run).result()
+            log.debug(f'Enqueueing threaded popup={self!r} with {parent=}')
+            result = TkFuture.submit(parent, self._run).result()
             log.debug(f'Got threaded popup={self!r} {result=}')
 
-        if self.return_focus and (parent := self.parent):
+        if in_main_thread and self.return_focus and (parent := self.parent):
             # log.debug(f'Returning focus to {parent=}')
             try:
                 parent.take_focus()

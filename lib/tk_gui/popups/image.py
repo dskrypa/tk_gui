@@ -213,7 +213,14 @@ class BaseAnimatedPopup(Popup, ABC):
     def stop_animation(self, event: Event = None):
         self.gui_image.stop()
 
-    def run_task_in_thread(self, func: Callable[P, T], args: P.args = (), kwargs: P.kwargs = None) -> T:
+    def run_task_in_thread(
+        self,
+        func: Callable[P, T],
+        args: P.args = (),
+        kwargs: P.kwargs = None,
+        *,
+        poll_interval: float = 0.05,
+    ) -> T:
         """
         Primarily intended to be used with spinner animations.  Starts a Thread with the function as the target.  Once
         the function is complete, the animation stops, and the value returned by the function is returned.  If an
@@ -222,6 +229,7 @@ class BaseAnimatedPopup(Popup, ABC):
         :param func: The function to call in a thread.
         :param args: Positional arguments to pass to that function.
         :param kwargs: Keyword arguments to pass to that function.
+        :param poll_interval: The interval between checks to determine whether the task was completed
         :return: The return value from that function.
         """
         future = Future()
@@ -231,7 +239,7 @@ class BaseAnimatedPopup(Popup, ABC):
             func_thread.start()
             while True:
                 try:
-                    return future.result(0.05)
+                    return future.result(poll_interval)
                 except TimeoutError:
                     window.update()
 

@@ -10,6 +10,7 @@ import logging
 import tkinter as tk
 from dataclasses import dataclass
 from os import environ
+from queue import Queue, Empty as QueueEmpty
 from time import monotonic
 from tkinter import Tk, Toplevel, PhotoImage, TclError, Event, CallWrapper, BaseWidget
 from tkinter.ttk import Sizegrip, Scrollbar, Treeview
@@ -91,6 +92,7 @@ class Window(BindMixin, RowContainer):
     # region Pure Instance Attrs
     _finalizer: finalize
     _child_windows: WeakSet[Window]
+    _task_queue: Queue
     element_map: dict[Key, Element]
     # endregion
 
@@ -187,6 +189,7 @@ class Window(BindMixin, RowContainer):
         super().__init__(layout, style=style or self.config.style, **kwargs)
         self._event_cbs = BindMap()
         self._bound_for_events: set[str] = set()
+        self._task_queue = Queue()
         self.element_map = {}
         self.close_cbs = list(close_cbs) if close_cbs is not None else []
         if binds:
@@ -212,7 +215,7 @@ class Window(BindMixin, RowContainer):
         try:
             size, pos = self.true_size_and_pos
             has_focus = self.has_focus
-        except AttributeError:  # No root
+        except (AttributeError, RuntimeError):  # No root or not in main thread
             size = pos = has_focus = None
         cls_name = self.__class__.__name__
         return f'<{cls_name}[{self._id}][{pos=}, {size=}, {has_focus=}, {modal=}, {title_bar=}, {rows=}, {title=}]>'
@@ -229,7 +232,7 @@ class Window(BindMixin, RowContainer):
             try:
                 size, pos = self.true_size_and_pos
                 has_focus = self.has_focus
-            except AttributeError:  # No root
+            except (AttributeError, RuntimeError):  # No root or not in main thread
                 size = pos = has_focus = None
             for key, val in {'pos': pos, 'size': size, 'focus': has_focus}.items():
                 if show[key]:
@@ -270,6 +273,7 @@ class Window(BindMixin, RowContainer):
 
         self._last_run = monotonic()
         while not self.closed and self._last_interrupt.time < self._last_run:
+            self._process_scheduled_tasks()
             # log.debug(f'{self:wt}: Running tk event loop', extra={'color': 14})
             root.mainloop()
             # log.debug(f'{self:wt}: Interrupted tk event loop', extra={'color': 11})
@@ -295,8 +299,25 @@ class Window(BindMixin, RowContainer):
             self.show()
             self.root.update()
 
+        self._process_scheduled_tasks()
+
     def update_idle_tasks(self):
         self.root.update_idletasks()
+
+    def schedule_task(self, func: Callable, after_ms: int = 1):
+        # log.debug(f'{self:wt}.schedule_task: adding to queue: {func=}')
+        self._task_queue.put((func, after_ms))
+        self.root.quit()
+
+    def _process_scheduled_tasks(self):
+        while True:
+            try:
+                func, after_ms = self._task_queue.get_nowait()
+            except QueueEmpty:
+                break
+            else:
+                # log.debug(f'Scheduling task={func} after={after_ms} ms')
+                self.root.after(after_ms, func)
 
     def read(self, timeout: int) -> tuple[Optional[Key], dict[Key, Any], Optional[Event]]:
         self.run(timeout)
@@ -943,7 +964,10 @@ class Window(BindMixin, RowContainer):
 
             if self.global_cleanup_on_close:
                 cls = self.__class__
-                cls.__hidden_root.after(500, cls.__maybe_close_hidden_root)
+                try:
+                    cls.__hidden_root.after(500, cls.__maybe_close_hidden_root)
+                except AttributeError:  # hidden root was already destroyed
+                    pass
 
     def _close_child_windows(self):
         for window in tuple(self._child_windows):
