@@ -3,7 +3,7 @@
 import logging
 from pathlib import Path
 
-from cli_command_parser import Command, Action, Counter, Option, main
+from cli_command_parser import Command, Action, Counter, main
 
 from tk_gui.__version__ import __author_email__, __version__, __author__, __url__  # noqa
 from tk_gui.elements import Table, Input, Text, ScrollFrame, SizeGrip
@@ -36,7 +36,6 @@ class BaseRightClickMenu(Menu):
 class GuiTest(Command):
     action = Action(help='The test to perform')
     verbose = Counter('-v', default=2, help='Increase logging verbosity (can specify multiple times)')
-    color = Option('-c', help='The initial color to display when action=pick_color')
 
     def _init_command_(self):
         logging.getLogger('PIL').setLevel(50)
@@ -44,8 +43,7 @@ class GuiTest(Command):
             from ds_tools.logging import init_logging
         except ImportError:
             log_fmt = '%(asctime)s %(levelname)s %(name)s %(lineno)d %(message)s' if self.verbose > 1 else '%(message)s'
-            level = logging.DEBUG if self.verbose else logging.INFO
-            logging.basicConfig(level=level, format=log_fmt)
+            logging.basicConfig(level=logging.DEBUG if self.verbose else logging.INFO, format=log_fmt)
         else:
             init_logging(self.verbose, log_path=None, names=None)
 

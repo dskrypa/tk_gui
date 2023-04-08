@@ -17,8 +17,7 @@ class Clock(Command):
     def __init__(self):
         logging.getLogger('PIL.PngImagePlugin').setLevel(50)
         log_fmt = '%(asctime)s %(levelname)s %(name)s %(lineno)d %(message)s' if self.verbose > 1 else '%(message)s'
-        level = logging.DEBUG if self.verbose else logging.INFO
-        logging.basicConfig(level=level, format=log_fmt)
+        logging.basicConfig(level=logging.DEBUG if self.verbose else logging.INFO, format=log_fmt)
 
     def main(self):
         ClockView(seconds=not self.no_seconds, fg=self.color, bg=self.background).run()

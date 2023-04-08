@@ -30,8 +30,7 @@ class GuiInputTest(Command):
             from ds_tools.logging import init_logging
         except ImportError:
             log_fmt = '%(asctime)s %(levelname)s %(name)s %(lineno)d %(message)s' if self.verbose > 1 else '%(message)s'
-            level = logging.DEBUG if self.verbose else logging.INFO
-            logging.basicConfig(level=level, format=log_fmt)
+            logging.basicConfig(level=logging.DEBUG if self.verbose else logging.INFO, format=log_fmt)
         else:
             init_logging(self.verbose, log_path=None, names=None)
 

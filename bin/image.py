@@ -3,7 +3,7 @@
 import logging
 from pathlib import Path
 
-from cli_command_parser import Command, Positional, Counter, Option, Flag, main, inputs
+from cli_command_parser import Command, Positional, Counter, main, inputs
 
 from tk_gui.__version__ import __author_email__, __version__, __author__, __url__  # noqa
 from tk_gui.views.image import ImageView
@@ -19,8 +19,7 @@ class ImageViewer(Command):
             from ds_tools.logging import init_logging
         except ImportError:
             log_fmt = '%(asctime)s %(levelname)s %(name)s %(lineno)d %(message)s' if self.verbose > 1 else '%(message)s'
-            level = logging.DEBUG if self.verbose else logging.INFO
-            logging.basicConfig(level=level, format=log_fmt)
+            logging.basicConfig(level=logging.DEBUG if self.verbose else logging.INFO, format=log_fmt)
         else:
             init_logging(self.verbose, log_path=None, names=None)
 
