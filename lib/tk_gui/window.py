@@ -693,7 +693,10 @@ class Window(BindMixin, RowContainer):
     def _init_fix_focus(self):
         if (element := self.__focus_ele) is None:
             return
-        focus_id: str = self.root.focus_get()._w  # noqa
+        try:
+            focus_id: str = self.root.focus_get()._w  # noqa
+        except AttributeError:
+            return
         ele_id: str = element.widget._w  # noqa
         if not focus_id.startswith(ele_id):
             log.debug(f'Setting focus on {element}')
