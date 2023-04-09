@@ -22,6 +22,7 @@ from tk_gui.utils import Inheritable, max_line_len, call_with_popped
 from tk_gui.widgets.scroll import ScrollableText
 from tk_gui.widgets.utils import unbind
 from ..element import Element, Interactive
+from ..exceptions import MultilineContextError
 from ..mixins import DisableableMixin, TraceCallbackMixin
 from .links import LinkTarget, _Link
 
@@ -349,6 +350,7 @@ class Text(TextValueMixin, LinkableMixin, Element):
         **kwargs,
     ):
         self.init_text_value(value, strip, justify, change_cb, auto_size, pad_width)
+        # TODO: Also bind link to middle click
         self.init_linkable(link, link_bind, kwargs.pop('tooltip', None))
         super().__init__(**kwargs)
         self._use_input_style = use_input_style
@@ -709,7 +711,7 @@ class Multiline(InteractiveText, disabled_state='disabled'):
 
     def __enter__(self) -> Multiline:
         if self.__entered:
-            raise RuntimeError(f'{self} does not support entering its context multiple times')
+            raise MultilineContextError(f'{self} does not support entering its context multiple times')
         self.__entered = True
         # if self._read_only and not self.disabled:
         #     self.widget.inner_widget.configure(state='normal')

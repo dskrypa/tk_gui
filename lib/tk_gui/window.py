@@ -62,7 +62,7 @@ class Window(BindMixin, RowContainer):
     # region Class Attrs
     config: GuiConfig = WindowConfigProperty()
     tk_load_profile: Bool = False
-    __hidden_root: Tk | None = None
+    _hidden_root: HiddenRoot | None = None
     _tk_event_handlers: dict[str, str] = {}
     _always_bind_events: set[BindEvent] = set()
     _instances: WeakSet[Window] = WeakSet()
@@ -674,21 +674,9 @@ class Window(BindMixin, RowContainer):
         self._finalizer = finalize(self, self._close, root)
 
     @classmethod
-    def _init_hidden_root(cls):
-        tk_cls = Tk if cls.tk_load_profile else NoProfileTk
-        Window.__hidden_root = hidden_root = tk_cls()
-        hidden_root.attributes('-alpha', 0)  # Hide this window
-        try:
-            hidden_root.wm_overrideredirect(True)
-        except (TclError, RuntimeError):
-            log.error('Error overriding redirect for hidden root:', exc_info=True)
-        hidden_root.withdraw()
-        Window.__hidden_finalizer = finalize(Window, Window.__close_hidden_root)
-
-    @classmethod
     def _ensure_tk_is_initialized(cls):
-        if cls.__hidden_root is None:
-            cls._init_hidden_root()
+        if cls._hidden_root is None:
+            cls._hidden_root = HiddenRoot()
 
     def _init_fix_focus(self):
         if (element := self.__focus_ele) is None:
@@ -966,9 +954,8 @@ class Window(BindMixin, RowContainer):
                 close_cb()
 
             if self.global_cleanup_on_close:
-                cls = self.__class__
                 try:
-                    cls.__hidden_root.after(500, cls.__maybe_close_hidden_root)
+                    self._hidden_root.schedule_close()
                 except AttributeError:  # hidden root was already destroyed
                     pass
 
@@ -977,20 +964,6 @@ class Window(BindMixin, RowContainer):
             if window.is_popup and not window.closed:
                 # log.debug(f'{self:wt}: Closing child={window:wt}')
                 window.close()
-
-    @classmethod
-    def __maybe_close_hidden_root(cls):
-        if not cls.get_active_windows():
-            cls.__close_hidden_root()
-
-    @classmethod
-    def __close_hidden_root(cls):
-        # log.debug('Closing hidden Tk root')
-        try:
-            cls.__hidden_root.destroy()
-            cls.__hidden_root = None
-        except AttributeError:
-            pass
 
     # endregion
 
@@ -1011,6 +984,54 @@ class Window(BindMixin, RowContainer):
 
     def register_child_window(self, window: Window):
         self._child_windows.add(window)
+
+
+class HiddenRoot:
+    __slots__ = ('root', '_close_cb_id', '_finalizer', '__weakref__')
+    tk_load_profile: bool = False
+
+    def __init__(self):
+        tk_cls = Tk if self.tk_load_profile else NoProfileTk
+        # log.debug('Initializing hidden root')
+        self.root = root = tk_cls()
+        root.attributes('-alpha', 0)  # Hide this window
+        try:
+            root.wm_overrideredirect(True)
+        except (TclError, RuntimeError):
+            log.error('Error overriding redirect for hidden root:', exc_info=True)
+        root.withdraw()
+        self._finalizer = finalize(self, self._close, root)
+        self._close_cb_id = None
+
+    def close(self):
+        if root := self.root:
+            if cb_id := self._close_cb_id:
+                try:
+                    root.after_cancel(cb_id)
+                except TclError:
+                    pass
+            self._close(root)
+            self.root = None
+
+    @classmethod
+    def _close(cls, root: Tk | NoProfileTk):
+        # log.debug(f'Closing hidden Tk {root=}')
+        try:
+            root.destroy()
+        except (AttributeError, TclError):
+            pass
+        Window._hidden_root = None
+
+    def schedule_close(self):
+        if not self._close_cb_id:
+            try:
+                self._close_cb_id = self.root.after(500, self.maybe_close)
+            except (AttributeError, TclError):  # hidden root was already destroyed
+                pass
+
+    def maybe_close(self):
+        if not Window.get_active_windows():
+            self.close()
 
 
 # region Initialization

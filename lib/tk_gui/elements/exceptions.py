@@ -5,7 +5,7 @@ Exceptions related to TK GUI elements.
 from ..exceptions import TkGuiException
 
 __all__ = [
-    'ElementGroupError', 'NoActiveGroup', 'BadGroupCombo',
+    'ElementGroupError', 'NoActiveGroup', 'BadGroupCombo', 'MultilineContextError',
     'CallbackError', 'CallbackAlreadyRegistered', 'NoCallbackRegistered'
 ]
 
@@ -20,6 +20,10 @@ class NoActiveGroup(ElementGroupError):
 
 class BadGroupCombo(ElementGroupError):
     """Exception raised when a bad combination of group members/choices are provided"""
+
+
+class MultilineContextError(TkGuiException):
+    """Raised when attempting to enter a Multiline element's context when it is already active."""
 
 
 # region Callback Exceptions

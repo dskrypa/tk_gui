@@ -10,6 +10,8 @@ from logging import NOTSET, DEBUG, Handler, Formatter, Logger, getLogger
 from tkinter import TclError
 from typing import TYPE_CHECKING, ContextManager
 
+from ..exceptions import MultilineContextError
+
 if TYPE_CHECKING:
     from .text import Multiline
 
@@ -30,7 +32,7 @@ class GuiTextHandler(Handler):
             self.element.write(msg + '\n', append=True)
         except RecursionError:  # See issue 36272
             raise
-        except TclError:
+        except (TclError, MultilineContextError):
             pass  # The element was most likely destroyed
         except Exception:  # noqa
             self.handleError(record)
