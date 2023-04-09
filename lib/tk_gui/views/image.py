@@ -8,7 +8,7 @@ import logging
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, TypeVar, ParamSpec, Iterator
+from typing import TYPE_CHECKING, Union, TypeVar, ParamSpec, Iterator
 
 from PIL.Image import registered_extensions
 
@@ -27,7 +27,7 @@ from .view import View
 
 if TYPE_CHECKING:
     from tkinter import Event
-    from tk_gui.typing import XY, Layout, ImageType, OptInt, ImgResizeMode
+    from tk_gui.typing import XY, Layout, ImageType, OptInt, ImgResizeMode  # noqa
     from tk_gui.window import Window
 
 __all__ = ['ImageView']
@@ -35,20 +35,10 @@ log = logging.getLogger(__name__)
 
 P = ParamSpec('P')
 T = TypeVar('T')
+AnyImage = Union['ImageType', ImageWrapper]
 
 
-class InfoLoc(MissingMixin, Enum):
-    NONE = 'none'
-    TITLE_BAR = 'title_bar'
-    FOOTER = 'footer'
-
-
-class MenuBar(Menu):
-    with MenuGroup('File'):
-        MenuItem('Open')
-        CloseWindow()
-    with MenuGroup('Help'):
-        MenuItem('About', AboutPopup)
+# region Directories
 
 
 class ImageDir:
@@ -147,19 +137,159 @@ class ImageDir:
     # endregion
 
 
+class EmptyImageDirError(Exception):
+    def __init__(self, path: Path):
+        self.path = path
+
+    def __str__(self) -> str:
+        return f'Directory has no images or subdirectories: {self.path.as_posix()}'
+
+
+class DirPicker(View, is_popup=True):
+    name_key, count_key = 'Folder', 'Image Files'
+    submitted = go_to_parent = False
+
+    def __init__(
+        self, image_dir: ImageDir, title: str = None, last_dir: ImageDir = None, init_dir: ImageDir = None, **kwargs
+    ):
+        log.debug(f'Initializing {self.__class__.__name__} for {image_dir=}')
+        kwargs.setdefault('margins', (0, 0))
+        kwargs.setdefault('exit_on_esc', True)
+        super().__init__(title=title or 'Browse Subfolders', **kwargs)
+        self.image_dir: ImageDir = image_dir
+        self.last_dir: ImageDir | None = last_dir
+        self.init_dir = image_dir if init_dir is None else init_dir
+
+    def get_pre_window_layout(self) -> Layout:
+        yield [Text('End of folder reached.  Do you want to continue in another folder?')]
+        yield [Text('You are in folder:')]
+        path_str = self.image_dir.path.as_posix()
+        yield [Text(path_str, use_input_style=True, size=(len(path_str) + 5, 1))]
+        buttons = [[Button('Use Folder', key='submit', bind_enter=True, side='t')], [Button('Cancel', side='t')]]
+        yield [self.table, Frame(buttons, anchor='n')]
+        yield [Text('-> or space', size=(12, 1)), Text('= enter the folder')]
+        yield [Text('<-', size=(12, 1)), Text('= previous folder level (..)')]
+
+    def _dirs(self) -> Iterator[str, int | str]:
+        for path in sorted(self.image_dir.path.iterdir()):
+            if path.is_dir():
+                try:
+                    yield path.name, len(ImageDir(path))
+                except PermissionError:
+                    pass
+
+    @cached_property(block=False)
+    def table(self) -> Table:
+        nk, ck = self.name_key, self.count_key
+        rows = [{nk: '..', ck: '?'}, {nk: '.', ck: len(self.image_dir)}, *({nk: n, ck: c} for n, c in self._dirs())]
+        columns = (TableColumn(nk, width=rows), TableColumn(ck, anchor_values='e', width=rows))
+        if (last_dir := self.last_dir) and last_dir.path != self.image_dir.path.parent:
+            focus_row = (nk, last_dir.path.name)
+        else:
+            focus_row = (nk, '.')
+        return Table(*columns, data=rows, key='table', select_mode='browse', focus=True, init_focus_row=focus_row)
+
+    def get_path_selection(self, results=None) -> Path | None:
+        if self.go_to_parent:
+            dir_name = '..'
+        else:
+            table = self.window['table'].value if results is None else results['table']
+            try:
+                dir_name = table[0][self.name_key]
+            except (IndexError, KeyError):
+                return None
+
+        log.debug(f'Selected {dir_name=}')
+        img_dir_path = self.image_dir.path
+        if dir_name == '.':
+            return img_dir_path
+        elif dir_name == '..':
+            if img_dir_path == img_dir_path.parent:
+                popup_warning(f'No valid parent directory exists for {img_dir_path.as_posix()}')
+                log.warning(f'No valid parent directory exists for {img_dir_path.as_posix()}')
+                return None
+            return img_dir_path.parent
+        else:
+            return img_dir_path.joinpath(dir_name)
+
+    def run(self, take_focus: bool = True):
+        with self.finalize_window()(take_focus=take_focus) as window:
+            while True:
+                window.run()
+                try:
+                    results = self.get_results()
+                except EmptyImageDirError as e:
+                    error_msg = str(e)
+                    log.warning(error_msg)
+                    popup_warning(error_msg)
+                    # TODO: Up/down arrows don't work after this, but left/right still works
+                else:
+                    break
+
+            self.cleanup()
+            return results
+
+    def get_results(self) -> Path | ImageDir | None:
+        results = super().get_results()
+        chdir, submitted = self.submitted, results['submit']
+        if not (chdir or submitted):
+            # log.debug('No submission')
+            return None
+        elif not (next_path := self.get_path_selection(results)):
+            # log.debug('No selection')
+            return None
+        elif next_path == self.image_dir.path:
+            # log.debug('Same path')
+            if not self.image_dir and self.image_dir != self.init_dir:
+                raise EmptyImageDirError(next_path)
+            return next_path
+        elif (img_dir := ImageDir(next_path)) or img_dir.sub_dirs or chdir:
+            # log.debug(f'Moving into {img_dir=}' if chdir else f'Returning {img_dir=}')
+            return self._change_dir(img_dir) if chdir else img_dir
+        else:
+            raise EmptyImageDirError(next_path)
+
+    def _change_dir(self, img_dir: Path | ImageDir) -> Path | None:  # noqa
+        self.window.hide()
+        # TODO: Update table in-place instead
+        return DirPicker(ImageDir(img_dir), last_dir=self.image_dir, init_dir=self.init_dir).run()  # noqa
+
+    @event_handler('<space>', '<Right>', '<Left>', '<Double-Button-1>')
+    def handle_chdir_key(self, event: Event):
+        self.go_to_parent = event.keysym == 'Left'
+        self.submitted = True
+        self.window.interrupt(event)
+
+
+# endregion
+
+
+# region Image Helpers
+
+
+class InfoLoc(MissingMixin, Enum):
+    NONE = 'none'
+    TITLE_BAR = 'title_bar'
+    FOOTER = 'footer'
+
+
+class MenuBar(Menu):
+    with MenuGroup('File'):
+        MenuItem('Open')
+        CloseWindow()
+    with MenuGroup('Help'):
+        MenuItem('About', AboutPopup)
+
+
 class ActiveImage:
     src_image: SourceImage
     image_dir: ImageDir | None = None
 
-    def __init__(
-        self, image: ImageType | ImageWrapper, new_size: XY = None, image_dir: ImageDir = None, standalone: bool = False
-    ):
+    def __init__(self, image: AnyImage, new_size: XY = None, image_dir: ImageDir = None, standalone: bool = False):
         self.src_image = SourceImage.from_image(image)
         self.image = image = self.src_image.as_size(new_size)
         log.debug(f'Initialized ActiveImage with {image=}')
-        if standalone:
-            self.image_dir = None
-        else:
+        if not standalone:
             self.image_dir = ImageDir(self.src_image.path.parent) if image_dir is None else image_dir
 
     @cached_property(block=False)
@@ -216,99 +346,7 @@ class ActiveImage:
         return self.resize(self.image.scale_percent(percent))
 
 
-class DirPicker(View, is_popup=True):
-    name_key, count_key = 'Folder', 'Image Files'
-    submitted = go_to_parent = False
-
-    def __init__(self, image_dir: ImageDir, title: str = None, last_dir: ImageDir = None, **kwargs):
-        log.debug(f'Initializing {self.__class__.__name__} for {image_dir=}')
-        kwargs.setdefault('margins', (0, 0))
-        kwargs.setdefault('exit_on_esc', True)
-        super().__init__(title=title or 'Browse Subfolders', **kwargs)
-        self.image_dir: ImageDir = image_dir
-        self.last_dir: ImageDir | None = last_dir
-
-    def get_pre_window_layout(self) -> Layout:
-        yield [Text('End of folder reached.  Do you want to continue in another folder?')]
-        yield [Text('You are in folder:')]
-        path_str = self.image_dir.path.as_posix()
-        yield [Text(path_str, use_input_style=True, size=(len(path_str) + 5, 1))]
-        buttons = [[Button('Use Folder', key='submit', bind_enter=True, side='t')], [Button('Cancel', side='t')]]
-        yield [self.table, Frame(buttons, anchor='n')]
-        yield [Text('-> or space', size=(12, 1)), Text('= enter the folder')]
-        yield [Text('<-', size=(12, 1)), Text('= previous folder level (..)')]
-
-    def _dirs(self) -> Iterator[str, int | str]:
-        for path in sorted(self.image_dir.path.iterdir()):
-            if path.is_dir():
-                try:
-                    yield path.name, len(ImageDir(path))
-                except PermissionError:
-                    pass
-
-    @cached_property(block=False)
-    def table(self) -> Table:
-        nk, ck = self.name_key, self.count_key
-        rows = [{nk: '..', ck: '?'}, {nk: '.', ck: len(self.image_dir)}, *({nk: n, ck: c} for n, c in self._dirs())]
-        columns = (TableColumn(nk, width=rows), TableColumn(ck, anchor_values='e', width=rows))
-        if (last_dir := self.last_dir) and last_dir.path != self.image_dir.path.parent:
-            focus_row = (nk, last_dir.path.name)
-        else:
-            focus_row = (nk, '.')
-        return Table(*columns, data=rows, key='table', select_mode='browse', focus=True, init_focus_row=focus_row)
-
-    def get_path_selection(self, results=None) -> Path | None:
-        if self.go_to_parent:
-            dir_name = '..'
-        else:
-            table = self.window['table'].value if results is None else results['table']
-            try:
-                dir_name = table[0][self.name_key]
-            except (IndexError, KeyError):
-                return None
-
-        log.debug(f'Selected {dir_name=}')
-        img_dir_path = self.image_dir.path
-        if dir_name == '.':
-            return img_dir_path
-        elif dir_name == '..':
-            if img_dir_path == img_dir_path.parent:
-                popup_warning(f'No valid parent directory exists for {img_dir_path.as_posix()}')
-                log.warning(f'No valid parent directory exists for {img_dir_path.as_posix()}')
-                return None
-            return img_dir_path.parent
-        else:
-            return img_dir_path.joinpath(dir_name)
-
-    def get_results(self) -> Path | ImageDir | None:
-        results = super().get_results()
-        chdir, submitted = self.submitted, results['submit']
-        if not (chdir or submitted):
-            # log.debug('No submission')
-            return None
-        elif not (next_path := self.get_path_selection(results)):
-            # log.debug('No selection')
-            return None
-        elif next_path == self.image_dir.path:
-            # log.debug('Same path')
-            return next_path
-        elif (img_dir := ImageDir(next_path)) or img_dir.sub_dirs:
-            return self._change_dir(img_dir) if chdir else img_dir
-        else:
-            log.warning(f'Directory has no images or subdirectories: {next_path.as_posix()}')
-            popup_warning(f'Directory has no images or subdirectories: {next_path.as_posix()}')
-            return None
-
-    def _change_dir(self, img_dir: Path | ImageDir) -> Path | None:  # noqa
-        self.window.hide()
-        # TODO: Update table in-place instead
-        return DirPicker(ImageDir(img_dir), last_dir=self.image_dir).run()  # noqa
-
-    @event_handler('<space>', '<Right>', '<Left>')
-    def handle_chdir_key(self, event: Event):
-        self.go_to_parent = event.keysym == 'Left'
-        self.submitted = True
-        self.window.interrupt(event)
+# endregion
 
 
 class ImageView(View):
@@ -320,7 +358,7 @@ class ImageView(View):
 
     def __init__(
         self,
-        image: ImageType | ImageWrapper,
+        image: AnyImage,
         title: str = None,
         standalone: bool = False,
         dir_loc: InfoLoc | str = InfoLoc.FOOTER,
@@ -336,6 +374,9 @@ class ImageView(View):
         self.window_kwargs['show'] = 2
         if size := self._new_window_size():
             self.window_kwargs['size'] = size
+
+    def _show_dir(self, location: InfoLoc) -> bool:
+        return self.dir_loc == location and not self.standalone
 
     # region Size
 
@@ -385,7 +426,7 @@ class ImageView(View):
     @property
     def title(self) -> str:
         try:
-            prefix, suffix = self.active_image.title_parts(self.dir_loc == InfoLoc.TITLE_BAR and not self.standalone)
+            prefix, suffix = self.active_image.title_parts(self._show_dir(InfoLoc.TITLE_BAR))
         except AttributeError:  # During init with no config_name
             return self._title
         else:
@@ -422,9 +463,7 @@ class ImageView(View):
 
     @cached_property
     def info_bar(self) -> InfoBar:
-        return InfoBar.from_dict(
-            self.active_image.get_info_bar_data(self.dir_loc == InfoLoc.FOOTER and not self.standalone)
-        )
+        return InfoBar.from_dict(self.active_image.get_info_bar_data(self._show_dir(InfoLoc.FOOTER)))
 
     @cached_property
     def gui_image(self) -> ScrollableImage:
@@ -445,7 +484,7 @@ class ImageView(View):
 
     # region Image Methods
 
-    def update_active_image(self, image: ImageType | ImageWrapper, image_dir: ImageDir = None):
+    def update_active_image(self, image: AnyImage, image_dir: ImageDir = None):
         src_image = SourceImage.from_image(image)
         self.active_image = ActiveImage(src_image, src_image.fit_inside_size(self._window_box.size), image_dir)
         self._update(self.active_image.image)
@@ -476,7 +515,7 @@ class ImageView(View):
     def _update(self, image: ResizedImage, frame: bool = False):
         self.gui_image.update(image, image.size)
         self.window.set_title(self.title)
-        info_bar_data = self.active_image.get_info_bar_data(self.dir_loc == InfoLoc.FOOTER and not self.standalone)
+        info_bar_data = self.active_image.get_info_bar_data(self._show_dir(InfoLoc.FOOTER))
         self.info_bar.update(info_bar_data, auto_resize=True)
         if frame:
             # TODO: Why is this still needed with expand=True, fill=both?
