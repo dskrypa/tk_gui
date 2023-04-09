@@ -192,3 +192,13 @@ class WindowInitializer(HandlesEvents, ABC):
         return self.window.results
 
     # endregion
+
+    def cleanup(self):
+        """
+        Intended to be overridden by subclasses to handle cleanup actions, such as canceling ``after`` callbacks,
+        before the window is closed.
+
+        Called by :meth:`.View.run` and :meth:`.Popup._run` after :meth:`.Window.run` returns, before calling
+        :meth:`.get_results`.
+        """
+        pass

@@ -213,6 +213,9 @@ class BaseAnimatedPopup(Popup, ABC):
     def stop_animation(self, event: Event = None):
         self.gui_image.stop()
 
+    def cleanup(self):
+        self.gui_image.stop()
+
     def run_task_in_thread(
         self,
         func: Callable[P, T],

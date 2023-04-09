@@ -127,6 +127,7 @@ class Popup(PopupMixin, WindowInitializer, is_popup=True):
     def _run(self):
         with self.finalize_window()(take_focus=True) as window:
             window.run()
+            self.cleanup()
             return self.get_results()
 
     def __enter__(self) -> Popup:

@@ -91,6 +91,7 @@ class View(WindowInitializer, ABC):
     def run(self, take_focus: bool = True) -> dict[Key, Any]:
         with self.finalize_window()(take_focus=take_focus) as window:
             window.run()
+            self.cleanup()
             return self.get_results()
 
     @classmethod
