@@ -30,10 +30,8 @@ class DuplicateKeyError(TkGuiException):
         self.window = window
 
     def __str__(self) -> str:
-        return (
-            f'Invalid key={self.key!r} for element={self.new!r} in window={self.window!r}'
-            f' - it is already associated with element={self.old!r}'
-        )
+        key, window, new, old = self.key, self.window, self.new, self.old
+        return f'Invalid {key=} for element={new!r} in {window=} - it is already associated with element={old!r}'
 
 
 class WindowClosed(TkGuiException):

@@ -103,6 +103,8 @@ class GuiConfig:
         self.is_popup = is_popup
         self.name = name
         self.path = normalize_path(path)
+        # TODO: If multiple instances of an app with the same name / config path are active, prevent issues...
+        #  - Don't let size/pos of one affect the other, especially during view transitions
 
     def __repr__(self) -> str:
         try:
