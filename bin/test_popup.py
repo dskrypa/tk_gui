@@ -74,49 +74,49 @@ class GuiPopupTest(Command):
         print(f'{results=}')
 
     @action
-    def popup_multiline(self):
+    def multiline(self):
         filler = 'the quick brown fox jumped over the lazy dog'
         popup_ok(f'{filler}\n{filler}')
 
     @action
-    def popup_warning(self):
+    def warning(self):
         popup_warning('This is a test warning!')
 
     @action
-    def popup_error(self):
+    def error(self):
         popup_error('This is a test error!')
 
     @action
-    def popup_yes_no(self):
+    def yes_no(self):
         result = popup_yes_no('This is a test!')
         print(f'{result=}')
 
     @action
-    def popup_no_yes(self):
+    def no_yes(self):
         result = popup_no_yes('This is a test!')
         print(f'{result=}')
 
     @action
-    def popup_ok(self):
+    def ok(self):
         popup_ok('This is a test!')
 
     @action
-    def popup_text(self):
+    def text(self):
         result = TextPromptPopup('Enter a string').run()
         print(f'{result=}')
 
     @action
-    def popup_text_cancel(self):
+    def text_cancel(self):
         result = TextPromptPopup('Enter a string', cancel_text='Cancel', bind_esc=True).run()
         print(f'{result=}')
 
     @action
-    def popup_login(self):
+    def login(self):
         user, pw = LoginPromptPopup('Enter your login info', cancel_text='Cancel').run()
         print(f'{user=}, {pw=}')
 
     @action
-    def popup_img_choice(self):
+    def image_choices(self):
         icons = Icons(500)
         items = {name: icons.draw(name) for name in tuple(icons.char_names)[:10]}
         # items = {name: ICONS_DIR.joinpath(name) for name in ('exclamation-triangle-yellow.png', 'search.png')}
@@ -124,8 +124,8 @@ class GuiPopupTest(Command):
         print(f'{result=}')
 
     @action
-    def popup_choice(self):
-        items = [f'Letter: {c}' for c in 'abcdefghijklmnopqrstuvwxyz']
+    def choices(self):
+        items = [f'Letter: {c}' for c in 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ']
         result = choose_item(items, item_name='Letter')
         print(f'{result=}')
 

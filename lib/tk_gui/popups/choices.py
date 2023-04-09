@@ -22,17 +22,19 @@ K = TypeVar('K')
 V = TypeVar('V')
 P = TypeVar('P', bound='ChoiceMapPopup')
 ReprFunc = Callable[[Any], str]
+KVMap = Mapping[K, V]
+Items = KVMap | Collection[V]
 
 
 class ChoiceMapPopup(Generic[K, V], BasicPopup):
-    def __init__(self, items: Mapping[K, V], **kwargs):
+    def __init__(self, items: KVMap, **kwargs):
         super().__init__(bind_esc=True, **kwargs)
         self.items = items
 
     @classmethod
     def with_auto_prompt(
         cls: Type[P],
-        items: Mapping[K, V],
+        items: KVMap,
         *,
         item_name: str = 'value',
         source: Any = '',
@@ -52,7 +54,7 @@ class ChoiceMapPopup(Generic[K, V], BasicPopup):
     def get_frame_size(self) -> XY | None:
         return None
 
-    def get_pre_window_layout(self):
+    def get_pre_window_layout(self) -> Layout:
         yield from self.prepare_text()
         submit_button = Button('Submit', disabled=True, bind_enter=True)
         with RadioGroup('item_choices', change_cb=lambda *a: submit_button.enable(), include_label=True):
@@ -65,50 +67,35 @@ class ChoiceMapPopup(Generic[K, V], BasicPopup):
 
 
 class ChooseItemPopup(ChoiceMapPopup[K, V]):
-    def __init__(self, items: Mapping[K, V] | Collection[V], *, repr_func: ReprFunc = repr, **kwargs):
+    def __init__(self, items: Items, *, repr_func: ReprFunc = repr, **kwargs):
         if not isinstance(items, Mapping):
             items = {repr_func(i): i for i in items}
         super().__init__(items, **kwargs)
 
     def get_frame_size(self) -> XY | None:
         m_width, m_height = self.get_monitor().size
+        chr_w, chr_h = self.style.text_size('A', 'radio')
 
-        per_item_width = 20  # TODO: Calculate properly
-        per_item_height = 30  # TODO: Calculate properly
-        items_shown = max(1, min(m_height // per_item_height, len(self.items)))
         max_line_len = max(map(len, self.items))
-
-        max_frame_width = (m_width - 130) - 150  # TODO: Fix
-        if (frame_width := max_line_len * per_item_width) > max_frame_width:
+        max_frame_width = m_width - 200
+        if (frame_width := max_line_len * chr_w) > max_frame_width:
             frame_width = max_frame_width
 
-        max_frame_height = (m_height - 130) - 150  # max Window height: - 130
-        if (frame_height := items_shown * per_item_height) > max_frame_height:
+        items_shown = max(1, min(m_height // chr_h, len(self.items)))
+        max_frame_height = m_height - 200
+        if (frame_height := items_shown * chr_h) > max_frame_height:
             frame_height = max_frame_height
 
         return frame_width, frame_height
 
     @classmethod
-    def with_auto_prompt(
-        cls,
-        items: Mapping[K, V] | Collection[V],
-        *,
-        repr_func: ReprFunc = repr,
-        **kwargs,
-    ) -> ChooseItemPopup:
+    def with_auto_prompt(cls, items: Items, *, repr_func: ReprFunc = repr, **kwargs) -> ChooseItemPopup:
         items = {repr_func(i): i for i in items}
         return super().with_auto_prompt(items, **kwargs)
 
 
 class ChooseImagePopup(ChoiceMapPopup[K, 'ImageType']):
-    def __init__(
-        self,
-        items: Mapping[K, ImageType],
-        *,
-        img_size: XY = (250, 250),
-        img_title_fmt: str = None,
-        **kwargs,
-    ):
+    def __init__(self, items: Mapping[K, ImageType], *, img_size: XY = (250, 250), img_title_fmt: str = None, **kwargs):
         super().__init__(items, **kwargs)
         self.img_size = img_size
         self.img_title_fmt = img_title_fmt
@@ -177,7 +164,7 @@ def _prepare_source(source: Any) -> str:
 
 
 def choose_item(
-    items: Mapping[K, V] | Collection[V],
+    items: Items,
     item_name: str = 'value',
     source: Any = '',
     *,

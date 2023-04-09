@@ -246,7 +246,7 @@ class Style(ClearableCachedPropertyMixin):
 
         :param text: The text for which the width should be measured.
         :param layer: The style layer containing the font that should be used .
-        :param state: The state of the specirfied style layer containing the font that should be used.
+        :param state: The state of the specified style layer containing the font that should be used.
         :return: The width of the given text.
         """
         tk_font: TkFont = getattr(self, layer).tk_font[state]
