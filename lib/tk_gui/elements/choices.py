@@ -472,6 +472,9 @@ def make_checkbox_grid(rows: list[Sequence[CheckBox]]):
 # endregion
 
 
+TTK_STYLE_COMBO_KEY_MAP = {'active': 'active', 'alternate': 'default', 'disabled': 'disabled', 'readonly': 'default'}
+
+
 class Combo(
     DisableableMixin, TraceCallbackMixin, Interactive,
     disabled_state='disable', enabled_state='enable', base_style_layer='combo',
@@ -495,7 +498,7 @@ class Combo(
         super().__init__(**kwargs)
         self.choices = tuple(choices)
         self.default = default
-        self.read_only = read_only
+        self.read_only = read_only  # TODO: Doesn't seem to do anything
         self.allow_any = allow_any
         self._callback = callback
         if change_cb:
@@ -579,15 +582,25 @@ class Combo(
     def _prepare_ttk_style(self) -> str:
         style, state = self.style, self.style_state
         ttk_style_name, ttk_style = self._ttk_style
+        combo, arrows = style.combo, style.arrows
+        fg, bg, arrow_fg, arrow_bg = combo.fg, combo.bg, arrows.fg, arrows.bg
         style_kwargs = {
-            **style.get_map('combo', state, foreground='fg', insertcolor='fg', fieldbackground='bg'),
-            **style.get_map('arrows', state, arrowcolor='fg', background='bg'),
-            # **style.get_map('selected', state, selectforeground='fg', selectbackground='bg'),
+            'foreground': fg.default,
+            'fieldbackground': bg.default,
+            'arrowcolor': arrow_fg.default,
+            'background': arrow_bg.default,
+            **style.get_map('combo', state, insertcolor='fg'),
         }
         ttk_style.configure(ttk_style_name, **style_kwargs)
-        if ro_bg := style.combo.bg[state]:
-            ttk_style.map(ttk_style_name, fieldbackground=[('readonly', ro_bg)])
 
+        keys = TTK_STYLE_COMBO_KEY_MAP.items()
+        ttk_style.map(
+            ttk_style_name,
+            foreground=[(ttk_key, fg[s_key]) for ttk_key, s_key in keys],
+            fieldbackground=[(ttk_key, bg[s_key]) for ttk_key, s_key in keys],
+            arrowcolor=[(ttk_key, arrow_fg[s_key]) for ttk_key, s_key in keys],
+            background=[(ttk_key, arrow_bg[s_key]) for ttk_key, s_key in keys],
+        )
         return ttk_style_name
 
     def _apply_ttk_style(self):

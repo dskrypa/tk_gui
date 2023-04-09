@@ -150,7 +150,7 @@ def _prep_input_eles(disabled: bool, include_label: bool = True):
     yield Rating(show_value=True, disabled=disabled)
     yield Slider(0, 10, tick_interval=2, disabled=disabled)
     yield ListBox(choices, size=(40, 5), disabled=disabled)
-    yield Combo(choices, size=(40, 10), disabled=disabled)
+    yield Combo(choices, 'cccccccccc', size=(40, 10), disabled=disabled)
     yield InteractiveScrollFrame(radios, size=(284, 100), scroll_y=True, disabled=disabled)
     yield Multiline('\n'.join(choices), size=(40, 5), disabled=disabled)
 

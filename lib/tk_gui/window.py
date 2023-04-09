@@ -915,7 +915,7 @@ class Window(BindMixin, RowContainer):
 
     # @_tk_event_handler(BindEvent.LEFT_CLICK, True)
     # def _handle_left_click(self, event: Event):
-    #     log_event_widget_data(self, event, prefix='Tkinter Click')
+    #     log_event_widget_data(self, event, prefix='Tkinter Click', show_ttk_info=True)
     #     # log_event_widget_data(self, event, prefix='Tkinter Click', show_config=True)
 
     # endregion
