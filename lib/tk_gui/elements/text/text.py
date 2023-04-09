@@ -10,6 +10,7 @@ import logging
 import tkinter.constants as tkc
 from abc import ABC, abstractmethod
 from functools import partial
+from pathlib import Path
 from tkinter import StringVar, Event, Entry, Label as TkLabel, Text as TkText, Frame as TkFrame
 from typing import TYPE_CHECKING, Optional, Union, Any, Callable, Generic, TypeVar
 
@@ -89,9 +90,12 @@ class TextValueMixin(TraceCallbackMixin):
 
     @value.setter
     def value(self, value: Any):
-        value = str(value)
-        if self.strip:
-            value = value.strip()
+        if isinstance(value, Path):
+            value = value.as_posix()
+        else:
+            value = str(value)
+            if self.strip:
+                value = value.strip()
         self._value = value
         try:
             self.string_var.set(value)
