@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from typing import TYPE_CHECKING, Protocol, TypeVar, Any, Union, Callable, Iterable, Optional, runtime_checkable
-from typing import Iterator, Literal, _ProtocolMeta  # noqa
+from typing import Hashable, Iterator, Literal
 
 if TYPE_CHECKING:
     from pathlib import Path  # noqa
@@ -42,6 +42,7 @@ BindTarget = Union[BindCallback, EventCallback, ButtonEventCB, 'BindTargets', st
 AnyEle = Union['ElementBase', 'Element']
 E = TypeVar('E', bound=AnyEle)
 ElementRow = Iterable[E]
+Key = Hashable
 
 PathLike = Union['Path', str]
 OptStr = Optional[str]
@@ -85,24 +86,6 @@ class HasParent(Protocol[T_co]):
         pass
 
 
-class KeyMeta(_ProtocolMeta):
-    __slots__ = ()
-
-    def __instancecheck__(self, instance) -> bool:
-        if not instance:
-            return False
-        try:
-            hash(instance)
-        except TypeError:
-            return False
-        return True
-
-
-@runtime_checkable
-class Key(Protocol, metaclass=KeyMeta):
-    __slots__ = ()
-
-
 @runtime_checkable
 class HasValue(Protocol[T_co]):
     __slots__ = ()
@@ -132,12 +115,16 @@ class ProvidesEventCallback(Protocol):
         pass
 
 
-class Layout(Protocol[E]):
+class _Layout(Protocol[E]):
     __slots__ = ()
 
     @abstractmethod
     def __iter__(self) -> Iterator[ElementRow | Row[E]]:
         pass
+
+
+# I thought just the Protocol should be enough, but PyCharm started to get confused by lists of lists of elements...
+Layout = Union[_Layout, list[ElementRow | Row[E]]]
 
 
 @runtime_checkable
