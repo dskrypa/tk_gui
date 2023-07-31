@@ -124,7 +124,10 @@ class _Layout(Protocol[E]):
 
 
 # I thought just the Protocol should be enough, but PyCharm started to get confused by lists of lists of elements...
-Layout = Union[_Layout, list[ElementRow | Row[E]]]
+if TYPE_CHECKING:
+    Layout = Union[_Layout, list[ElementRow | Row[E]]]
+else:
+    Layout = _Layout
 
 
 @runtime_checkable
