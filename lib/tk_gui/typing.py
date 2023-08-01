@@ -127,7 +127,7 @@ class _Layout(Protocol[E]):
 if TYPE_CHECKING:
     Layout = Union[_Layout, list[ElementRow | Row[E]]]
 else:
-    Layout = _Layout
+    Layout = Union[_Layout, list[ElementRow]]
 
 
 @runtime_checkable
