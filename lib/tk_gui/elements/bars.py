@@ -172,6 +172,7 @@ class ProgressBar(Element, base_style_layer='progress'):
             'value': self.default,
             'takefocus': int(self.allow_focus),
             'length': length,
+            'maximum': self.max_value,
             **self.style_config,
         }
         self.widget = Progressbar(tk_container, mode='determinate', **kwargs)

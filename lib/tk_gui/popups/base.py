@@ -124,9 +124,13 @@ class Popup(PopupMixin, WindowInitializer, is_popup=True):
     def get_pre_window_layout(self) -> Layout:
         return self.layout
 
+    def run_window(self):
+        # Runs the window.  May be overridden in subclasses to implement custom run behavior
+        self.window.run()
+
     def _run(self):
         with self.finalize_window()(take_focus=True) as window:
-            window.run()
+            self.run_window()
             self.cleanup()
             return self.get_results()
 
