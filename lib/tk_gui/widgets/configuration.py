@@ -72,8 +72,11 @@ class AxisConfig(Generic[ScrollAmount]):
 
     def view_scroll_args(self, positive: bool) -> tuple[ScrollAmount, TkScrollWhat]:
         amount = self.amount if positive else -self.amount
+        # when `what` is `units`, 1 unit = the scroll increment, which defaults to 1/10th of the window's width/height
+        # when `what` is `pages`, 1 page = 9/10ths of the window's width/height
+        what = 'units' if self.what == ScrollUnit.PIXELS else self.what.value
         # log.debug(f'Scrolling along axis={self.axis} {amount=} what={self.what.value}')
-        return amount, self.what.value
+        return amount, what
 
     def arg_str(self, include_axis: Bool = False) -> str:
         format_key = f'{{}}_{self.axis}'.format if include_axis else str

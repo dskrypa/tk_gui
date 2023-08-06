@@ -15,6 +15,7 @@ from tkinter.ttk import Scrollbar, Treeview
 from typing import TYPE_CHECKING, Type, Mapping, Union, Optional, Any, Iterator, Callable, Literal
 
 from tk_gui.caching import cached_property
+from tk_gui.enums import ScrollUnit
 from tk_gui.event_handling.decorators import delayed_event_handler
 from tk_gui.geometry import Box
 from tk_gui.utils import ON_WINDOWS
@@ -222,6 +223,12 @@ class ComplexScrollable(ScrollableBase, ABC):
 
     def init_canvas(self, style: Style = None, pad: XY = None, verify: bool = False):
         kwargs = self.init_canvas_kwargs(style)
+        # Scroll increment values may be an int for pixels, or `{n}m` for millimeters, `{n}c` for cm, `{n}i` for inches
+        if self._x_config.what == ScrollUnit.PIXELS:
+            kwargs['xscrollincrement'] = 1
+        if self._y_config.what == ScrollUnit.PIXELS:
+            kwargs['yscrollincrement'] = 1
+
         self.canvas = canvas = Canvas(self, borderwidth=0, highlightthickness=0, **kwargs)
         if self._x_config.scroll:
             self.scroll_bar_x = _add_scroll_bar(self, canvas, 'x', style, {'expand': 'false'}, verify=verify)
