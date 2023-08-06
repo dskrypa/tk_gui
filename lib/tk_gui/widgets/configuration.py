@@ -17,10 +17,20 @@ if TYPE_CHECKING:
     from tkinter import BaseWidget
     from tk_gui.typing import Bool, Axis, TkContainer, ScrollWhat, TkScrollWhat, OptInt
 
-__all__ = ['AxisConfig', 'ScrollAmount', 'FillConfig']
+__all__ = ['AxisConfig', 'ScrollAmount', 'FillConfig', 'set_default_scroll_pixels', 'get_default_scroll_pixels']
 log = logging.getLogger(__name__)
 
 ScrollAmount = TypeVar('ScrollAmount', int, float)
+_DEFAULT_SCROLL_PIXELS: int = 100
+
+
+def set_default_scroll_pixels(value: int):
+    global _DEFAULT_SCROLL_PIXELS
+    _DEFAULT_SCROLL_PIXELS = value
+
+
+def get_default_scroll_pixels() -> int:
+    return _DEFAULT_SCROLL_PIXELS
 
 
 def _fill_config_key_map(axis: Axis):
@@ -46,13 +56,15 @@ class AxisConfig(Generic[ScrollAmount]):
         self,
         axis: Axis,
         scroll: bool = False,
-        amount: ScrollAmount = 4,
-        what: ScrollWhat = ScrollUnit.UNITS,
+        amount: ScrollAmount = None,
+        what: ScrollWhat = ScrollUnit.PIXELS,
         fill: bool = False,
         size_div: float = None,
     ):
         self.axis = axis
         self.what = what = ScrollUnit(what)
+        if amount is None:
+            amount = _DEFAULT_SCROLL_PIXELS
         if not isinstance(amount, int) and what != ScrollUnit.PIXELS:
             raise TypeError(f'Invalid type={amount.__class__.__name__} for {amount=} with {what=}')
         self.scroll = scroll

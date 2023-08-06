@@ -69,8 +69,8 @@ class RowContainer(Generic[E], ABC):
         scroll_x_div: float = None,
         fill_y: Bool = False,
         fill_x: Bool = False,
-        scroll_y_amount: ScrollAmount = 4,
-        scroll_x_amount: ScrollAmount = 4,
+        scroll_y_amount: ScrollAmount = None,
+        scroll_x_amount: ScrollAmount = None,
         scroll_y_what: ScrollWhat = None,
         scroll_x_what: ScrollWhat = None,
     ):
