@@ -235,8 +235,6 @@ class ScrollableImage(SrcImageMixin, Element, base_style_layer='image'):
     ):
         kwargs.setdefault('scroll_x', True)
         kwargs.setdefault('scroll_y', True)
-        kwargs.setdefault('scroll_x_amount', 1)
-        kwargs.setdefault('scroll_y_amount', 1)
         self.x_config = AxisConfig.from_kwargs('x', kwargs)
         self.y_config = AxisConfig.from_kwargs('y', kwargs)
         kwargs.setdefault('pad', (0, 0))
