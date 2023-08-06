@@ -364,6 +364,10 @@ class ComplexScrollable(ScrollableBase, ABC):
         bbox = canvas.bbox('all')  # top left (x, y), bottom right (x, y) I think ==>> last 2 => (width, height)
         box = Box(*bbox)
         if force or self._last_box != box:
+            if self._x_config.what == ScrollUnit.PIXELS:
+                kwargs['xscrollincrement'] = 1
+            if self._y_config.what == ScrollUnit.PIXELS:
+                kwargs['yscrollincrement'] = 1
             # log.debug(f'Updating scroll region to {box=} != {self._last_box=} for {self} with {kwargs=}')
             canvas.configure(scrollregion=bbox, **kwargs)
             self._last_box = box
