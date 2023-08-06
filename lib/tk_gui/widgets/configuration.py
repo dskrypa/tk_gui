@@ -87,7 +87,7 @@ class AxisConfig(Generic[ScrollAmount]):
         # when `what` is `units`, 1 unit = the scroll increment, which defaults to 1/10th of the window's width/height
         # when `what` is `pages`, 1 page = 9/10ths of the window's width/height
         what = 'units' if self.what == ScrollUnit.PIXELS else self.what.value
-        # log.debug(f'Scrolling along axis={self.axis} {amount=} what={self.what.value}')
+        # log.debug(f'Scrolling along axis={self.axis} {amount=} self.what={self.what.value} ({what=})')
         return amount, what
 
     def arg_str(self, include_axis: Bool = False) -> str:

@@ -2,7 +2,7 @@
 __title__ = 'tk_gui'
 __description__ = 'TK GUI'
 __url__ = 'https://github.com/dskrypa/tk_gui'
-__version__ = '2023.08.06-4'
+__version__ = '2023.08.06-5'
 __author__ = 'Doug Skrypa'
 __author_email__ = 'dskrypa@gmail.com'
 __copyright__ = 'Copyright 2022 Doug Skrypa'
