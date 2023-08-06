@@ -217,7 +217,7 @@ class ComplexScrollable(ScrollableBase, ABC):
         self.init_canvas(style, pad, verify)
         self.resize_offset = resize_offset
         self._init_binds()
-        self.__last_event = None
+        # self.__last_event = None
 
     def init_canvas_kwargs(self, style: Style = None) -> dict[str, Any]:
         return style.get_map('frame', background='bg') if style else {}
@@ -276,12 +276,12 @@ class ComplexScrollable(ScrollableBase, ABC):
     # region Scroll Methods
 
     def scroll_y(self, event: Event):
-        if self.__last_event and self.__last_event.serial == event.serial:
-            # This is a hack to work around what I suspect is a bind leak, where the first canvas with a scroll bar
-            # will have 1 callback executed (as expected), while subsequent ones end up having this called as many
-            # times as the number of scrollable canvases previously existed...
-            return
-        self.__last_event = event
+        # if self.__last_event and self.__last_event.serial == event.serial:
+        #     # This is a hack to work around what I suspect is a bind leak, where the first canvas with a scroll bar
+        #     # will have 1 callback executed (as expected), while subsequent ones end up having this called as many
+        #     # times as the number of scrollable canvases previously existed...
+        #     return
+        # self.__last_event = event
         # log.debug(f'scroll_y: {id(event)} {event=}, {self.canvas.yview()=}')
         if (event.num == 5 or event.delta < 0) and (canvas := self.canvas).yview() != (0, 1):
             # canvas.yview_scroll(4, 'units')
@@ -291,12 +291,12 @@ class ComplexScrollable(ScrollableBase, ABC):
             canvas.yview_scroll(*self._y_config.view_scroll_args(False))
 
     def scroll_x(self, event: Event):
-        if self.__last_event and self.__last_event.serial == event.serial:
-            # This is a hack to work around what I suspect is a bind leak, where the first canvas with a scroll bar
-            # will have 1 callback executed (as expected), while subsequent ones end up having this called as many
-            # times as the number of scrollable canvases previously existed...
-            return
-        self.__last_event = event
+        # if self.__last_event and self.__last_event.serial == event.serial:
+        #     # This is a hack to work around what I suspect is a bind leak, where the first canvas with a scroll bar
+        #     # will have 1 callback executed (as expected), while subsequent ones end up having this called as many
+        #     # times as the number of scrollable canvases previously existed...
+        #     return
+        # self.__last_event = event
         # log.debug(f'scroll_x: {event=}, {self.canvas.xview()=}')
         if (event.num == 5 or event.delta < 0) and (canvas := self.canvas).xview() != (0, 1):
             # canvas.xview_scroll(4, 'units')
