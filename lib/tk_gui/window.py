@@ -931,9 +931,9 @@ class Window(BindMixin, RowContainer):
         except Exception:  # noqa
             pass
 
-        if binds := root.bind_all():    # This seems to be necessary to avoid a bind leak across Windows when
-            for bind in binds:          # rendering a series of windows/views
-                root.unbind_all(bind)
+        # if binds := root.bind_all():    # This seems to be necessary to avoid a bind leak across Windows when
+        #     for bind in binds:          # rendering a series of windows/views
+        #         root.unbind_all(bind)
 
         try:
             root.destroy()
