@@ -6,10 +6,8 @@ from pathlib import Path
 from cli_command_parser import Command, Action, Counter, main
 
 from tk_gui.__version__ import __author_email__, __version__, __author__, __url__  # noqa
-from tk_gui.elements import Table, Input, Text, ScrollFrame, SizeGrip
-from tk_gui.elements.choices import CheckBox
+from tk_gui.elements import Table, Input, Text, ScrollFrame, SizeGrip, CheckBox, Button
 from tk_gui.elements.bars import HorizontalSeparator, VerticalSeparator
-from tk_gui.elements.buttons import Button
 from tk_gui.elements.images import Image, Animation, SpinnerImage, ClockImage
 from tk_gui.elements.menu.menu import Menu, MenuGroup, MenuItem
 from tk_gui.elements.menu.items import CopySelection, GoogleSelection, SearchKpopFandom, SearchGenerasia, PasteClipboard
@@ -17,7 +15,7 @@ from tk_gui.elements.menu.items import ToUpperCase, ToTitleCase, ToLowerCase, Op
 from tk_gui.elements.menu.items import CloseWindow
 from tk_gui.elements.text import Multiline, gui_log_handler
 from tk_gui.event_handling import ClickHighlighter
-from tk_gui.images import IconSourceImage, Icons, ICONS_DIR
+from tk_gui.images import Icons, ICONS_DIR
 from tk_gui.popups.about import AboutPopup
 from tk_gui.popups.raw import PickColor
 from tk_gui.window import Window
@@ -65,24 +63,6 @@ class GuiTest(Command):
     def max_size(self):
         layout = [[Text(f'test_{i:03d}')] for i in range(100)]
         Window(layout, 'Auto Max Size Test', exit_on_esc=True).run()
-
-    @action
-    def icons(self):
-        icons = Icons(30)
-        layout, row = [], []
-        for i, (icon, name) in enumerate(icons.draw_many(icons.char_names)):
-            if row and i % 5 == 0:
-                layout.append(row[:-1])
-                row = []
-
-            iw = IconSourceImage(icons, name, icon, init_size=3000)
-            row += [Image(iw, popup=True), Text(name, size=(30, 1)), VerticalSeparator()]
-
-        if row:
-            layout.append(row[:-1])
-
-        config = {'remember_size': False, 'remember_position': False}
-        Window(layout, 'Icon Test', exit_on_esc=True, scroll_y=True, config=config).run()
 
     @action(default=True)
     def window(self):

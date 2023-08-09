@@ -12,7 +12,7 @@ from functools import partial
 from tkinter import Event, BaseWidget, Menu as TkMenu
 from typing import TYPE_CHECKING, Optional, Union, Type, Any, Sequence, Generic, TypeVar
 
-from ...event_handling import CustomEventResultsMixin
+from tk_gui.event_handling import CustomEventResultsMixin
 from ..element import ElementBase
 from ..exceptions import CallbackError, CallbackAlreadyRegistered, NoCallbackRegistered
 from .._utils import normalize_underline
@@ -20,6 +20,7 @@ from .utils import MenuMode, MenuModeCallback, Mode, ContainerMixin, MenuMeta
 from .utils import get_current_menu_group, wrap_menu_cb, find_member, copy_menu_obj
 
 if TYPE_CHECKING:
+    from tk_gui.popups.base import PopupMixin
     from tk_gui.pseudo_elements import Row
     from tk_gui.typing import Bool, XY, EventCallback, ProvidesEventCallback, Top, HasFrame
 
@@ -139,7 +140,7 @@ class MenuItem(MenuEntry):
     def __init__(
         self,
         label: str,
-        callback: EventCallback | ProvidesEventCallback = None,
+        callback: EventCallback | ProvidesEventCallback | Type[PopupMixin] = None,
         *,
         underline: Union[str, int] = None,
         enabled: Mode = MenuMode.ALWAYS,
