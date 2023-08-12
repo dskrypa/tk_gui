@@ -11,6 +11,15 @@ Notes:
     - `Event types <https://tcl.tk/man/tcl8.6.13/TkCmd/bind.htm#M7>`__:
         - ButtonPress / Button, ButtonRelease, MouseWheel, Motion
         - KeyPress / Key, KeyRelease
+            - Valid keysym values: https://tcl.tk/man/tcl8.6.13/TkCmd/keysyms.htm
+            - Some keysym values are not obvious.  It is possible to bind ``<Key>`` with no keysym to a callback that
+              prints the event to determine the value to use for any key.
+            - Some non-obvious keysyms (as ``keysym``: common name):
+                - ``Prior``: Page Up
+                - ``Next``: Page Down
+                - ``App``: Menu key (usually opens the right-click menu)
+                - ``Win_L``: Left Windows key
+                - ``Win_R``: Right Windows key (if present)
         - Activate, Deactivate, Enter, Leave, FocusIn, FocusOut
         - Configure, Destroy, Visibility
 """
@@ -21,7 +30,7 @@ import logging
 from enum import IntFlag
 from functools import partial
 from time import monotonic
-from tkinter import TclError, BaseWidget, Misc, Event
+from tkinter import TclError, BaseWidget, Misc, Event, EventType
 from typing import TYPE_CHECKING, Mapping, Any, Union
 
 from tk_gui.widgets.utils import unbind, log_event_widget_data, get_widget_ancestor
@@ -35,19 +44,51 @@ log = logging.getLogger(__name__)
 
 
 class EventState(IntFlag):
-    Shift = 1
-    Lock = 2
-    Control = 4
-    Mod1 = 8
-    Mod2 = 16
-    Mod3 = 32
-    Mod4 = 64
-    Mod5 = 128
-    Button1 = 256
-    Button2 = 512
-    Button3 = 1024
-    Button4 = 2048
-    Button5 = 4096
+    """Bit-packed flags stored in the ``state`` field of Tk Events"""
+    Shift =     0x00001     # Shift
+    Lock =      0x00002     # CapsLock
+    Control =   0x00004     # Control
+    Mod1 =      0x00008     # NumLock
+    Mod2 =      0x00010     # (16) ??
+    Mod3 =      0x00020     # (32) Scroll Lock
+    Mod4 =      0x00040     # (64) ??
+    Mod5 =      0x00080     # (128) ??
+    Button1 =   0x00100     # (256) Mouse: left-click button
+    Button2 =   0x00200     # (512) Mouse: middle-click button
+    Button3 =   0x00400     # (1024) Mouse: right-click button
+    Button4 =   0x00800     # (2048) Mouse: programmable (down/back)
+    Button5 =   0x01000     # (4096) Mouse: programmable (up/forward)
+    # _UNK01 =    0x02000
+    # _UNK02 =    0x04000
+    # _UNK03 =    0x08000
+    # _UNK04 =    0x10000
+    Alt =       0x20000     # Alt
+
+
+class _Event:
+    # Copied from tkinter/__init__.pyi, but re-arranged with comments describing each field
+    serial: int                 # Unique identifier for the event
+    type: EventType             # Enum indicating what triggered the event
+    state: EventState | str     # Active modifiers
+    widget: BaseWidget          # The widget in which the event occurred
+
+    keysym: str                 # Name of the key pressed for Key/KeyPress/KeyRelease events
+    keysym_num: int             # Numeric identifier of the key pressed for Key/KeyPress/KeyRelease events
+    keycode: int                # ???
+    char: str                   # The character associated with a key (if any) for Key/KeyPress/KeyRelease events
+    delta: int                  # +/- multiple of 120 for mouse wheel events
+
+    width: int                  #
+    height: int                 #
+    x: int                      #
+    y: int                      #
+    x_root: int                 #
+    y_root: int                 #
+
+    time: int                   # Appears to be a monotonic-like timestamp with millisecond granularity
+    send_event: bool            # Seems to always be True
+    num: int                    # ??
+    focus: bool                 # Doesn't seem to be present in __dict__
 
 
 class Interrupt:

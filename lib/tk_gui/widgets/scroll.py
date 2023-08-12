@@ -117,10 +117,10 @@ class ScrollableBase(BaseWidget, ABC):
 
     def _widgets(self) -> Iterator[BaseWidget]:
         yield self
-        if (scroll_bar_y := self.scroll_bar_y) is not None:
-            yield scroll_bar_y
-        if (scroll_bar_x := self.scroll_bar_x) is not None:
-            yield scroll_bar_x
+        if self.scroll_bar_y is not None:
+            yield self.scroll_bar_y
+        if self.scroll_bar_x is not None:
+            yield self.scroll_bar_x
 
     @cached_property
     def widgets(self) -> tuple[BaseWidget, ...]:
@@ -158,8 +158,9 @@ class ScrollableWidget(ScrollableBase, ABC):
 
     def find_container_scroll_cb(self, scroll_bar_name: str, axis: Axis) -> Optional[BindCallback]:
         # A scrollable widget may or may not have been actually configured to scroll on this axis.
-        # If it was, then None is returned so that its scroll action will be triggered, skipping any container cbs.
         if self.has_scrollable_bar(scroll_bar_name):
+            # None is returned to skip the container callback because this
+            # widget has a scroll action that will be triggered directly by Tk
             return None
         return self.find_ancestor_scroll_cb(scroll_bar_name, axis)
 
@@ -247,7 +248,12 @@ class ComplexScrollable(ScrollableBase, ABC):
 
     def _init_binds(self):
         y_config, x_config = self._y_config, self._x_config
+        # TODO: Only register _scroll_y/_scroll_x once per window + key combo (or at least only when it hasn't been
+        #  registered, if it persists across Windows), and have find_container_scroll_cb validate the key combo
         if y_config.scroll:
+            # TODO: Handle Page[Up|Down]
+            # self.canvas.bind_all('<Key-Prior>', _scroll_y, add='+')     # PageUp
+            # self.canvas.bind_all('<Key-Next>', _scroll_y, add='+')      # PageDown
             self.canvas.bind_all(self._y_bind, _scroll_y, add='+')
         if x_config.scroll:
             self.canvas.bind_all(self._x_bind, _scroll_x, add='+')
@@ -258,6 +264,8 @@ class ComplexScrollable(ScrollableBase, ABC):
             get_parent_or_none(self).bind('<Configure>', self._maybe_fill_region, add=True)
 
     # endregion
+
+    # region Bar Dimensions
 
     @cached_property
     def bar_height_x(self) -> int:
@@ -273,9 +281,15 @@ class ComplexScrollable(ScrollableBase, ABC):
         except AttributeError:
             return 0
 
+    # endregion
+
     # region Scroll Methods
 
     def scroll_y(self, event: Event):
+        """
+        Scroll the canvas along the Y axis (vertically).  Only called for scroll wheel events, not when the bar is
+        clicked and dragged.
+        """
         if self.__last_event and self.__last_event.serial == event.serial:
             # This is a hack to work around what I suspect is a bind leak, where the first canvas with a scroll bar
             # will have 1 callback executed (as expected), while subsequent ones end up having this called as many
@@ -291,6 +305,10 @@ class ComplexScrollable(ScrollableBase, ABC):
             canvas.yview_scroll(*self._y_config.view_scroll_args(False))
 
     def scroll_x(self, event: Event):
+        """
+        Scroll the canvas along the X axis (horizontally).  Only called for scroll wheel events, not when the bar is
+        clicked and dragged.
+        """
         if self.__last_event and self.__last_event.serial == event.serial:
             # This is a hack to work around what I suspect is a bind leak, where the first canvas with a scroll bar
             # will have 1 callback executed (as expected), while subsequent ones end up having this called as many
@@ -306,6 +324,8 @@ class ComplexScrollable(ScrollableBase, ABC):
             canvas.xview_scroll(*self._x_config.view_scroll_args(False))
 
     def find_container_scroll_cb(self, scroll_bar_name: str, axis: Axis) -> Optional[BindCallback]:
+        # TODO: Accept the event (or at least the key combo from it) + verify that the key combo used matches the
+        #  one configured for this widget + axis
         if self.has_scrollable_bar(scroll_bar_name):
             # This widget has a bar for this axis that is not soft-disabled
             # log.debug(f'find_scroll_cb: [found bar for scrollable={self}] {axis=}')
@@ -315,6 +335,8 @@ class ComplexScrollable(ScrollableBase, ABC):
 
     # endregion
 
+    # region Widgets
+
     def _widgets(self) -> Iterator[BaseWidget]:
         yield self.canvas
         yield from super()._widgets()
@@ -322,6 +344,10 @@ class ComplexScrollable(ScrollableBase, ABC):
     @cached_property
     def _top_level(self) -> Toplevel:
         return get_root_widget(self)
+
+    # endregion
+
+    # region Scroll Region: Update / Resize / Fill
 
     def resize_scroll_region(self, size: XY | None, *, force: Bool = False):
         try:
@@ -335,22 +361,25 @@ class ComplexScrollable(ScrollableBase, ABC):
             self.update_canvas_size(width, height)
 
     def update_canvas_size(self, width: int = None, height: int = None, force: bool = False):
-        # canvas = self.canvas
-        # log.debug(f'{self!r}.update_canvas_size: size=({width}, {height})')
-        # TODO: Should the scrollregion update happen after the size change, or should the bbox be manually edited
-        #  to have the new size?
-
-        # if width and height:
-        #     bbox = (0, 0, width, height)
-        # else:
-        #     x0, y0, x1, y1 = canvas.bbox('all')
-        #     bbox = (x0, y0, width or x1, height or y1)
-        # canvas.configure(scrollregion=bbox, width=width, height=height)
-        # canvas.configure(scrollregion=canvas.bbox('all'), width=width, height=height)
         size = (width, height)
         if force or self._last_size != size:
             self.update_scroll_region(True, width=width, height=height)
             self._last_size = size
+
+    @delayed_event_handler(delay_ms=75)
+    def _maybe_update_scroll_region(self, event: Event = None):
+        self.update_scroll_region()
+
+    def update_scroll_region(self, force: bool = False, **kwargs):
+        canvas = self.canvas
+        bbox = canvas.bbox('all')  # top left (x, y), bottom right (x, y) I think ==>> last 2 => (width, height)
+        box = Box(*bbox)
+        if force or self._last_box != box:
+            # log.debug(f'Updating scroll region to {box=} != {self._last_box=} for {self} with {kwargs=}')
+            canvas.configure(scrollregion=bbox, **kwargs)
+            self._last_box = box
+        # else:
+        #     log.debug(f'{self!r}: Skipping scroll region update ({bbox=})')
 
     @delayed_event_handler(delay_ms=75)
     def _maybe_fill_region(self, event: Event = None):
@@ -368,20 +397,7 @@ class ComplexScrollable(ScrollableBase, ABC):
         # log.debug(f'{self!r}._maybe_resize_scroll_region: {event=}, {size=}', extra={'color': 'yellow'})
         self.resize_scroll_region(size)
 
-    @delayed_event_handler(delay_ms=75)
-    def _maybe_update_scroll_region(self, event: Event = None):
-        self.update_scroll_region()
-
-    def update_scroll_region(self, force: bool = False, **kwargs):
-        canvas = self.canvas
-        bbox = canvas.bbox('all')  # top left (x, y), bottom right (x, y) I think ==>> last 2 => (width, height)
-        box = Box(*bbox)
-        if force or self._last_box != box:
-            # log.debug(f'Updating scroll region to {box=} != {self._last_box=} for {self} with {kwargs=}')
-            canvas.configure(scrollregion=bbox, **kwargs)
-            self._last_box = box
-        # else:
-        #     log.debug(f'{self!r}: Skipping scroll region update ({bbox=})')
+    # endregion
 
 
 class ScrollableContainer(ComplexScrollable, ABC):
