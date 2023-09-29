@@ -81,6 +81,7 @@ class ChooseItemPopup(ChoiceMapPopup[K, V]):
         if (frame_width := max_line_len * chr_w) > max_frame_width:
             frame_width = max_frame_width
 
+        chr_h *= 2  # Accommodate padding
         items_shown = max(1, min(m_height // chr_h, len(self.items)))
         max_frame_height = m_height - 200
         if (frame_height := items_shown * chr_h) > max_frame_height:
