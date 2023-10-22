@@ -8,7 +8,7 @@ bootstrap-icons font.
 from __future__ import annotations
 
 from base64 import b64encode
-from importlib.resources import path as get_data_path
+from importlib.resources import files
 from io import BytesIO
 from typing import TYPE_CHECKING, Optional, Union, TypeVar, Iterator, Iterable
 
@@ -24,9 +24,7 @@ if TYPE_CHECKING:
 
 __all__ = ['Icons', 'PlaceholderCache', 'placeholder_icon_cache', 'icon_path']
 
-with get_data_path('tk_gui', 'icons') as _icon_path:
-    ICONS_DIR = _icon_path
-
+ICONS_DIR = files('tk_gui.icons')
 ICON_DIR = ICONS_DIR.joinpath('bootstrap')
 
 Icon = Union[str, int]
@@ -43,7 +41,7 @@ class Icons:
 
     def __init__(self, size: int = 10):
         if self._font is None:
-            self.__class__._font = truetype(ICON_DIR.joinpath('bootstrap-icons.woff').as_posix())
+            self.__class__._font = truetype(ICON_DIR.joinpath('bootstrap-icons.woff').as_posix())  # noqa
         self.font: FreeTypeFont = self._font.font_variant(size=size)
 
     @property
@@ -151,7 +149,19 @@ def draw_icon(size: XY, text: str, fg: RGB | RGBA, bg: RGB | RGBA, font: FreeTyp
     f = font.font
     f_size, offset = f.getsize(text, 'L')
     mask = _core_fill('L', f_size, 0)
-    f.render(text, mask.id, 'L', None, None, None, 0, ink, 0, 0)
+    f.render(
+        text,               # text
+        lambda *a: mask,    # fill (expects callable that accepts mode(str) + size(2-tuple))
+        'L',                # mode
+        None,               # direction
+        None,               # features
+        None,               # language
+        0,                  # stroke_width
+        None,               # anchor (new)
+        ink,                # ink
+        0,                  # start[0]
+        0,                  # start[1]
+    )
     draw.draw_bitmap(offset, mask, ink)
     return image
 
@@ -189,4 +199,4 @@ placeholder_icon_cache: PlaceholderCache = PlaceholderCache()
 
 
 def icon_path(rel_path: str) -> Path:
-    return ICONS_DIR.joinpath(rel_path)
+    return ICONS_DIR.joinpath(rel_path)  # noqa
