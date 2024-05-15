@@ -33,7 +33,7 @@ T = TypeVar('T')
 T_co = TypeVar('T_co', covariant=True)
 
 BindCallback = Callable[['Event'], Any]
-EventCallback = Callable[['Event', ...], Any]
+EventCallback = BindCallback | Callable[['Event', ...], Any]
 ButtonEventCB = Callable[['Event', 'Key'], Any]
 TraceCallback = Callable[[str, str, str], Any]
 Bindable = Union['BindEvent', str]

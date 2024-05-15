@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 import tkinter.constants as tkc
 from tkinter import Toplevel, TclError, Event, Label
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from tk_gui.styles import Style
 
@@ -23,10 +23,15 @@ log = logging.getLogger(__name__)
 
 
 class ToolTip:
-    """Based on https://stackoverflow.com/a/36221216/19070573"""
+    """
+    A tooltip that is displayed when the user's mouse pointer hovers over the associated parent Element.
+
+    Based on https://stackoverflow.com/a/36221216/19070573 and ``idlelib.tooltip``.
+    """
+
+    __slots__ = ('parent', 'text', 'delay', 'wrap_len_px', 'style', '_schedule_id', '_tip_window', '_bind_ids')
     DEFAULT_DELAY = 400
     DEFAULT_OFFSET = (0, -20)
-    __slots__ = ('parent', 'text', 'delay', 'wrap_len_px', 'style', '_schedule_id', '_tip_window')
 
     def __init__(
         self, element: Element, text: str, delay: int = DEFAULT_DELAY, style: StyleSpec = None, wrap_len_px: int = None
@@ -43,12 +48,14 @@ class ToolTip:
         self.delay = delay
         self.wrap_len_px = wrap_len_px
         self.style = Style.get_style(style) if style else None
-        self._schedule_id: Optional[str] = None
-        self._tip_window: Optional[Toplevel] = None
+        self._schedule_id: str | None = None
+        self._tip_window: Toplevel | None = None
         widget = element.widget
-        widget.bind('<Enter>', self.on_hover, add=True)
-        widget.bind('<Leave>', self.on_leave, add=True)
-        widget.bind('<ButtonPress>', self.on_leave, add=True)
+        self._bind_ids = (
+            widget.bind('<Enter>', self.on_hover, add=True),
+            widget.bind('<Leave>', self.on_leave, add=True),
+            widget.bind('<ButtonPress>', self.on_leave, add=True),
+        )
 
     def __repr__(self) -> str:
         return f'<{self.__class__.__name__}[parent={self.parent!r}, text={self.text!r}]>'
@@ -59,10 +66,15 @@ class ToolTip:
 
     def cancel(self):
         if schedule_id := self._schedule_id:
-            self.parent.widget.after_cancel(schedule_id)
             self._schedule_id = None
+            self.parent.widget.after_cancel(schedule_id)
 
     def show(self, position: XY):
+        """
+        Show this tooltip.
+
+        :param position: The position of the mouse pointer, within the widget, as reported by an <Enter> event.
+        """
         if self._tip_window:
             return
 
@@ -79,7 +91,6 @@ class ToolTip:
         tip_window.wm_attributes('-topmost', 1)
 
         style = self.style or self.parent.style
-        kwargs = style.get_map('tooltip', foreground='fg', background='bg', font='font')
         label = Label(
             tip_window,
             text=self.text,
@@ -87,14 +98,17 @@ class ToolTip:
             relief=tkc.SOLID,
             borderwidth=1,
             wraplength=self.wrap_len_px,
-            **kwargs,
+            **style.get_map('tooltip', foreground='fg', background='bg', font='font'),
         )
         label.pack()
 
     def hide(self):
         if tip_window := self._tip_window:
-            tip_window.destroy()
             self._tip_window = None
+            try:
+                tip_window.destroy()
+            except TclError:
+                pass
 
     def on_hover(self, event: Event):
         self.schedule((event.x, event.y))
@@ -104,4 +118,10 @@ class ToolTip:
         self.hide()
 
     def __del__(self):
+        widget = self.parent.widget
+        try:
+            for seq, func_id in zip(('<Enter>', '<Leave>', '<ButtonPress>'), self._bind_ids):
+                widget.unbind(seq, func_id)
+        except TclError:
+            pass
         self.on_leave()
