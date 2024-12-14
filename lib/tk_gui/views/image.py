@@ -21,13 +21,13 @@ from tk_gui.event_handling import EventState, event_handler, delayed_event_handl
 from tk_gui.geometry import Box
 from tk_gui.images.wrapper import ImageWrapper, SourceImage, ResizedImage
 from tk_gui.popups.about import AboutPopup
-from tk_gui.popups import pick_file_popup, popup_warning
+from tk_gui.popups import SaveAs, pick_file_popup, popup_warning
 from tk_gui.utils import readable_bytes
 from .view import View
 
 if TYPE_CHECKING:
     from tkinter import Event
-    from tk_gui.typing import XY, Layout, ImageType, OptInt, ImgResizeMode  # noqa
+    from tk_gui.typing import XY, Layout, ImageType, OptInt, ImgResizeMode, PathLike  # noqa
     from tk_gui.window import Window
 
 __all__ = ['ImageView']
@@ -362,12 +362,17 @@ class ImageView(View):
         title: str = None,
         standalone: bool = False,
         dir_loc: InfoLoc | str = InfoLoc.FOOTER,
+        *,
+        add_save_as_menu: bool = True,
+        save_as_init_dir: PathLike = None,
         **kwargs,
     ):
         kwargs.setdefault('margins', (0, 0))
         kwargs.setdefault('exit_on_esc', True)
         kwargs.setdefault('config_name', self.__class__.__name__)
         super().__init__(title=title or 'Image View', **kwargs)
+        self._add_save_as_menu = add_save_as_menu
+        self._save_as_init_dir = save_as_init_dir
         self.dir_loc = InfoLoc(dir_loc)
         self.standalone = standalone
         self.active_image = ActiveImage(SourceImage.from_image(image), standalone=standalone)
@@ -467,10 +472,15 @@ class ImageView(View):
 
     @cached_property
     def gui_image(self) -> ScrollableImage:
-        # return ScrollableImage(None, size=self._window_box.size, pad=(0, 0), anchor='c', style=self._style)
-        return ScrollableImage(
-            None, size=self._window_box.size, pad=(0, 0), style=self._style, expand=True, fill='both'
-        )
+        kwargs = {'pad': (0, 0), 'style': self._style}
+        if self._add_save_as_menu:
+            class ImageMenu(Menu):
+                MenuItem('Save As...', callback=self.handle_save_as)
+
+            kwargs['right_click_menu'] = ImageMenu()
+
+        # return ScrollableImage(None, size=self._window_box.size, anchor='c', **kwargs)
+        return ScrollableImage(None, size=self._window_box.size, expand=True, fill='both', **kwargs)
 
     def finalize_window(self) -> Window:
         window = super().finalize_window()
@@ -540,6 +550,9 @@ class ImageView(View):
         if grew and self.active_image.image.size_percent < 1:
             self.window.update_idle_tasks()
             self.resize_image(size, ImageResizeMode.FIT_INSIDE)
+
+    def handle_save_as(self, event: Event = None):
+        return self.active_image.src_image.save_as_with_prompt(event, init_dir=self._save_as_init_dir)
 
     # endregion
 

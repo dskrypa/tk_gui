@@ -9,20 +9,23 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from concurrent.futures import Future, TimeoutError
+from functools import partial
 from threading import Thread
 from typing import TYPE_CHECKING, Optional, Callable, TypeVar, ParamSpec
 
 from tk_gui.caching import cached_property
 from tk_gui.elements import Text
+from tk_gui.elements.menu import Menu, MenuItem
 from tk_gui.elements.images import Image, BaseImage, BaseAnimation, Animation, ClockImage, SpinnerImage
 from tk_gui.event_handling import event_handler
 from tk_gui.event_handling.futures import run_func_in_future
 from tk_gui.images.wrapper import ImageWrapper, SourceImage
 from .base import Popup
+from .raw import SaveAs
 
 if TYPE_CHECKING:
     from tkinter import Event
-    from tk_gui.typing import XY, Layout, ImageType
+    from tk_gui.typing import XY, Layout, ImageType, PathLike
 
 __all__ = ['ImagePopup', 'AnimatedPopup', 'SpinnerPopup', 'ClockPopup']
 log = logging.getLogger(__name__)
@@ -44,6 +47,8 @@ class ImagePopup(Popup):
         *,
         text: str = None,
         text_above_img: bool = True,
+        add_save_as_menu: bool = True,
+        save_as_init_dir: PathLike = None,
         **kwargs,
     ):
         kwargs.setdefault('margins', (0, 0))
@@ -51,6 +56,8 @@ class ImagePopup(Popup):
         kwargs.setdefault('keep_on_top', False)
         kwargs.setdefault('can_minimize', True)
         self.image = self.src_image = SourceImage.from_image(image)
+        self._add_save_as_menu = add_save_as_menu
+        self._save_as_init_dir = save_as_init_dir
         super().__init__(title=title or 'Image', **kwargs)
         if text:
             self.text = text
@@ -86,7 +93,15 @@ class ImagePopup(Popup):
         if src.pil_image:
             log.debug(f'{self}: Using {init_size=} to display image={src!r} with {src.format=} mime={src.mime_type!r}')
         self.image = image = src.as_size(init_size)
-        return Image(image, size=init_size, pad=(2, 2))
+
+        kwargs = {'pad': (2, 2)}
+        if self._add_save_as_menu:
+            class ImageMenu(Menu):
+                MenuItem('Save As...', callback=partial(src.save_as_with_prompt, init_dir=self._save_as_init_dir))
+
+            kwargs['right_click_menu'] = ImageMenu()
+
+        return Image(image, size=init_size, **kwargs)
 
     def _init_size(self) -> XY:
         src_w, src_h = self.src_image.size
