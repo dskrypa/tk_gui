@@ -49,7 +49,7 @@ class BindMixin:
     def _bind(self, event_pat: Bindable, cb: BindTarget, add: Bool = True):
         if cb is None:
             return
-        # log.debug(f'Binding event={event_pat!r} to {cb=}')
+        # log.debug(f'Binding event={event_pat!r} on widget={self._bind_widget!r} to {cb=} for {self}')
         try:
             func_id = self._bind_widget.bind(event_pat, cb, add=add)
         except (TclError, RuntimeError) as e:

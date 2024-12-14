@@ -232,7 +232,6 @@ class Element(BindMixin, ElementBase, ABC):
     tooltip_text: Optional[str] = None
     right_click_menu: Optional[Menu] = None
     left_click_cb: Optional[Callable] = None
-    bind_clicks: bool = None
     data: Any = None                                            # Any data that needs to be stored with the element
 
     size: XY = Inheritable('element_size', default=None)
@@ -270,10 +269,6 @@ class Element(BindMixin, ElementBase, ABC):
         self._visible = visible
         if tooltip:
             self.tooltip_text = tooltip
-        if bind_clicks is None:
-            self.bind_clicks = bool(kwargs.get('right_click_menu') or kwargs.get('left_click_cb'))
-        else:
-            self.bind_clicks = bind_clicks
 
         for key, val in kwargs.items():
             if key in _DIRECT_ATTRS:
@@ -287,6 +282,10 @@ class Element(BindMixin, ElementBase, ABC):
                 # This also avoids creating the `bad` dict that would otherwise be thrown away on 99.9% of init calls.
                 bad = {k: v for k, v in kwargs.items() if k not in _DIRECT_ATTRS and k not in _INHERITABLES}
                 raise TypeError(f'Invalid options for {self.__class__.__name__}: {bad}')
+
+        if bind_clicks or (bind_clicks is None and (kwargs.get('right_click_menu') or kwargs.get('left_click_cb'))):
+            self.binds.add('<ButtonRelease-1>', self.handle_left_click, add=True)
+            self.binds.add('<ButtonRelease-3>', self.handle_right_click, add=True)
 
     def __repr__(self) -> str:
         key, size, visible = self._key, self.size, self._visible
@@ -413,14 +412,6 @@ class Element(BindMixin, ElementBase, ABC):
     def _bind_widget(self) -> BaseWidget | None:
         return self.widget
 
-    def apply_binds(self):
-        if self.bind_clicks:
-            widget = self.widget
-            widget.bind('<ButtonRelease-1>', self.handle_left_click, add=True)
-            widget.bind('<ButtonRelease-3>', self.handle_right_click, add=True)
-
-        super().apply_binds()
-
     def normalize_callback(self, cb: BindTarget) -> BindCallback:
         if isinstance(cb, str):
             cb = BindTargets(cb)
@@ -443,14 +434,16 @@ class Element(BindMixin, ElementBase, ABC):
         self.window.interrupt(event, self)
 
     def handle_left_click(self, event: Event):
-        # log.debug(f'Handling left click')
+        # log.debug('Handling left click')
         if cb := self.left_click_cb:
             # log.debug(f'Passing {event=} to {cb=}')
             result = cb(event)
             self.window._handle_callback_action(result, event, self)
 
     def handle_right_click(self, event: Event):
+        # log.debug('Handling right click')
         if menu := self.right_click_menu:
+            # log.debug(f'Showing right-click {menu=}')
             menu.parent = self  # Needed for style inheritance
             menu.show(event, self.widget.master)  # noqa
 

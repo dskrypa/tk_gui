@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from inspect import Signature
-from tkinter import Label, TclError, Event
+from tkinter import Label, TclError, Event, Canvas
 from typing import TYPE_CHECKING, Optional, Any, Union, Callable
 
 from PIL.Image import Resampling
@@ -109,7 +109,7 @@ class BaseImage(Element, ABC, base_style_layer='image'):
         # log.debug(f'_re_pack: {width=}, {height=}, {self}')
         self.size = (width, height)
         widget: Label = self.widget
-        widget.configure(image=image, width=width, height=height, anchor=self.anchor_image.value)
+        widget.configure(image=image, width=width, height=height, anchor=self.anchor_image.value)  # noqa
         widget.image = image
         widget.pack(**self.pad_kw)
 
@@ -246,6 +246,10 @@ class ScrollableImage(SrcImageMixin, Element, base_style_layer='image'):
     #     box_map = self.widget.get_boxes()
     #     box_str = '{\n' + ',\n'.join(f'        {k!r}: {v!r}' for k, v in box_map.items()) + '\n    }'
     #     return f'<{self.__class__.__name__}[id={self.id}, {size=}, boxes={box_str}]>'
+
+    @property
+    def _bind_widget(self) -> Canvas | None:
+        return self.widget.canvas
 
     # region Widget Init & Packing
 
