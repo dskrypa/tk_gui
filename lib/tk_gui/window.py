@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from os import environ
 from queue import Queue, Empty as QueueEmpty
 from time import monotonic
-from tkinter import Tk, Toplevel, PhotoImage, TclError, Event, CallWrapper, BaseWidget
+from tkinter import Tk, Toplevel, PhotoImage, TclError, Event, CallWrapper, BaseWidget, Variable
 from tkinter.ttk import Sizegrip, Scrollbar, Treeview
 from typing import TYPE_CHECKING, Optional, Union, Any, Iterable, Callable, Iterator, overload
 from weakref import finalize, WeakSet
@@ -804,7 +804,7 @@ class Window(BindMixin, RowContainer):
         return cb
 
     def _bind_event(self, bind_event: BindEvent, cb: Optional[EventCallback], add: bool = True):
-        tk_event = getattr(bind_event, 'event', bind_event)
+        tk_event: str = getattr(bind_event, 'event', bind_event)
         try:
             window_method_name = self._tk_event_handlers[tk_event]
         except KeyError:
@@ -1229,6 +1229,34 @@ def patch_call_wrapper():
     CallWrapper.__call__ = _cw_call
 
 
+def patch_variable_del():
+    """
+    Patch Variable.__del__ to prevent running outside of the main thread.  The official implementation has remained the
+    same in Python 3.7 through 3.13.
+    """
+
+    def _var_del(self):
+        """Unset the variable in Tcl."""
+        if self._tk is None:
+            return
+
+        try:
+            if self._tk.getboolean(self._tk.call('info', 'exists', self._name)):
+                self._tk.globalunsetvar(self._name)
+        except RuntimeError as e:  # RuntimeError: main thread is not in main loop
+            # TODO: Maybe put the var in a global queue for the main thread window to process?
+            log.warning(f'Error deleting {self.__class__.__name__} with name={self._name!r}: {e}')
+            raise
+
+        if self._tclCommands is not None:
+            for name in self._tclCommands:
+                # log.debug(f'Tkinter: deleting command={name!r}')
+                self._tk.deletecommand(name)
+            self._tclCommands = None
+
+    Variable.__del__ = _var_del
+
+
 class NoProfileTk(Tk):
     def readprofile(self, baseName: str, className: str):
         return
@@ -1236,3 +1264,6 @@ class NoProfileTk(Tk):
 
 if environ.get('TK_GUI_NO_CALL_WRAPPER_PATCH', '0') != '1':
     patch_call_wrapper()
+
+if environ.get('TK_GUI_NO_VARIABLE_DEL_PATCH', '0') != '1':
+    patch_variable_del()
