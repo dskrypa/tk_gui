@@ -53,6 +53,7 @@ class PopupMixin(ABC):
 
     def run(self):
         if in_main_thread := current_thread() == main_thread():
+            log.debug(f'Running popup={self!r} directly in the main thread')
             result = self._run()
         elif not (parent := self.parent):
             raise RuntimeError(f'Unable to run {self!r} with no parent Window')
@@ -83,10 +84,9 @@ class BasePopup(PopupMixin, ABC):
     def __init__(self, title: str = None, parent: Window = _NotSet, return_focus: Bool = None):
         self.title = title or self._default_title
         if parent is _NotSet:
-            try:
-                parent = Window.get_active_windows(sort_by_last_focus=True)[0]
-            except IndexError:
-                parent = None
+            parent = Window.get_active_window()
+        # else:
+        #     log.debug(f'Popup parent window was explicitly provided: {parent}', extra={'color': 13})
         self.parent = parent
         if return_focus is not None:
             self.return_focus = return_focus
@@ -177,7 +177,7 @@ class BasicPopup(Popup):
     @cached_property
     def text_size(self) -> XY:
         if size := self.window_kwargs.pop('size', None):
-            return size
+            return size  # type: ignore
         lines = self.lines
         n_lines = len(lines)
         if self.multiline:

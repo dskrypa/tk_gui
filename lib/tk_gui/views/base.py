@@ -69,12 +69,11 @@ class WindowInitializer(HandlesEvents, ABC):
         **kwargs,
     ):
         if parent is _NotSet:
-            try:
-                self.parent = Window.get_active_windows(sort_by_last_focus=True)[0]
-            except IndexError:
-                pass
+            self.parent = Window.get_active_window()
         elif parent is not None:
+            # log.debug(f'{self.__class__.__name__} parent was explicitly provided: {parent}', extra={'color': 13})
             self.parent = parent.window if isinstance(parent, WindowInitializer) else parent
+        # log.debug(f'Initializing {self.__class__.__name__} with parent={self.parent}', extra={'color': 13})
         if title is not None:
             self.title = title
         if config_name:

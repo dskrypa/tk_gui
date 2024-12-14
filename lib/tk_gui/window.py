@@ -6,6 +6,7 @@ Tkinter GUI Window
 
 from __future__ import annotations
 
+import gc
 import logging
 import tkinter as tk
 from dataclasses import dataclass
@@ -14,7 +15,7 @@ from queue import Queue, Empty as QueueEmpty
 from time import monotonic
 from tkinter import Tk, Toplevel, PhotoImage, TclError, Event, CallWrapper, BaseWidget, Variable
 from tkinter.ttk import Sizegrip, Scrollbar, Treeview
-from typing import TYPE_CHECKING, Optional, Union, Any, Iterable, Callable, Iterator, overload
+from typing import TYPE_CHECKING, Any, Iterable, Callable, Iterator, overload
 from weakref import finalize, WeakSet
 
 from PIL import ImageGrab
@@ -68,19 +69,19 @@ class Window(BindMixin, RowContainer):
     _instances: WeakSet[Window] = WeakSet()
     # endregion
     # region Instance Attrs (with defaults)
-    __focus_ele: Optional[ElementBase] = None
-    _config: tuple[str, Union[str, Path, None], Optional[dict[str, Any]]] = None
+    __focus_ele: ElementBase | None = None
+    _config: tuple[str, str | Path | None, dict[str, Any] | None] = None
     _keep_on_top: bool = False
     _last_interrupt: Interrupt = Interrupt(time=0)
-    _last_known_pos: Optional[XY] = None
-    _last_known_size: Optional[XY] = None
+    _last_known_pos: XY | None = None
+    _last_known_size: XY | None = None
     _last_run: float = 0
     _last_focus: float = 0
     _motion_tracker: MotionTracker = None
     _grab_anywhere_mgr: BindManager | None = None
     _grab_anywhere: GrabAnywhere = False  #: Whether the window should move on mouse click + movement
-    root: Optional[Top] = None
-    tk_container: Optional[TkContainer] = None
+    root: Top | None = None
+    tk_container: TkContainer | None = None
     widget: Top = None
     is_popup: bool = False                              #: Whether the window is a popup
     closed: bool = False
@@ -123,9 +124,9 @@ class Window(BindMixin, RowContainer):
         no_title_bar: Bool = False,
         # Style-related params
         style: StyleSpec = None,
-        anchor_elements: Union[str, Anchor] = None,
-        text_justification: Union[str, Justify] = None,
-        element_side: Union[str, Side] = None,
+        anchor_elements: str | Anchor = None,
+        text_justification: str | Justify = None,
+        element_side: str | Side = None,
         element_padding: XY = None,
         element_size: XY = None,
         # Bind-related params
@@ -257,6 +258,11 @@ class Window(BindMixin, RowContainer):
           interrupted
         :return: Returns itself to allow chaining
         """
+        # Force garbage collection to run now, so if previous windows had variables that need to be cleaned up,
+        # that cleanup will happen before this window has a chance to create any threads that may have focus during
+        # a gc run.  When a thread other than the main thread has focus during a gc run, and tkinter.Variable.__del__
+        # is called, a `RuntimeError: main thread is not in main loop` ends up being raised.
+        gc.collect()
         try:
             root = self.root
         except AttributeError:
@@ -305,7 +311,7 @@ class Window(BindMixin, RowContainer):
         self.root.update_idletasks()
 
     def schedule_task(self, func: Callable, after_ms: int = 1):
-        # log.debug(f'{self:wt}.schedule_task: adding to queue: {func=}')
+        # log.debug(f'Scheduling task in {self:wt} - adding to queue: {func=}', extra={'color': (0, 11)})
         self._task_queue.put((func, after_ms))
         self.root.quit()
 
@@ -319,7 +325,7 @@ class Window(BindMixin, RowContainer):
                 # log.debug(f'Scheduling task={func} after={after_ms} ms')
                 self.root.after(after_ms, func)
 
-    def read(self, timeout: int) -> tuple[Optional[Key], dict[Key, Any], Optional[Event]]:
+    def read(self, timeout: int) -> tuple[Key | None, dict[Key, Any], Event | None]:
         self.run(timeout)
         interrupt = self._last_interrupt
         if (element := interrupt.element) is not None:
@@ -356,7 +362,7 @@ class Window(BindMixin, RowContainer):
 
     # region Results
 
-    def __getitem__(self, item: Union[Key, str, BaseWidget, tuple[int, int]]) -> Union[ElementBase, Element, HasValue]:
+    def __getitem__(self, item: Key | str | BaseWidget | tuple[int, int]) -> ElementBase | Element | HasValue:
         try:
             return self.element_map[item]
         except KeyError:
@@ -370,7 +376,7 @@ class Window(BindMixin, RowContainer):
     def get_result(self, key: Key) -> Any:
         return self.element_map[key].value
 
-    def register_element(self, key: Key, element: Union[Element, HasValue]):
+    def register_element(self, key: Key, element: Element | HasValue):
         ele_map = self.element_map
         try:
             old = ele_map[key]
@@ -447,7 +453,7 @@ class Window(BindMixin, RowContainer):
         vis_bw = self.visible_border_width
         return Rectangle.from_pos_and_size(x, y, width + (2 * vis_bw), height)
 
-    def resize_scroll_region(self, size: Optional[XY] = None):
+    def resize_scroll_region(self, size: XY | None = None):
         outer, inner = self.root, self.tk_container
         if outer != inner:
             outer.resize_scroll_region(size)
@@ -490,7 +496,7 @@ class Window(BindMixin, RowContainer):
         return int(x), int(y)
 
     @property
-    def monitor(self) -> Optional[Monitor]:
+    def monitor(self) -> Monitor | None:
         return monitor_manager.get_monitor(*self.position)
 
     def move_to_center(self, other: Window = None):
@@ -803,7 +809,7 @@ class Window(BindMixin, RowContainer):
 
         return cb
 
-    def _bind_event(self, bind_event: BindEvent, cb: Optional[EventCallback], add: bool = True):
+    def _bind_event(self, bind_event: BindEvent, cb: EventCallback | None, add: bool = True):
         tk_event: str = getattr(bind_event, 'event', bind_event)
         try:
             window_method_name = self._tk_event_handlers[tk_event]
@@ -976,7 +982,7 @@ class Window(BindMixin, RowContainer):
         return ImageGrab.grab(self.outer_rect().as_bbox())
 
     @classmethod
-    def get_active_windows(cls, is_popup: Bool = None, *, sort_by_last_focus: bool = False) -> list[Window]:
+    def _get_active_windows(cls, is_popup: Bool = None, *, sort_by_last_focus: bool = False) -> list[Window]:
         if is_popup is None:
             windows = [w for w in tuple(cls._instances) if not w.closed]
         else:
@@ -986,6 +992,14 @@ class Window(BindMixin, RowContainer):
             windows.sort(key=lambda w: w._last_focus, reverse=True)
 
         return windows
+
+    @classmethod
+    def get_active_window(cls) -> Window | None:
+        for w in tuple(cls._instances):
+            if not w.closed and w.has_focus:
+                return w
+
+        return None
 
     def register_child_window(self, window: Window):
         self._child_windows.add(window)
@@ -1035,7 +1049,7 @@ class HiddenRoot:
                 pass
 
     def maybe_close(self):
-        if not Window.get_active_windows():
+        if not Window._get_active_windows():
             self.close()
 
 
@@ -1071,7 +1085,7 @@ class WindowInitializer:
         return root
 
     @cached_property
-    def monitor(self) -> Optional[Monitor]:
+    def monitor(self) -> Monitor | None:
         x, y = self.position or self.window.position
         if not (monitor := monitor_manager.get_monitor(x, y)):
             log.debug(f'Could not find monitor for pos={x, y}')
@@ -1160,7 +1174,7 @@ class WindowInitializer:
             root.update_idletasks()
             self.window.move_to_center()
 
-    def _get_init_inner_size(self, inner: TkContainer) -> Optional[XY]:
+    def _get_init_inner_size(self, inner: TkContainer) -> XY | None:
         if size := self.size:
             return size
 
@@ -1178,7 +1192,7 @@ class WindowInitializer:
 
         return width, height
 
-    def _get_init_outer_size(self, root: Top) -> Optional[XY]:
+    def _get_init_outer_size(self, root: Top) -> XY | None:
         if size := self.size:
             return size
         elif not (monitor := self.monitor):
@@ -1255,6 +1269,14 @@ def patch_variable_del():
             self._tclCommands = None
 
     Variable.__del__ = _var_del
+
+    # real_var_init = Variable.__init__
+    #
+    # def _var_init(self, *args, **kwargs):
+    #     real_var_init(self, *args, **kwargs)
+    #     log.debug(f'Initialized {self.__class__.__name__}[{self._name}]', extra={'color': 12})
+    #
+    # Variable.__init__ = _var_init
 
 
 class NoProfileTk(Tk):
