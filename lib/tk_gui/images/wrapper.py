@@ -11,6 +11,7 @@ from io import BytesIO
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import PIL.Image as ImageModule
 from cachetools import LRUCache
 from PIL.Image import Resampling, MIME, Image as PILImage, open as open_image, new as new_image
 from PIL.ImageTk import PhotoImage
@@ -106,15 +107,26 @@ class ImageWrapper(Sized, ABC):
         return image.format or ('png' if image.mode == 'RGBA' else 'jpeg')
 
     def as_format(self, format: str = None) -> PILImage:  # noqa
-        return self._as_format(format)[0]
+        return self._as_format(target_format=format)[0]
 
-    def _as_format(self, target_format: str = None) -> tuple[PILImage, str]:
+    def _as_format(self, path: PathLike = None, target_format: str = None) -> tuple[PILImage, str]:
         image = self.pil_image
-        if not target_format:
-            target_format = self.format
-        if target_format == 'jpeg' and image.mode not in RAWMODE:
+        target_format = self._get_target_format(path, target_format)
+        if target_format.lower() == 'jpeg' and image.mode not in RAWMODE:
             image = image.convert('RGB')
         return image, target_format
+
+    def _get_target_format(self, path: PathLike = None, target_format: str = None) -> str:
+        if target_format:
+            return target_format
+        elif not path:
+            return self.format
+
+        if not isinstance(path, Path):
+            path = Path(path)
+        if not ImageModule.EXTENSION:
+            ImageModule.init()
+        return ImageModule.EXTENSION.get(path.suffix.lower()) or self.format
 
     @cached_property
     def mime_type(self) -> str | None:
@@ -130,7 +142,7 @@ class ImageWrapper(Sized, ABC):
     def raw_size(self) -> int:
         image = self.pil_image
         image.load()
-        return len(image.im)  # This provides the raw / uncompressed size
+        return len(image.im)  # noqa  # This provides the raw / uncompressed size
 
     def get_image_as_size(
         self,
@@ -150,12 +162,12 @@ class ImageWrapper(Sized, ABC):
         return image.resize(size, resample=resample, box=box, reducing_gap=reducing_gap)
 
     def save_as(self, path: PathLike, format: str = None):  # noqa
-        image, target_format = self._as_format(format)
+        image, target_format = self._as_format(path, format)
         with Path(path).expanduser().open('wb') as f:
             image.save(f, target_format)
 
     def to_bytes(self, format: str = None) -> bytes:  # noqa
-        image, target_format = self._as_format(format)
+        image, target_format = self._as_format(target_format=format)
         bio = BytesIO()
         image.save(bio, target_format)
         return bio.getvalue()
