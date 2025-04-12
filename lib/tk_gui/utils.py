@@ -19,11 +19,12 @@ from typing import TYPE_CHECKING, Optional, Type, Any, Callable, Collection, Ite
 from .constants import STYLE_CONFIG_KEYS
 
 if TYPE_CHECKING:
-    from .typing import HasParent
+    from .typing import HasParent, Bool
 
 __all__ = [
     'ON_WINDOWS', 'ON_LINUX', 'ON_MAC', 'Inheritable', 'ProgramMetadata',
     'tcl_version', 'max_line_len', 'call_with_popped', 'extract_kwargs', 'get_user_temp_dir', 'readable_bytes',
+    'mapping_repr',
 ]
 log = logging.getLogger(__name__)
 
@@ -250,3 +251,22 @@ def readable_bytes(
     if rate:
         unit = unit.strip() + ('/s' if rate is True else rate) + ('' if exp else ' ')  # noqa
     return f'{size / kilo ** exp:,.{dec}f} {unit}'
+
+
+def mapping_repr(
+    data: Mapping,
+    keys: Collection[str] = None,
+    sort: Bool = True,
+    indent: int = 0,
+    val_repr: Callable[[Any], str] = repr,
+) -> str:
+    if keys:
+        kv_pairs = (kv for kv in data.items() if kv[0] in keys)
+    else:
+        kv_pairs = data.items()
+    if sort:
+        kv_pairs = sorted(kv_pairs)
+
+    inner = ' ' * (indent + 4)
+    outer = ' ' * indent
+    return '{\n' + ',\n'.join(f'{inner}{k!r}: {val_repr(v)}' for k, v in kv_pairs) + f'\n{outer}}}'

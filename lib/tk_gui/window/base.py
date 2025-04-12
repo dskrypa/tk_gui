@@ -1,49 +1,41 @@
-"""
-Tkinter GUI Window
-
-:author: Doug Skrypa
-"""
-
 from __future__ import annotations
 
 import gc
 import logging
 import tkinter as tk
-from dataclasses import dataclass
-from os import environ
 from queue import Queue, Empty as QueueEmpty
 from time import monotonic
-from tkinter import Tk, Toplevel, PhotoImage, TclError, Event, CallWrapper, BaseWidget, Variable
+from tkinter import PhotoImage, TclError, Event, BaseWidget
 from tkinter.ttk import Sizegrip, Scrollbar, Treeview
 from typing import TYPE_CHECKING, Any, Iterable, Callable, Iterator, overload
 from weakref import finalize, WeakSet
 
 from PIL import ImageGrab
 
-from .assets import PYTHON_LOGO
-from .caching import cached_property
-from .config import GuiConfig, WindowConfigProperty
-from .elements.menu import Menu
-from .enums import BindTargets, Anchor, Justify, Side, BindEvent, CallbackAction
-from .event_handling import BindMixin, BindMapping, BindMap, BindManager
-from .event_handling.decorators import delayed_event_handler, _tk_event_handler
-from .event_handling.utils import MotionTracker, Interrupt
-from .exceptions import DuplicateKeyError
-from .monitors import Monitor, Rectangle, monitor_manager
-from .pseudo_elements.row_container import RowContainer
-from .styles import Style
-from .utils import ON_LINUX, ON_WINDOWS, ProgramMetadata, extract_kwargs
-from .widgets.scroll import ScrollableToplevel
-from .widgets.utils import log_event_widget_data, get_root_widget, get_req_size  # noqa
+from ..assets import PYTHON_LOGO
+from ..caching import cached_property
+from ..config import GuiConfig, WindowConfigProperty
+from ..elements.menu import Menu
+from ..enums import BindTargets, Anchor, Justify, Side, BindEvent, CallbackAction
+from ..event_handling import BindMixin, BindMapping, BindMap, BindManager
+from ..event_handling.decorators import delayed_event_handler, _tk_event_handler
+from ..event_handling.utils import MotionTracker, Interrupt
+from ..exceptions import DuplicateKeyError
+from ..monitors import Monitor, Rectangle, monitor_manager
+from ..pseudo_elements.row_container import RowContainer
+from ..styles import Style
+from ..utils import ON_LINUX, ON_WINDOWS, ProgramMetadata, extract_kwargs
+from ..widgets.utils import WidgetData, log_event_widget_data, get_root_widget, get_req_size  # noqa
+from .init import HiddenRoot, InitConfig, WindowInitializer, ensure_tk_is_initialized
+from .utils import WindowData  # noqa
 
 if TYPE_CHECKING:
     from pathlib import Path
     from PIL.Image import Image as PILImage
-    from .elements.element import Element, ElementBase
-    from .styles.typing import StyleSpec
-    from .typing import XY, BindCallback, EventCallback, Key, BindTarget, Bindable, Layout, Bool, HasValue
-    from .typing import TkContainer, GrabAnywhere, Top, PathLike
-    from .widgets.configuration import AxisConfig
+    from ..elements.element import Element, ElementBase
+    from ..styles.typing import StyleSpec
+    from ..typing import XY, BindCallback, EventCallback, Key, BindTarget, Bindable, Layout, Bool, HasValue
+    from ..typing import TkContainer, GrabAnywhere, Top, PathLike
 
 __all__ = ['Window']
 log = logging.getLogger(__name__)
@@ -63,7 +55,6 @@ class Window(BindMixin, RowContainer):
     # region Class Attrs
     config: GuiConfig = WindowConfigProperty()
     tk_load_profile: Bool = False
-    _hidden_root: HiddenRoot | None = None
     _tk_event_handlers: dict[str, str] = {}
     _always_bind_events: set[BindEvent] = set()
     _instances: WeakSet[Window] = WeakSet()
@@ -270,10 +261,10 @@ class Window(BindMixin, RowContainer):
             root = self.root
 
         if not self._last_run:
-            root.after(100, self._init_fix_focus)  # Nothing else seemed to work...
+            root.after(100, self._init_fix_focus)  # noqa # Nothing else seemed to work...
 
         if timeout > 0:
-            interrupt_id = root.after(timeout, self.interrupt)
+            interrupt_id = root.after(timeout, self.interrupt)  # noqa
         else:
             interrupt_id = None
 
@@ -323,7 +314,7 @@ class Window(BindMixin, RowContainer):
                 break
             else:
                 # log.debug(f'Scheduling task={func} after={after_ms} ms')
-                self.root.after(after_ms, func)
+                self.root.after(after_ms, func)  # noqa
 
     def read(self, timeout: int) -> tuple[Key | None, dict[Key, Any], Event | None]:
         self.run(timeout)
@@ -542,13 +533,17 @@ class Window(BindMixin, RowContainer):
         self.root.iconify()
 
     def maximize(self):
-        self.root.state('zoomed')
-        # self.root.attributes('-fullscreen', True)  # May be needed on Windows
+        if ON_LINUX:
+            self.root.attributes('-fullscreen', True)  # May be needed on Windows
+        else:
+            self.root.state('zoomed')  # Only available on Windows/macOS
 
     def normal(self):
         root = self.root
         if (state := root.state()) == 'iconic':
             root.deiconify()
+        elif ON_LINUX:
+            root.attributes('-fullscreen', False)
         elif state == 'zoomed':
             root.state('normal')
             # root.attributes('-fullscreen', False)
@@ -599,10 +594,15 @@ class Window(BindMixin, RowContainer):
     def disable_title_bar(self):
         self.no_title_bar = True
         try:
+            # WindowData(self).log('Disabling title bar; before:', level=logging.INFO)
             if ON_LINUX:
+                # TODO: On linux, it seems like the window cannot hold focus when the title bar is disabled,
+                #  so key presses go to the terminal instead of being handled by bound methods
                 self.root.wm_attributes('-type', 'dock')
             else:
+                # Instruct the window manager to ignore this widget (on Windows/Mac: hides the title bar)
                 self.root.wm_overrideredirect(True)
+            # WindowData(self).log('Disabled title bar; after:', level=logging.INFO)
         except (TclError, RuntimeError):
             log.warning('Error while disabling title bar:', exc_info=True)
 
@@ -612,10 +612,18 @@ class Window(BindMixin, RowContainer):
         root.wm_title(self.title)
         root.tk.call('wm', 'iconphoto', root._w, PhotoImage(data=self.icon))  # noqa
         try:
-            # if ON_LINUX:
-            #     root.wm_attributes('-type', 'dock')
-            # else:
-            root.wm_overrideredirect(False)
+            # WindowData(self).log('Enabling title bar; before:', level=logging.INFO)
+            if ON_LINUX:
+                root.wm_attributes('-type', 'normal')
+                # The title bar doesn't get re-drawn unless the window is withdrawn and then deiconified
+                root.withdraw()
+                root.deiconify()
+                # TODO: When restoring the title bar after it has been disabled, the window position shifts (probably
+                #  by the size of the title bar)
+            else:
+                # Instruct the window manager to stop ignoring this widget (on Windows/Mac: shows the title bar)
+                root.wm_overrideredirect(False)
+            # WindowData(self).log('Enabled title bar; after:', level=logging.INFO)
         except (TclError, RuntimeError):
             log.warning('Error while enabling title bar:', exc_info=True)
 
@@ -671,18 +679,13 @@ class Window(BindMixin, RowContainer):
     # region Show Window Methods
 
     def show(self):
-        self._ensure_tk_is_initialized()
+        ensure_tk_is_initialized()
         if self.root is not None:
             log.warning('Attempted to show window after it was already shown', stack_info=True)
             return
 
         root = WindowInitializer(self._init_config, self).initialize_window()
         self._finalizer = finalize(self, self._close, root)
-
-    @classmethod
-    def _ensure_tk_is_initialized(cls):
-        if cls._hidden_root is None:
-            cls._hidden_root = HiddenRoot()
 
     def _init_fix_focus(self):
         if (element := self.__focus_ele) is None:
@@ -892,8 +895,16 @@ class Window(BindMixin, RowContainer):
             # else:
             #     log.debug(f'  Size did not change: old={self._last_known_size}, new={new_size}')
 
+    # @_tk_event_handler(BindEvent.LEFT_CLICK, True)
+    # def _handle_left_click(self, event: Event):
+    #     log_event_widget_data(self, event, prefix='Tkinter Click', show_ttk_info=True)
+    #     # log_event_widget_data(self, event, prefix='Tkinter Click', show_config=True)
+
     @_tk_event_handler(BindEvent.RIGHT_CLICK)
     def handle_right_click(self, event: Event):
+        # WindowData(self).log(level=logging.INFO)
+        # log_event_widget_data(self, event, prefix='Tkinter Click', show_ttk_info=True)
+        # log_event_widget_data(self, event, prefix='Tkinter Click', show_config=True)
         try:
             if self.widget_id_element_map[event.widget._w].right_click_menu:
                 # If the element that was clicked has its own right-click menu, it should override the window's
@@ -918,11 +929,6 @@ class Window(BindMixin, RowContainer):
     @_tk_event_handler('<FocusIn>', True)
     def _handle_gain_focus(self, event: Event):
         self._last_focus = monotonic()
-
-    # @_tk_event_handler(BindEvent.LEFT_CLICK, True)
-    # def _handle_left_click(self, event: Event):
-    #     log_event_widget_data(self, event, prefix='Tkinter Click', show_ttk_info=True)
-    #     # log_event_widget_data(self, event, prefix='Tkinter Click', show_config=True)
 
     # endregion
 
@@ -965,10 +971,7 @@ class Window(BindMixin, RowContainer):
                 close_cb()
 
             if self.global_cleanup_on_close:
-                try:
-                    self._hidden_root.schedule_close()
-                except AttributeError:  # hidden root was already destroyed
-                    pass
+                HiddenRoot.maybe_schedule_close()
 
     def _close_child_windows(self):
         for window in tuple(self._child_windows):
@@ -1005,287 +1008,8 @@ class Window(BindMixin, RowContainer):
         self._child_windows.add(window)
 
 
-class HiddenRoot:
-    __slots__ = ('root', '_close_cb_id', '_finalizer', '__weakref__')
-    tk_load_profile: bool = False
-
-    def __init__(self):
-        tk_cls = Tk if self.tk_load_profile else NoProfileTk
-        # log.debug('Initializing hidden root')
-        self.root = root = tk_cls()
-        root.attributes('-alpha', 0)  # Hide this window
-        try:
-            root.wm_overrideredirect(True)
-        except (TclError, RuntimeError):
-            log.error('Error overriding redirect for hidden root:', exc_info=True)
-        root.withdraw()
-        self._finalizer = finalize(self, self._close, root)
-        self._close_cb_id = None
-
-    def close(self):
-        if root := self.root:
-            if cb_id := self._close_cb_id:
-                try:
-                    root.after_cancel(cb_id)
-                except TclError:
-                    pass
-            self._close(root)
-            self.root = None
-
-    @classmethod
-    def _close(cls, root: Tk | NoProfileTk):
-        # log.debug(f'Closing hidden Tk {root=}')
-        try:
-            root.destroy()
-        except (AttributeError, TclError):
-            pass
-        Window._hidden_root = None
-
-    def schedule_close(self):
-        if not self._close_cb_id:
-            try:
-                self._close_cb_id = self.root.after(500, self.maybe_close)
-            except (AttributeError, TclError):  # hidden root was already destroyed
-                pass
-
-    def maybe_close(self):
-        if not Window._get_active_windows():
-            self.close()
-
-
-# region Initialization
-
-
-@dataclass
-class InitConfig:
-    min_size: XY = (200, 50)
-    size: XY = None
-    position: XY = None
-    margins: XY = (10, 5)  # Padding values for the outer [Scrollable]Toplevel
-    resizable: Bool = True
-    can_minimize: Bool = True
-    transparent_color: str = None
-    alpha_channel: float = None
-    scaling: float = None
-
-
-class WindowInitializer:
-    def __init__(self, init_config: InitConfig, window: Window):
-        self.init_config = init_config
-        self.window = window
-        self.size: XY | None = init_config.size or window.config.size
-        self.position: XY | None = init_config.position or window.config.position
-
-    def initialize_window(self) -> Top:
-        root = self._init_root_widget()
-        self._configure_root(root)
-        self.window.pack_rows()
-        self._set_init_size_and_pos(root)
-        self._finalize_root(root, self.init_config.alpha_channel)
-        return root
-
-    @cached_property
-    def monitor(self) -> Monitor | None:
-        x, y = self.position or self.window.position
-        if not (monitor := monitor_manager.get_monitor(x, y)):
-            log.debug(f'Could not find monitor for pos={x, y}')
-        return monitor
-
-    # region Initialize Widget
-
-    def _init_root_widget(self) -> Top:
-        window = self.window
-        x_config, y_config = window.x_config, window.y_config
-        if y_config.scroll or x_config.scroll:
-            root = self._init_root_scrollable(x_config, y_config)
-        else:
-            root = self._init_root_normal()
-        window.widget = window.root = root
-        return root
-
-    def _init_root_scrollable(self, x_config: AxisConfig, y_config: AxisConfig) -> ScrollableToplevel:
-        style = self.window.style
-        kwargs = style.get_map(background='bg')
-        kwargs['inner_kwargs'] = kwargs.copy()  # noqa
-        root = ScrollableToplevel(
-            x_config=x_config, y_config=y_config, style=style, pad=self.init_config.margins, **kwargs
-        )
-        self.window.tk_container = root.inner_widget
-        return root
-
-    def _init_root_normal(self) -> Toplevel:
-        window = self.window
-        pad_x, pad_y = self.init_config.margins
-        window.tk_container = root = Toplevel(padx=pad_x, pady=pad_y, **window.style.get_map(background='bg'))
-        return root
-
-    # endregion
-
-    def _configure_root(self, root: Top):
-        window, init_config = self.window, self.init_config
-        window.set_alpha(0)  # Hide window while building it
-        if not init_config.resizable:
-            root.resizable(False, False)
-        if not init_config.can_minimize:
-            try:
-                root.attributes('-toolwindow', 1)
-            except (TclError, RuntimeError) as e:
-                log.error(f'Unable to prevent window minimization: {e}')
-        if window._keep_on_top:
-            root.attributes('-topmost', 1)
-        if (transparent_color := init_config.transparent_color) is not None:
-            try:
-                root.attributes('-transparentcolor', transparent_color)
-            except (TclError, RuntimeError):
-                log.error('Transparent window color not supported on this platform (Windows only)')
-        if (scaling := init_config.scaling) is not None:
-            root.tk.call('tk', 'scaling', scaling)
-
-    def _finalize_root(self, root: Top, alpha_channel: float = None):
-        window = self.window
-        if window.no_title_bar:
-            window.disable_title_bar()
-        else:
-            window.enable_title_bar()
-
-        window.set_alpha(1 if alpha_channel is None else alpha_channel)
-        if window.no_title_bar:
-            root.focus_force()
-        if window.modal:
-            window.make_modal()
-
-        root.protocol('WM_DESTROY_WINDOW', window.close)
-        root.protocol('WM_DELETE_WINDOW', window.close)
-        window.apply_binds()
-        root.update_idletasks()
-
-    # region Size & Position
-
-    def _set_init_size_and_pos(self, root: Top):
-        if (inner := self.window.tk_container) != root:  # root is scrollable
-            root.resize_scroll_region(self._get_init_inner_size(inner))
-        if min_size := self.init_config.min_size:
-            self.window.set_min_size(*min_size)
-        if size := self._get_init_outer_size(root):
-            self.window.size = size
-        if pos := self.position:
-            self.window.position = pos
-        else:
-            root.update_idletasks()
-            self.window.move_to_center()
-
-    def _get_init_inner_size(self, inner: TkContainer) -> XY | None:
-        if size := self.size:
-            return size
-
-        y_div = self.window.y_config.size_div
-        if y_div <= 1 or not (monitor := self.monitor):
-            return None
-
-        max_outer_height = monitor.work_area.height - 50
-
-        inner.update_idletasks()
-        width = self.window.x_config.target_size(inner)
-        if (height := inner.winfo_reqheight()) > max_outer_height / 3:
-            max_inner_height = max_outer_height - 50
-            height = min(max_inner_height, height // y_div)
-
-        return width, height
-
-    def _get_init_outer_size(self, root: Top) -> XY | None:
-        if size := self.size:
-            return size
-        elif not (monitor := self.monitor):
-            return None
-
-        work_area = monitor.work_area
-        max_width = work_area.width - 100
-        max_height = work_area.height - 50
-
-        root.update_idletasks()
-        width, height = get_req_size(root)
-        if width < max_width and height < max_height:
-            return None
-
-        if width > max_width:
-            width = max_width
-        if height > max_height:
-            height = max_height
-        return width, height
-
-    # endregion
-
-
-# endregion
-
-
 def _normalize_bind_event(event_pat: Bindable) -> Bindable:
     try:
         return BindEvent(event_pat)
     except ValueError:
         return event_pat
-
-
-def patch_call_wrapper():
-    """Patch CallWrapper.__call__ to prevent it from suppressing KeyboardInterrupt"""
-
-    def _cw_call(self, *args):
-        # log.debug(f'CallWrapper({self!r}, {args=})')
-        try:
-            if subst := self.subst:
-                args = subst(*args)
-            return self.func(*args)
-        except Exception:  # noqa
-            # The original implementation re-raises SystemExit, but uses a bare `except:` here
-            # log.error('Error encountered during tkinter call:', exc_info=True)
-            self.widget._report_exception()
-
-    CallWrapper.__call__ = _cw_call
-
-
-def patch_variable_del():
-    """
-    Patch Variable.__del__ to prevent running outside of the main thread.  The official implementation has remained the
-    same in Python 3.7 through 3.13.
-    """
-
-    def _var_del(self):
-        """Unset the variable in Tcl."""
-        if self._tk is None:
-            return
-
-        try:
-            if self._tk.getboolean(self._tk.call('info', 'exists', self._name)):
-                self._tk.globalunsetvar(self._name)
-        except RuntimeError as e:  # RuntimeError: main thread is not in main loop
-            # TODO: Maybe put the var in a global queue for the main thread window to process?
-            log.warning(f'Error deleting {self.__class__.__name__} with name={self._name!r}: {e}')
-            raise
-
-        if self._tclCommands is not None:
-            for name in self._tclCommands:
-                # log.debug(f'Tkinter: deleting command={name!r}')
-                self._tk.deletecommand(name)
-            self._tclCommands = None
-
-    Variable.__del__ = _var_del
-
-    # real_var_init = Variable.__init__
-    #
-    # def _var_init(self, *args, **kwargs):
-    #     real_var_init(self, *args, **kwargs)
-    #     log.debug(f'Initialized {self.__class__.__name__}[{self._name}]', extra={'color': 12})
-    #
-    # Variable.__init__ = _var_init
-
-
-class NoProfileTk(Tk):
-    def readprofile(self, baseName: str, className: str):
-        return
-
-
-if environ.get('TK_GUI_NO_CALL_WRAPPER_PATCH', '0') != '1':
-    patch_call_wrapper()
-
-if environ.get('TK_GUI_NO_VARIABLE_DEL_PATCH', '0') != '1':
-    patch_variable_del()

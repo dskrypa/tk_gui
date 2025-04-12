@@ -122,9 +122,9 @@ def _font_or_none(font: Font) -> TkFont | None:
     except RuntimeError:  # Fonts require the hidden root to have been initialized first
         pass
 
-    from tk_gui.window import Window
+    from tk_gui.window import ensure_tk_is_initialized
 
-    Window._ensure_tk_is_initialized()
+    ensure_tk_is_initialized()
     return TkFont(font=font)
 
 

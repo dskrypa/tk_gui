@@ -7,9 +7,10 @@ from __future__ import annotations
 import logging
 from tkinter import BaseWidget, Misc, Event, TclError, Entry, Text, Tk
 from tkinter.ttk import Style
-from typing import TYPE_CHECKING, Any, Collection, Literal, Iterator, Mapping, Callable, Sequence
+from typing import TYPE_CHECKING, Any, Collection, Literal, Iterator, Callable, Sequence
 
 from tk_gui.caching import cached_property
+from tk_gui.utils import mapping_repr
 
 if TYPE_CHECKING:
     from tk_gui.elements import Element
@@ -229,7 +230,7 @@ class WidgetData:
     @cached_property
     def config_str(self) -> str:
         if self.widget:
-            return _mapping_repr(self._config, self.config_keys, indent=4)
+            return mapping_repr(self._config, self.config_keys, indent=4)
         return '???'
 
     @cached_property
@@ -237,7 +238,7 @@ class WidgetData:
         data = self.event.__dict__
         if self.hide_event_unset:
             return '<{}>'.format(', '.join(f'{k}={v!r}' for k, v in data.items() if v != '??'))
-        return _mapping_repr(data, indent=4)
+        return mapping_repr(data, indent=4)
 
     @cached_property
     def get_result(self) -> str:
@@ -267,9 +268,9 @@ class WidgetData:
                 'style_name': repr(style_name),
                 'style_config': style.configure(style_name),
                 'style_layout': _sequence_repr(layout, indent=8) if layout else layout,
-                'elements': _mapping_repr(elements, val_repr=str, indent=8),
+                'elements': mapping_repr(elements, val_repr=str, indent=8),
             }
-            return _mapping_repr(data, val_repr=str, indent=4, sort=False)
+            return mapping_repr(data, val_repr=str, indent=4, sort=False)
         return '???'
 
     def __iter__(self) -> Iterator[str]:
@@ -343,7 +344,7 @@ def log_widget_data(
 
 
 def get_config_str(widget: Misc, keys: Collection[str] = None) -> str:
-    return _mapping_repr(widget.configure(), keys)
+    return mapping_repr(widget.configure(), keys)
 
 
 def log_config_str(widget: Misc, prefix: str = '', keys: Collection[str] = None, level: int = logging.DEBUG):
@@ -430,8 +431,8 @@ def _get_style_details(style, name, layout, indent: int = 0):
             opt: {state or 'default': style.lookup(name, opt, [state] if state else None) for state in states}
             for opt in style.element_options(element_name)
         }
-        options_str = _mapping_repr(options, indent=indent + 8)
-        ele_str = _mapping_repr({'layout': repr(data), 'options': options_str}, indent=indent + 4, val_repr=str)
+        options_str = mapping_repr(options, indent=indent + 8)
+        ele_str = mapping_repr({'layout': repr(data), 'options': options_str}, indent=indent + 4, val_repr=str)
         yield element_name, ele_str
 
         for key, value in data.items():
@@ -456,25 +457,6 @@ def get_selection_pos(widget: Entry | Text, raw: Bool = False) -> SelectionPos:
     first_line, first_index = map(int, first.split('.', 1))
     last_line, last_index = map(int, last.split('.', 1))
     return (first_line, first_index), (last_line, last_index)
-
-
-def _mapping_repr(
-    data: Mapping,
-    keys: Collection[str] = None,
-    sort: Bool = True,
-    indent: int = 0,
-    val_repr: Callable[[Any], str] = repr,
-) -> str:
-    if keys:
-        kv_pairs = (kv for kv in data.items() if kv[0] in keys)
-    else:
-        kv_pairs = data.items()
-    if sort:
-        kv_pairs = sorted(kv_pairs)
-
-    inner = ' ' * (indent + 4)
-    outer = ' ' * indent
-    return '{\n' + ',\n'.join(f'{inner}{k!r}: {val_repr(v)}' for k, v in kv_pairs) + f'\n{outer}}}'
 
 
 def _sequence_repr(data: Sequence, sort: Bool = False, indent: int = 0, val_repr: Callable[[Any], str] = repr) -> str:
