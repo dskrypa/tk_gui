@@ -78,6 +78,7 @@ class ScrollableBase(BaseWidget, ABC):
         raise NotImplementedError
 
     def has_scrollable_bar(self, scroll_bar_name: str) -> bool:
+        scroll_bar: Scrollbar
         if not (scroll_bar := getattr(self, scroll_bar_name)):
             return False
         # Even if it has a scroll bar, there may or may not be anything to scroll.
@@ -188,7 +189,13 @@ class ScrollableListbox(ScrollableWidget, Frame, inner_cls=Listbox):
 
 
 class ComplexScrollable(ScrollableBase, ABC):
-    _y_bind, _x_bind = ('<MouseWheel>', '<Shift-MouseWheel>') if ON_WINDOWS else ('<4>', '<5>')
+    if ON_WINDOWS:
+        _y_binds = ('<MouseWheel>',)
+        _x_binds = ('<Shift-MouseWheel>',)
+    else:
+        _y_binds = ('<4>', '<5>')
+        _x_binds = ('<Shift-4>', '<Shift-5>')
+
     canvas: Canvas
     _last_box: Box = Box(0, 0, 0, 0)
     _last_size: XY = ()
@@ -254,9 +261,11 @@ class ComplexScrollable(ScrollableBase, ABC):
             # TODO: Handle Page[Up|Down]
             # self.canvas.bind_all('<Key-Prior>', _scroll_y, add='+')     # PageUp
             # self.canvas.bind_all('<Key-Next>', _scroll_y, add='+')      # PageDown
-            self.canvas.bind_all(self._y_bind, _scroll_y, add='+')
+            for bind in self._y_binds:
+                self.canvas.bind_all(bind, _scroll_y, add='+')
         if x_config.scroll:
-            self.canvas.bind_all(self._x_bind, _scroll_x, add='+')
+            for bind in self._x_binds:
+                self.canvas.bind_all(bind, _scroll_x, add='+')
         if y_config.scroll or x_config.scroll:
             self.bind('<Configure>', self._maybe_update_scroll_region, add=True)
         if y_config.fill or x_config.fill:
