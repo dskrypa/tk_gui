@@ -71,7 +71,7 @@ class Window(BindMixin, RowContainer):
     _motion_tracker: MotionTracker = None
     _grab_anywhere_mgr: BindManager | None = None
     _grab_anywhere: GrabAnywhere = False  #: Whether the window should move on mouse click + movement
-    root: Top | None = None
+    root: Top | None = None  # Set via :meth:`WindowInitializer._init_root_widget`
     tk_container: TkContainer | None = None
     widget: Top = None
     is_popup: bool = False                              #: Whether the window is a popup
@@ -455,8 +455,7 @@ class Window(BindMixin, RowContainer):
 
     @property
     def _true_size_and_pos(self) -> tuple[int, int, int, int]:
-        root = self.root
-        size, x, y = root.geometry().split('+', 2)
+        size, x, y = self.root.geometry().split('+', 2)
         w, h = size.split('x', 1)
         return int(w), int(h), int(x), int(y)
 
@@ -469,15 +468,13 @@ class Window(BindMixin, RowContainer):
 
     @property
     def position(self) -> XY:
-        root = self.root
-        return root.winfo_x(), root.winfo_y()
+        return self.root.winfo_x(), self.root.winfo_y()
 
     @position.setter
     def position(self, pos: XY):
-        root = self.root
         try:
-            root.geometry('+{}+{}'.format(*pos))
-            root.update_idletasks()
+            self.root.geometry('+{}+{}'.format(*pos))
+            self.root.update_idletasks()
         except AttributeError:  # root has not been created yet
             self._init_config.position = pos
 
@@ -539,14 +536,13 @@ class Window(BindMixin, RowContainer):
             self.root.state('zoomed')  # Only available on Windows/macOS
 
     def normal(self):
-        root = self.root
-        if (state := root.state()) == 'iconic':
-            root.deiconify()
+        if (state := self.root.state()) == 'iconic':
+            self.root.deiconify()
         elif ON_LINUX:
-            root.attributes('-fullscreen', False)
+            self.root.attributes('-fullscreen', False)
         elif state == 'zoomed':
-            root.state('normal')
-            # root.attributes('-fullscreen', False)
+            self.root.state('normal')
+            # self.root.attributes('-fullscreen', False)
 
     @property
     def is_maximized(self) -> bool:
@@ -579,8 +575,8 @@ class Window(BindMixin, RowContainer):
         try:
             focus_widget = self.root.focus_get()
         except KeyError:
-            focus_widget = None
-        if focus_widget is None:  # focus_get may also return None
+            return False
+        if focus_widget is None:  # focus_get may return None
             return False
         return get_root_widget(focus_widget) == self.root
 
@@ -684,6 +680,7 @@ class Window(BindMixin, RowContainer):
             log.warning('Attempted to show window after it was already shown', stack_info=True)
             return
 
+        # Note: self.root is set by `WindowInitializer._init_root_widget` when the following line is called
         root = WindowInitializer(self._init_config, self).initialize_window()
         self._finalizer = finalize(self, self._close, root)
 

@@ -19,7 +19,7 @@ from weakref import WeakValueDictionary
 from tk_gui.caching import cached_property
 from tk_gui.enums import ListBoxSelectMode, Anchor
 from tk_gui.typing import Bool, T, BindTarget, BindCallback, TraceCallback, TkContainer, HasFrame, XY
-from tk_gui.utils import max_line_len, extract_kwargs
+from tk_gui.utils import ON_WINDOWS, max_line_len, extract_kwargs
 from tk_gui.widgets.scroll import ScrollableListbox
 from ._utils import normalize_underline
 from .element import Interactive
@@ -94,7 +94,7 @@ class Radio(DisableableMixin, CallbackCommandMixin, Interactive, Generic[T], bas
         super().pack_into_row(row)
         group = self.group
         if not group._registered and (key := group.key):
-            row.window.register_element(key, group)
+            row.window.register_element(key, group)  # noqa
         group._registered = True
 
     @property
@@ -411,7 +411,7 @@ class CheckBox(DisableableMixin, CallbackCommandMixin, TraceCallbackMixin, Inter
         """
         style, state = self.style, self.style_state
         return {
-            'highlightthickness': 1,
+            'highlightthickness': 1 if ON_WINDOWS else 0,
             **style.get_map(
                 'checkbox_label', state, bd='border_width', font='font', fg='fg', bg='bg',
                 activeforeground='fg', activebackground='bg', disabledforeground='fg',

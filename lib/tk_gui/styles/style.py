@@ -109,6 +109,7 @@ class Style(ClearableCachedPropertyMixin):
                 layers.setdefault('base', {})[key] = val
             else:
                 layer, attr = self._split_config_key(key)  # attr should be an attribute in StyleLayer
+                # log.debug(f'{self}: in {layer=}, setting {attr} = {val!r}')
                 layers.setdefault(layer, {})[attr] = val
 
         # log.info(f'{self}: Built layers: {layers!r}', extra={'color': 11})
@@ -121,13 +122,14 @@ class Style(ClearableCachedPropertyMixin):
                 layer, attr = key.split(delim, 1)
             except ValueError:
                 continue
-
-            if layer in self._layers and attr in StyleLayer._fields:
-                return layer, attr
+            else:
+                if layer in self._layers and attr in StyleLayer._fields:
+                    return layer, attr
 
         for layer_name, suffix_idx, delim_idx in self._compound_layer_names():
             if key.startswith(layer_name) and len(key) > suffix_idx and key[delim_idx] in '_.':
                 if (attr := key[suffix_idx:]) in StyleLayer._fields:
+                    # log.debug(f'Found layer={layer_name!r} for {attr=}')
                     return layer_name, attr
 
         raise KeyError(f'Invalid style option: {key!r}')

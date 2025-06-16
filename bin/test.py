@@ -3,9 +3,8 @@
 import logging
 from pathlib import Path
 
-from cli_command_parser import Command, Action, Counter, main
+from cli_command_parser import Command, Action, Counter, Flag, main
 
-from tk_gui.__version__ import __author_email__, __version__, __author__, __url__  # noqa
 from tk_gui.elements import Table, Input, Text, ScrollFrame, SizeGrip, CheckBox, Button
 from tk_gui.elements.bars import HorizontalSeparator, VerticalSeparator
 from tk_gui.elements.images import Image, Animation, SpinnerImage, ClockImage
@@ -34,6 +33,7 @@ class BaseRightClickMenu(Menu):
 class GuiTest(Command):
     action = Action(help='The test to perform')
     verbose = Counter('-v', default=2, help='Increase logging verbosity (can specify multiple times)')
+    highlight_clicks = Flag('-c', help='Use ClickHighlighter to highlight clicked elements')
 
     def _init_command_(self):
         logging.getLogger('PIL').setLevel(50)
@@ -44,6 +44,14 @@ class GuiTest(Command):
             logging.basicConfig(level=logging.DEBUG if self.verbose else logging.INFO, format=log_fmt)
         else:
             init_logging(self.verbose, log_path=None, names=None)
+
+    def _run_window(self, window: Window):
+        if not self.highlight_clicks:
+            return window.run()
+
+        # log_event_kwargs = {'window': window, 'show_event_attrs': True, 'show_config': True, 'show_get_result': True}
+        ClickHighlighter(log_event=True, log_event_kwargs={'window': window}).register(window)
+        return window.run()
 
     @action
     def scroll(self):
@@ -56,13 +64,13 @@ class GuiTest(Command):
         ]
 
         window = Window(layout, 'Scroll Test', size=(300, 500), exit_on_esc=True, scroll_y=True)
-        ClickHighlighter(log_event=True, log_event_kwargs={'window': window}).register(window)
-        window.run()
+        self._run_window(window)
 
     @action
     def max_size(self):
         layout = [[Text(f'test_{i:03d}')] for i in range(100)]
-        Window(layout, 'Auto Max Size Test', exit_on_esc=True).run()
+        window = Window(layout, 'Auto Max Size Test', exit_on_esc=True)
+        self._run_window(window)
 
     @action(default=True)
     def window(self):
@@ -155,11 +163,8 @@ class GuiTest(Command):
         # results = Window(layout, binds={'<Escape>': 'exit'}, right_click_menu=RightClickMenu()).run().results
         window = Window(layout, 'Mixed Test', right_click_menu=RightClickMenu(), exit_on_esc=True, grab_anywhere=True)
 
-        # log_event_kwargs = {'window': window, 'show_event_attrs': True, 'show_config': True, 'show_get_result': True}
-        # ClickHighlighter(log_event=True, log_event_kwargs=log_event_kwargs).register(window)
-
         with gui_log_handler(multiline):
-            results = window.run().results
+            results = self._run_window(window).results
         print(f'Results: {results}')
 
 
