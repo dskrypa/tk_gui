@@ -20,6 +20,7 @@ from .color import color_to_rgb, find_unused_color
 
 if TYPE_CHECKING:
     from pathlib import Path
+    from PIL.Image.core import ImagingCore
     from tk_gui.typing import XY, Color, RGB, RGBA, ImageType  # noqa
 
 __all__ = ['Icons', 'PlaceholderCache', 'placeholder_icon_cache', 'icon_path']
@@ -46,6 +47,10 @@ class Icons:
 
     @property
     def char_names(self) -> dict[str, int]:
+        """
+        Mapping of icon name to the character used to represent it.  Characters are stored in `bootstrap-icons.json`
+        as integers, then converted in :meth:`.__getitem__` / :meth:`._normalize`.
+        """
         if self._names is None:
             import json
 
@@ -61,12 +66,12 @@ class Icons:
         return chr(self.char_names[char_name])
 
     def _normalize(self, icon: Icon) -> str:
-        if isinstance(icon, int):  # TODO: What is the use case for this / what is this supposed to result in?
+        if isinstance(icon, int):  # No lookup is necessary - assume it matches a char defined in bootstrap-icons.json
             return chr(icon)
         try:
             return self[icon]
         except KeyError:
-            return icon  # TODO: This may not be valid either...
+            return icon  # assume it is a single-character string that matches an already-normalized char
 
     def _font_and_size(self, size: XY = None) -> tuple[FreeTypeFont, XY]:
         font = self.font
@@ -87,7 +92,6 @@ class Icons:
         :return: The specified icon as a PIL Image object.  It will need to be wrapped in a :class:`.images.Image`
           element to be included in a layout.
         """
-        icon = self._normalize(icon)
         font, size = self._font_and_size(size)
         # from PIL.ImageDraw import ImageDraw
         # image: PILImage = new_image('RGBA', size, color_to_rgb(bg))
@@ -143,26 +147,41 @@ class Icons:
 
 
 def draw_icon(size: XY, text: str, fg: RGB | RGBA, bg: RGB | RGBA, font: FreeTypeFont) -> PILImage:
+    """
+    Optimized version of the following::
+
+        from PIL.ImageDraw import ImageDraw
+        image: PILImage = new_image('RGBA', size, color_to_rgb(bg))
+        ImageDraw(image).text((0, 0), icon, fill=color_to_rgb(color), font=font)
+        return image
+    """
+    # TODO: Automatically detect changes to the functions that this is replacing?
     image: PILImage = new_image('RGBA', size, bg)
-    draw = _core_draw(image.im, 0)
-    ink = draw.draw_ink(fg)
+    draw = _core_draw(image.im, 0)  # This would happen in ImageDraw.__init__, but it does many other unnecessary steps
+    # mode=L is used for the remaining steps, matching the `fontmode` that would be set in __init__,
+    # since `new_image` was called with mode=RGBA
+
+    # The remaining steps replace the call to `ImageDraw.text`
+    ink = draw.draw_ink(fg)         # replaces a call to the ImageDraw._getink helper that normalizes to this
+    # The remaining steps replace the `draw_text` function defined inside `ImageDraw.text`
+    # They also replace the call to `FreeTypeFont.getmask2` inside `draw_text`, which defines a `fill` function
     f = font.font
-    f_size, offset = f.getsize(text, 'L')
-    mask = _core_fill('L', f_size, 0)
+    f_size, offset = f.getsize(text, 'L')  # noqa  # replaces a step performed in font.render
+    mask: ImagingCore = _core_fill('L', f_size, 0)  # replaces the `fill` func defined inside `FreeTypeFont.getmask2`
     f.render(
         text,               # text
-        lambda *a: mask,    # fill (expects callable that accepts mode(str) + size(2-tuple))
+        lambda *a: mask,    # noqa  # fill (expects callable that accepts mode(str) + size(2-tuple))
         'L',                # mode
         None,               # direction
         None,               # features
         None,               # language
         0,                  # stroke_width
-        None,               # anchor (new)
+        False,              # stroke_filled (added in 11.2.x)
+        None,               # anchor
         ink,                # ink
-        0,                  # start[0]
-        0,                  # start[1]
+        (0, 0),             # Changed from expecting x/y separately in 11.2.x
     )
-    draw.draw_bitmap(offset, mask, ink)
+    draw.draw_bitmap(offset, mask, ink)  # replaces the last line of `draw_text`
     return image
 
 
