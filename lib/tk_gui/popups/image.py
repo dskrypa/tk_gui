@@ -8,10 +8,10 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from concurrent.futures import Future, TimeoutError
+from concurrent.futures import Future
 from functools import partial
 from threading import Thread
-from typing import TYPE_CHECKING, Optional, Callable, TypeVar, ParamSpec
+from typing import TYPE_CHECKING, Any, Optional, Callable, TypeVar, ParamSpec
 
 from tk_gui.caching import cached_property
 from tk_gui.elements import Text
@@ -21,7 +21,6 @@ from tk_gui.event_handling import event_handler
 from tk_gui.event_handling.futures import run_func_in_future
 from tk_gui.images.wrapper import ImageWrapper, SourceImage
 from .base import Popup
-from .raw import SaveAs
 
 if TYPE_CHECKING:
     from tkinter import Event
@@ -80,8 +79,8 @@ class ImagePopup(Popup):
 
     def get_pre_window_layout(self) -> Layout:
         image_row = [self.gui_image]
-        if text := self.text:
-            text_row = [Text(text, side='t')]
+        if self.text:
+            text_row = [Text(self.text, side='t')]
             return [text_row, image_row] if self.text_above_img else [image_row, text_row]
         else:
             return [image_row]
@@ -94,7 +93,7 @@ class ImagePopup(Popup):
             log.debug(f'{self}: Using {init_size=} to display image={src!r} with {src.format=} mime={src.mime_type!r}')
         self.image = image = src.as_size(init_size)
 
-        kwargs = {'pad': (2, 2)}
+        kwargs: dict[str, Any] = {'pad': (2, 2)}
         if self._add_save_as_menu:
             class ImageMenu(Menu):
                 MenuItem('Save As...', callback=partial(src.save_as_with_prompt, init_dir=self._save_as_init_dir))
@@ -180,8 +179,8 @@ class BaseAnimatedPopup(Popup, ABC):
 
     def get_pre_window_layout(self) -> Layout:
         image_row = [self.gui_image]
-        if text := self.text:
-            text_row = [Text(text, side='t')]
+        if self.text:
+            text_row = [Text(self.text, side='t')]
             return [text_row, image_row] if self.text_above_img else [image_row, text_row]
         return [image_row]
 

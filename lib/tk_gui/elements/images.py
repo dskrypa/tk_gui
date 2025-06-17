@@ -544,9 +544,7 @@ class ClockImage(BaseAnimation):
 
 
 def _extract_kwargs(kwargs: dict[str, Any], keys: set[str], defaults: dict[str, Any]) -> dict[str, Any]:
-    pop = kwargs.pop
-    extracted = {key: pop(key) for key in keys.intersection(kwargs)}
-    for key, val in defaults.items():
-        extracted.setdefault(key, val)
-
-    return extracted
+    if kwargs:
+        return defaults | {key: kwargs.pop(key) for key in keys.intersection(kwargs)}
+    else:
+        return defaults.copy()
