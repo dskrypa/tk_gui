@@ -13,11 +13,13 @@ from tk_gui.elements.menu.items import CopySelection, GoogleSelection, SearchKpo
 from tk_gui.elements.menu.items import ToUpperCase, ToTitleCase, ToLowerCase, OpenFileLocation, OpenFile
 from tk_gui.elements.menu.items import CloseWindow
 from tk_gui.elements.text import Multiline, gui_log_handler
+from tk_gui.elements.trees.tree import Tree, Column, TreeNode
 from tk_gui.event_handling import ClickHighlighter
 from tk_gui.images import Icons, ICONS_DIR
 from tk_gui.popups.about import AboutPopup
 from tk_gui.popups.raw import PickColor
 from tk_gui.window import Window
+from tk_gui.utils import readable_bytes
 
 
 class BaseRightClickMenu(Menu):
@@ -71,6 +73,30 @@ class GuiTest(Command):
         layout = [[Text(f'test_{i:03d}')] for i in range(100)]
         window = Window(layout, 'Auto Max Size Test', exit_on_esc=True)
         self._run_window(window)
+
+    @action
+    def file_tree(self):
+        cwd = Path.cwd()
+        contents = list(cwd.iterdir())
+        root = TreeNode(None, key=cwd.as_posix(), text=cwd.name, values=[f'{len(contents)} items'])
+        self._add_dir(root, contents, 3)
+
+        tree = Tree(root, [Column('#0', 'Name', width=30), Column('Size', width=20)], rows=20)
+        window = Window([[tree]], 'File Tree Test', exit_on_esc=True)
+        self._run_window(window)
+
+    @classmethod
+    def _add_dir(cls, root: TreeNode, dir_items: list[Path], recurse: int = 0):
+        for path in dir_items:
+            if path.is_dir():
+                if recurse:
+                    child_items = list(path.iterdir())
+                    child = root.add_child(path.as_posix(), path.name, [f'{len(child_items)} items'])
+                    cls._add_dir(child, child_items, recurse - 1)
+                else:
+                    root.add_child(path.as_posix(), path.name, ['? items'])
+            else:
+                root.add_child(path.as_posix(), path.name, [readable_bytes(path.stat().st_size)])
 
     @action(default=True)
     def window(self):

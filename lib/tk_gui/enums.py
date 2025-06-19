@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 __all__ = [
     'Anchor', 'Justify', 'Side',
     'BindEvent', 'BindTargets', 'CallbackAction',
-    'StyleState', 'ListBoxSelectMode', 'ScrollUnit', 'ImageResizeMode',
+    'StyleState', 'ListBoxSelectMode', 'TreeSelectMode', 'ScrollUnit', 'ImageResizeMode',
 ]
 
 # fmt: off
@@ -201,6 +201,12 @@ class ListBoxSelectMode(MissingMixin, Enum):
     SINGLE = tkc.SINGLE         #: Select 1 item; cannot drag mouse to move selection
     MULTIPLE = tkc.MULTIPLE     #: Select multiple items; each must be clicked individually
     EXTENDED = tkc.EXTENDED     #: Select multiple items; can drag mouse to select multiple items (lib default)
+
+
+class TreeSelectMode(MissingMixin, Enum):
+    NONE = tkc.NONE
+    BROWSE = tkc.BROWSE         #: Select 1 item
+    EXTENDED = tkc.EXTENDED     #: Select multiple items
 
 
 class ScrollUnit(MissingMixin, Enum):

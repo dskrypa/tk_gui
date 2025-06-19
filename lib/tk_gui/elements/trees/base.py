@@ -1,0 +1,145 @@
+from __future__ import annotations
+
+import logging
+from abc import ABC, abstractmethod
+from tkinter.ttk import Treeview
+from typing import TYPE_CHECKING, Any, Union, Callable, Mapping, Iterable
+
+from tk_gui.caching import cached_property
+from tk_gui.elements.element import Interactive
+from tk_gui.enums import Anchor
+from tk_gui.widgets.scroll import ScrollableTreeview
+from .utils import mono_width
+
+if TYPE_CHECKING:
+    from tkinter import BaseWidget
+    from tk_gui.pseudo_elements import Row
+
+__all__ = ['TreeViewBase', 'Column']
+log = logging.getLogger(__name__)
+
+_Width = Union[float, Mapping[Any, Mapping[str, Any]], Iterable[Union[Mapping[str, Any], Any]]]
+FormatFunc = Callable[[Any], str]
+
+
+class TreeViewBase(Interactive, ABC):
+    widget: Treeview | ScrollableTreeview
+    tree_view: Treeview
+    _init_focus_row: int | tuple[str, str | int] | None = 0,
+
+    @abstractmethod
+    def set_focus_on_value(self, key: str, value: str | int):
+        raise NotImplementedError
+
+    def set_focus_on_row(self, n: int):
+        tree_view = self.tree_view
+        child_id = tree_view.get_children()[n]
+        tree_view.selection_set(child_id)
+        tree_view.focus(child_id)
+
+    def take_focus(self, force: bool = False):
+        if force:
+            self.tree_view.focus_force()
+        else:
+            self.tree_view.focus_set()
+
+        if (focus_row := self._init_focus_row) is not None:
+            try:
+                self.set_focus_on_value(*focus_row)
+            except TypeError:
+                self.set_focus_on_row(focus_row)
+
+    def enable(self):
+        pass
+
+    def disable(self):
+        pass
+
+    def pack_into(self, row: Row):
+        self._init_widget(row.frame)
+        self.pack_widget(expand=True)
+
+    @cached_property
+    def widgets(self) -> list[BaseWidget]:
+        widget = self.widget
+        try:
+            return widget.widgets
+        except AttributeError:
+            return [widget]
+
+
+class Column:
+    __slots__ = ('key', 'title', '_width', 'show', 'fmt_func', 'anchor_header', 'anchor_values')
+
+    def __init__(
+        self,
+        key: str,
+        title: str = None,
+        width: _Width = None,
+        show: bool = True,
+        fmt_func: FormatFunc = None,
+        anchor_header: Anchor | str = None,
+        anchor_values: Anchor | str = None,
+    ):
+        self.key = key
+        self.title = str(title or key)
+        self._width = 0
+        self.show = show
+        self.fmt_func = fmt_func
+        if width is not None:
+            self.width = width
+        self.anchor_header = Anchor(anchor_header) if anchor_header else Anchor.MID_CENTER
+        self.anchor_values = Anchor(anchor_values) if anchor_values else Anchor.MID_LEFT
+
+    @property
+    def width(self) -> int:
+        return self._width
+
+    @width.setter
+    def width(self, value: _Width):
+        try:
+            self._width = max(self._calc_width(value), mono_width(self.title))
+        except Exception:
+            log.error(f'Error calculating width for column={self.key!r}', exc_info=True)
+            raise
+
+    def width_for(self, char_width: int) -> int:
+        return self.width * char_width + 10
+
+    def _calc_width(self, width: _Width) -> int:
+        try:
+            return int(width)
+        except (TypeError, ValueError):
+            pass
+
+        if fmt_func := self.fmt_func:
+            def _len(obj: Any):
+                return mono_width(fmt_func(obj))
+        else:
+            def _len(obj: Any):
+                return mono_width(str(obj))
+
+        key = self.key
+        try:
+            return max(_len(e[key]) for e in width.values())
+        except (KeyError, TypeError, AttributeError):
+            pass
+        try:
+            return max(_len(e[key]) for e in width)
+        except (KeyError, TypeError, AttributeError):
+            pass
+        try:
+            return max(map(_len, width))
+        except ValueError as e:
+            if 'Unknown format code' in str(e):
+                if fmt_func := self.fmt_func:
+                    values = []
+                    for obj in width:
+                        try:
+                            values.append(fmt_func(obj))
+                        except ValueError:
+                            values.append(str(obj))
+                else:
+                    values = list(map(str, width))
+                return max(map(mono_width, values))
+            raise

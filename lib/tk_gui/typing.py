@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from tkinter import Event, Toplevel, Frame, LabelFrame  # noqa
     from PIL.Image import Image as PILImage  # noqa
     from tk_gui.elements.element import Element, ElementBase  # noqa
-    from tk_gui.enums import BindTargets, BindEvent, ScrollUnit, ImageResizeMode  # noqa
+    from tk_gui.enums import BindTargets, BindEvent, ScrollUnit, ImageResizeMode, TreeSelectMode  # noqa
     from tk_gui.pseudo_elements import Row
     from tk_gui.widgets.scroll import ScrollableToplevel  # noqa
     from tk_gui.window import Window  # noqa
@@ -58,6 +58,7 @@ Axis = Literal['x', 'y']
 # Orientation = Literal['horizontal', 'vertical']
 Orientation = Literal[tkc.HORIZONTAL, tkc.VERTICAL]  # noqa
 GrabAnywhere = Union[bool, Literal['control']]
+TreeSelectModes = Union['TreeSelectMode', Literal['none', 'browse', 'extended']]
 
 # TkFill = Union[Literal['none', 'x', 'y', 'both'], None, bool]
 # TkSide = Literal['left', 'right', 'top', 'bottom']

@@ -9,7 +9,7 @@ from tk_gui.typing import OptInt, OptStr
 Layer = Literal[
     'base', 'insert', 'scroll', 'arrows', 'radio', 'checkbox', 'frame', 'combo', 'progress', 'image', 'tooltip', 'text',
     'button', 'listbox', 'link', 'selected', 'input', 'table', 'table_header', 'table_alt', 'slider', 'menu',
-    'checkbox_label',
+    'checkbox_label', 'tree', 'tree_header',
 ]
 
 StateName = Literal['default', 'disabled', 'invalid', 'active', 'highlight']

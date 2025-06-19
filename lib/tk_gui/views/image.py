@@ -14,7 +14,7 @@ from PIL.Image import registered_extensions
 
 from tk_gui.caching import cached_property
 from tk_gui.elements import InfoBar, ScrollableImage, Text, Frame, Button
-from tk_gui.elements.table import Table, TableColumn
+from tk_gui.elements.trees import Table, Column
 from tk_gui.elements.menu import MenuProperty, Menu, MenuGroup, MenuItem, CloseWindow
 from tk_gui.enums import MissingMixin, ImageResizeMode
 from tk_gui.event_handling import EventState, event_handler, delayed_event_handler
@@ -182,7 +182,7 @@ class DirPicker(View, is_popup=True):
     def table(self) -> Table:
         nk, ck = self.name_key, self.count_key
         rows = [{nk: '..', ck: '?'}, {nk: '.', ck: len(self.image_dir)}, *({nk: n, ck: c} for n, c in self._dirs())]
-        columns = (TableColumn(nk, width=rows), TableColumn(ck, anchor_values='e', width=rows))
+        columns = (Column(nk, width=rows), Column(ck, anchor_values='e', width=rows))
         if (last_dir := self.last_dir) and last_dir.path != self.image_dir.path.parent:
             focus_row = (nk, last_dir.path.name)
         else:

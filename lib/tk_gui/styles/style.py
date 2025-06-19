@@ -64,6 +64,8 @@ class Style(ClearableCachedPropertyMixin):
     table_header = StyleLayerProperty('table')      # Table headers
     text = StyleLayerProperty('base')
     tooltip = StyleLayerProperty('base')
+    tree = StyleLayerProperty('base')               # Tree elements
+    tree_header = StyleLayerProperty('base')        # Headers for Tree columns
 
     def __init__(self, name: str = None, *, parent: Union[str, Style] = None, ttk_theme: str = None, **kwargs):
         if not name:  # Anonymous styles won't be stored

@@ -10,7 +10,7 @@ from .choices import Radio, RadioGroup, Combo, ComboMap, Dropdown, CheckBox, Lis
 from .images import Image, ScrollableImage, Animation, SpinnerImage, ClockImage
 from .menu import Menu, MenuGroup, MenuItem, MenuProperty
 from .misc import SizeGrip, Spacer, InfoBar
-from .table import TableColumn, Table
+from .trees import table, Table, Column, Tree, TreeNode
 from .text import Text, Link, Input, Multiline, Label
 
 __all__ = [
@@ -59,8 +59,11 @@ __all__ = [
     'SizeGrip',
     'Spacer',
     'InfoBar',
-    'TableColumn',
+    'table',
+    'Column',
     'Table',
+    'Tree',
+    'TreeNode',
     'Text',
     'Link',
     'Input',
