@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 from hashlib import sha256
 from io import BytesIO
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import PIL.Image as ImageModule
 from cachetools import LRUCache
@@ -41,6 +41,11 @@ class ImageWrapper(Sized, ABC):
     def name(self) -> str | None:
         return None
 
+    @property
+    @abstractmethod
+    def source(self) -> SourceImage:
+        raise NotImplementedError
+
     def __repr__(self) -> str:
         width, height = self.size
         ar_x, ar_y = self.aspect_ratio.as_integer_ratio()
@@ -53,33 +58,32 @@ class ImageWrapper(Sized, ABC):
 
     # region Size
 
-    @cached_property
+    @cached_property(block=False)
     def width(self) -> int:
         return self.size[0]
 
-    @cached_property
+    @cached_property(block=False)
     def height(self) -> int:
         return self.size[1]
 
-    @cached_property
+    @cached_property(block=False)
     def size(self) -> XY:
-        if (image := self.pil_image) is None:
+        try:
+            return self.pil_image.size
+        except AttributeError:  # self.pil_image is likely None
             return 0, 0
-        return image.size
 
-    @cached_property
+    @cached_property(block=False)
     def size_percent(self) -> float:
         return (self.width_percent + self.height_percent) / 2
 
-    @property
-    @abstractmethod
+    @cached_property(block=False)
     def width_percent(self) -> float:
-        raise NotImplementedError
+        return self.size[0] / self.source.size[0]
 
-    @property
-    @abstractmethod
+    @cached_property(block=False)
     def height_percent(self) -> float:
-        raise NotImplementedError
+        return self.size[1] / self.source.size[1]
 
     # endregion
 
@@ -92,7 +96,7 @@ class ImageWrapper(Sized, ABC):
         else:
             return super().target_size(size, keep_ratio)
 
-    @cached_property
+    @cached_property(block=False)
     def box(self) -> Box:
         return Box.from_pos_and_size(0, 0, *self.size)
 
@@ -101,10 +105,9 @@ class ImageWrapper(Sized, ABC):
 
     # region Format
 
-    @cached_property
+    @cached_property(block=False)
     def format(self) -> str:
-        image = self.pil_image
-        return image.format or ('png' if image.mode == 'RGBA' else 'jpeg')
+        return self.pil_image.format or ('png' if self.pil_image.mode == 'RGBA' else 'jpeg')
 
     def as_format(self, format: str = None) -> PILImage:  # noqa
         return self._as_format(target_format=format)[0]
@@ -128,13 +131,13 @@ class ImageWrapper(Sized, ABC):
             ImageModule.init()
         return ImageModule.EXTENSION.get(path.suffix.lower()) or self.format
 
-    @cached_property
+    @cached_property(block=False)
     def mime_type(self) -> str | None:
         return MIME.get(self.format)
 
     # endregion
 
-    @cached_property
+    @cached_property(block=False)
     def bits_per_pixel(self) -> int | None:
         return IMAGE_MODE_TO_BPP.get(self.pil_image.mode)
 
@@ -177,28 +180,28 @@ class ImageWrapper(Sized, ABC):
 
 
 class SourceImage(ImageWrapper):
+    source: SourceImage = None
     width_percent = height_percent = 1
 
     def __init__(self, image: ImageType):
         self._original = image
+        self.source = self
 
     @classmethod
     def from_image(cls, image: ImageType | ImageWrapper) -> SourceImage:
-        if isinstance(image, SourceImage):
-            return image
-        elif isinstance(image, ResizedImage):
+        try:
             return image.source
-        else:
+        except AttributeError:
             return cls(image)
 
-    @cached_property
+    @cached_property(block=False)
     def name(self) -> str | None:
         try:
             return self.path.name
         except AttributeError:
             return None
 
-    @cached_property
+    @cached_property(block=False)
     def path(self) -> Path | None:
         image = self._original
         if isinstance(image, Path):
@@ -206,22 +209,25 @@ class SourceImage(ImageWrapper):
         elif isinstance(image, str):
             return Path(image).expanduser()
         elif path := getattr(image, 'filename', None) or getattr(getattr(image, 'fp', None), 'name', None):
-            return Path(path)
+            return Path(path)  # noqa
         return None
 
     @cached_property
     def pil_image(self) -> PILImage | None:
-        image = self._original
-        if image is None or isinstance(image, PILImage):
-            return image
-        elif isinstance(image, bytes):
-            return open_image(BytesIO(image))
-        elif isinstance(image, (Path, str)):
-            path = Path(image).expanduser()
-            if not path.is_file():
-                raise ValueError(f'Invalid image path={path.as_posix()!r} - it is not a file')
-            return open_image(path)
-        raise TypeError(f'Image must be bytes, None, Path, str, or a PIL.Image.Image - found {type(image)}')
+        match self._original:  # noqa
+            case None | PILImage():
+                return self._original
+            case bytes():
+                return open_image(BytesIO(self._original))
+            case Path() | str():
+                path = Path(self._original).expanduser()
+                if not path.is_file():
+                    raise ValueError(f'Invalid image path={path.as_posix()!r} - it is not a file')
+                return open_image(path)
+            case _:
+                raise TypeError(
+                    f'Image must be bytes, None, Path, str, or a PIL.Image.Image - found {type(self._original)}'
+                )
 
     @cached_property
     def sha256sum(self) -> str | None:
@@ -267,7 +273,7 @@ class SourceImage(ImageWrapper):
             ('JPG - JPG/JPEG Format', '*.jpg *.jpeg'),
             ('PNG - Portable Network Graphics', '*.png'),
         ]
-        kwargs = {'file_types': file_types}
+        kwargs: dict[str, Any] = {'file_types': file_types}
         if path := self.path:
             kwargs['initial_name'] = path.name
             kwargs['default_ext'] = path.suffix
@@ -279,6 +285,9 @@ class SourceImage(ImageWrapper):
             log.info(f'Saving {self} as {path}')
             self.save_as(path)
 
+    def as_popup_src_img(self) -> SourceImage:
+        return self
+
 
 class IconSourceImage(SourceImage):
     def __init__(
@@ -288,37 +297,34 @@ class IconSourceImage(SourceImage):
         image: PILImage = None,
         color: Color = '#000000',
         bg: Color = '#ffffff',
-        init_size: int = 500,
+        popup_size: int = 500,
     ):
         self._icons = icons
         self._icon = icon
         self._color = color
         self._bg = bg
-        self._init_size = init_size
+        self._popup_size = popup_size
         if image is None:
-            if (size := icons.font.size) < init_size:
-                size = init_size
+            size = int(icons.font.size)
             image = icons.draw(icon, (size, size), color=color, bg=bg)
         super().__init__(image)
 
-    @cached_property
-    def size(self) -> XY:
-        if (image := self.pil_image) is None or image.size[0] < self._init_size:
-            size = (self._init_size, self._init_size)
-            self._original = image = self._icons.draw(self._icon, size, color=self._color, bg=self._bg)
-            self.__dict__['pil_image'] = image
-        return image.size
-
-    def as_size(self, size: XY | None, keep_ratio: bool = True, **kwargs) -> ResizedImage:
-        if size:
-            size = self.target_size(size, keep_ratio)
+    def as_size(self, size: XY | None, keep_ratio: bool = True, **kwargs) -> IconSourceImage | ResizedImage:
         if not size or size == self.size:
-            return ResizedImage(self, self.pil_image)
-        image = self._icons.draw(self._icon, size, color=self._color, bg=self._bg)
-        return ResizedImage(self, image)
+            return self
+        return ResizedImage(
+            self, self._icons.draw(self._icon, self.target_size(size, keep_ratio), color=self._color, bg=self._bg)
+        )
+
+    def as_popup_src_img(self) -> IconSourceImage:
+        if (popup_size := self._popup_size) == self.pil_image.size[0]:
+            return self
+        image = self._icons.draw(self._icon, (popup_size, popup_size), color=self._color, bg=self._bg)
+        return self.__class__(self._icons, self._icon, image, color=self._color, bg=self._bg, popup_size=popup_size)
 
 
 class ResizedImage(ImageWrapper):
+    source: SourceImage = None
     pil_image: PILImage = None  # Satisfies the abstract property so it can be stored in init
 
     def __init__(self, source: SourceImage, image: PILImage, cache_path: Path | None = None):
@@ -326,17 +332,9 @@ class ResizedImage(ImageWrapper):
         self.pil_image = image
         self.cache_path = cache_path
 
-    @cached_property
+    @cached_property(block=False)
     def name(self) -> str | None:
         return self.source.name
-
-    @cached_property
-    def width_percent(self) -> float:
-        return self.size[0] / self.source.size[0]
-
-    @cached_property
-    def height_percent(self) -> float:
-        return self.size[1] / self.source.size[1]
 
 
 class ImageCache:
@@ -346,7 +344,7 @@ class ImageCache:
         self._cache = LRUCache(mem_size)
         self.max_cache_size = max_cache_size
 
-    @cached_property
+    @cached_property(block=False)
     def cache_dir(self) -> Path:
         return get_user_temp_dir('tk_gui_image_cache')
 

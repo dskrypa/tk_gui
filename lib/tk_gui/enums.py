@@ -169,20 +169,20 @@ class Anchor(MissingMixin, Enum, aliases=ANCHOR_ALIASES):
     @cached_property
     def fill_axis(self) -> TkFill:
         if self.is_abs_center:
-            return tkc.BOTH
+            return tkc.BOTH  # noqa
         elif self.is_horizontal_center:
-            return tkc.X
+            return tkc.X  # noqa
         elif self.is_vertical_center:
-            return tkc.Y
+            return tkc.Y  # noqa
         else:
-            return tkc.NONE
+            return tkc.NONE  # noqa
 
     @cached_property
     def abs_fill_axis(self) -> TkFill:
         if self.is_abs_center:
-            return tkc.BOTH
+            return tkc.BOTH  # noqa
         else:
-            return tkc.NONE
+            return tkc.NONE  # noqa
 
 
 # endregion

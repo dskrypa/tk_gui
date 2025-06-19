@@ -18,7 +18,7 @@ from wcwidth import wcswidth
 from tk_gui.caching import cached_property
 from tk_gui.enums import Anchor
 from tk_gui.widgets.scroll import ScrollableTreeview
-from .element import Element, Interactive
+from .element import Interactive
 
 if TYPE_CHECKING:
     from tkinter import BaseWidget

@@ -8,13 +8,13 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from time import monotonic
 from typing import TYPE_CHECKING, Any, Union
 
 from tk_gui.caching import cached_property
 from tk_gui.config import GuiConfigProperty
 from tk_gui.event_handling import HandlesEvents, BindMap
 from tk_gui.monitors import Monitor, monitor_manager
+from tk_gui.utils import timer
 from tk_gui.window import Window
 
 if TYPE_CHECKING:
@@ -138,10 +138,8 @@ class WindowInitializer(HandlesEvents, ABC):
         return self.init_window()
 
     def finalize_window(self) -> Window:
-        start = monotonic()
-        window = self._finalize_window()
-        elapsed = monotonic() - start
-        log.debug(f'Rendered layout for {self.__class__.__name__} in seconds={elapsed:,.3f}')
+        with timer(f'Rendered layout for {self.__class__.__name__}'):
+            window = self._finalize_window()
         return window
 
     def _finalize_window(self) -> Window:

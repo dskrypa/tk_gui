@@ -8,13 +8,15 @@ from __future__ import annotations
 
 import logging
 import sys
+from contextlib import contextmanager
 from getpass import getuser
 from inspect import stack
 from math import log as math_log
 from pathlib import Path
 from platform import system
 from tempfile import gettempdir
-from typing import TYPE_CHECKING, Optional, Type, Any, Callable, Collection, Iterable, Sequence, Union, Mapping
+from time import monotonic
+from typing import TYPE_CHECKING, Any, Callable, Collection, Type, TypeVar, Iterable, Sequence, Mapping
 
 from .constants import STYLE_CONFIG_KEYS
 
@@ -24,7 +26,7 @@ if TYPE_CHECKING:
 __all__ = [
     'ON_WINDOWS', 'ON_LINUX', 'ON_MAC', 'Inheritable', 'ProgramMetadata',
     'tcl_version', 'max_line_len', 'call_with_popped', 'extract_kwargs', 'get_user_temp_dir', 'readable_bytes',
-    'mapping_repr',
+    'mapping_repr', 'timer',
 ]
 log = logging.getLogger(__name__)
 
@@ -33,6 +35,8 @@ _OS = system().lower()
 ON_WINDOWS = _OS == 'windows'
 ON_LINUX = _OS == 'linux'
 ON_MAC = _OS == 'darwin'
+
+T = TypeVar('T')
 
 
 class Inheritable:
@@ -59,7 +63,7 @@ class Inheritable:
     def __set_name__(self, owner: Type[HasParent], name: str):
         self.name = name
 
-    def __get__(self, instance: Optional[HasParent], owner: Type[HasParent]):
+    def __get__(self, instance: HasParent | None, owner: Type[HasParent]):
         if instance is None:
             return self
         try:
@@ -116,6 +120,7 @@ class ProgramMetadata:
                 path = Path.cwd().joinpath('[unknown]')
             return False, {}, path
 
+    # noinspection PyUnboundLocalVariable
     def _get_real_top_level(self):  # noqa
         _stack = stack()
         top_level_frame_info = _stack[-1]
@@ -166,14 +171,16 @@ def max_line_len(lines: Collection[str]) -> int:
 
 
 def call_with_popped(func: Callable, keys: Iterable[str], kwargs: dict[str, Any], args: Sequence[Any] = ()):
-    kwargs = {key: val for key in keys if (val := kwargs.pop(key, None)) is not None}
-    func(*args, **kwargs)
+    if kwargs:
+        func(*args, **{key: val for key in keys if (val := kwargs.pop(key, None)) is not None})
+    else:
+        func(*args)
 
 
 def extract_style(
-    kwargs: dict[str, Any],
+    kwargs: dict[str, T],
     _keys_intersection: Callable[[Iterable[str]], set[str] | frozenset[str]] = STYLE_CONFIG_KEYS.intersection,
-) -> dict[str, Any]:
+) -> dict[str, T]:
     if kwargs:
         pop = kwargs.pop
         return {key: pop(key) for key in _keys_intersection(kwargs)}
@@ -181,9 +188,12 @@ def extract_style(
         return {}
 
 
-def extract_kwargs(kwargs: dict[str, Any], keys: set[str] | frozenset[str]) -> dict[str, Any]:
-    pop = kwargs.pop
-    return {key: pop(key) for key in keys.intersection(kwargs)}
+def extract_kwargs(kwargs: dict[str, T], keys: set[str] | frozenset[str]) -> dict[str, T]:
+    if kwargs:
+        pop = kwargs.pop
+        return {key: pop(key) for key in keys.intersection(kwargs)}
+    else:
+        return {}
 
 
 # endregion
@@ -209,13 +219,13 @@ def get_user_temp_dir(*sub_dirs, mode: int = 0o777) -> Path:
 
 
 def readable_bytes(
-    size: Union[float, int],
+    size: float | int,
     dec_places: int = None,
     dec_by_unit: Mapping[str, int] = None,
     si: bool = False,
     bits: bool = False,
     i: bool = False,
-    rate: Union[bool, str] = False,
+    rate: bool | str = False,
 ) -> str:
     """
     :param size: The number of bytes to render as a human-readable string
@@ -270,3 +280,11 @@ def mapping_repr(
     inner = ' ' * (indent + 4)
     outer = ' ' * indent
     return '{\n' + ',\n'.join(f'{inner}{k!r}: {val_repr(v)}' for k, v in kv_pairs) + f'\n{outer}}}'
+
+
+@contextmanager
+def timer(prefix: str, log_lvl: int = logging.DEBUG):
+    start = monotonic()
+    yield
+    elapsed = monotonic() - start
+    log.log(log_lvl, f'{prefix} in seconds={elapsed:,.3f}')

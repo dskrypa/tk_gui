@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from inspect import Signature
 from tkinter import Label, TclError, Event, Canvas
 from typing import TYPE_CHECKING, Optional, Any, Union, Callable
@@ -116,22 +117,22 @@ class BaseImage(Element, ABC, base_style_layer='image'):
     # endregion
 
 
+@dataclass(slots=True)
+class ResizeOptions:
+    use_cache: bool = False
+    keep_ratio: bool = True
+    resample: Resampling | None = Resampling.LANCZOS
+
+    def as_dict(self) -> dict[str, bool | Resampling | None]:
+        return {'use_cache': self.use_cache, 'keep_ratio': self.keep_ratio, 'resample': self.resample}
+
+
 class SrcImageMixin:
     widget: Label | ScrollableImageWidget
     resize: Callable
     size: XY
     _src_image: SourceImage = None
-    _resize_kwargs: dict[str, bool | Resampling | None]
-
-    def init_src_image(
-        self,
-        image: ImageType | ImageWrapper = None,
-        use_cache: bool = False,
-        keep_ratio: bool = True,
-        resample: Resampling | None = Resampling.LANCZOS,
-    ):
-        self._resize_kwargs = {'use_cache': use_cache, 'keep_ratio': keep_ratio, 'resample': resample}
-        self.image = image
+    _resize_opts: ResizeOptions = ResizeOptions()
 
     # region Image Data
 
@@ -148,7 +149,7 @@ class SrcImageMixin:
     # endregion
 
     def target_size(self, width: int, height: int) -> XY:
-        return self._src_image.target_size((width, height), keep_ratio=self._resize_kwargs['keep_ratio'])
+        return self._src_image.target_size((width, height), keep_ratio=self._resize_opts.keep_ratio)
 
     def update(self, image: ImageType | ImageWrapper, size: XY = None):
         if size:
@@ -182,7 +183,9 @@ class Image(SrcImageMixin, BaseImage):
         if (cb_provided := callback is not None) or popup:
             kwargs['bind_clicks'] = True
         Element.__init__(self, **kwargs)
-        self.init_src_image(image, use_cache=use_cache, keep_ratio=keep_ratio, resample=resample)
+        if use_cache or not keep_ratio or resample != Resampling.LANCZOS:
+            self._resize_opts = ResizeOptions(use_cache, keep_ratio, resample)
+        self.image = image
         if popup:
             if cb_provided:
                 raise TypeError(f"Only one of 'popup' xor 'callback' may be provided for {self.__class__.__name__}")
@@ -196,13 +199,19 @@ class Image(SrcImageMixin, BaseImage):
     # region Widget Init & Packing
 
     def pack_into(self, row: Row):
-        resized = self._src_image.as_size(self.size, **self._resize_kwargs)
+        opts = self._resize_opts
+        resized = self._src_image.as_size(
+            self.size, keep_ratio=opts.keep_ratio, resample=opts.resample, use_cache=opts.use_cache
+        )
         self._pack_into(row, resized.as_tk_image(), *resized.size)
 
     # endregion
 
     def resize(self, width: int, height: int) -> ResizedImage:
-        resized = self._src_image.as_size((width, height), **self._resize_kwargs)
+        opts = self._resize_opts
+        resized = self._src_image.as_size(
+            (width, height), keep_ratio=opts.keep_ratio, resample=opts.resample, use_cache=opts.use_cache
+        )
         self._re_pack(resized.as_tk_image(), *resized.size)
         return resized
 
@@ -210,7 +219,7 @@ class Image(SrcImageMixin, BaseImage):
         # from tk_gui.popups.image import ImagePopup
         from tk_gui.views.image import ImageView
 
-        src_image = self._src_image
+        src_image = self._src_image.as_popup_src_img()
         # ImagePopup(src_image, self.popup_title or getattr(src_image.path, 'name', None), parent=self.window).run()
         ImageView(src_image, self.popup_title, parent=self.window, is_popup=True, standalone=True).run()
 
@@ -239,7 +248,9 @@ class ScrollableImage(SrcImageMixin, Element, base_style_layer='image'):
         self.y_config = AxisConfig.from_kwargs('y', kwargs)
         kwargs.setdefault('pad', (0, 0))
         Element.__init__(self, **kwargs)
-        self.init_src_image(image, use_cache=use_cache, keep_ratio=keep_ratio, resample=resample)
+        if use_cache or not keep_ratio or resample != Resampling.LANCZOS:
+            self._resize_opts = ResizeOptions(use_cache, keep_ratio, resample)
+        self.image = image
 
     # def __repr__(self) -> str:
     #     size = self.size
@@ -267,8 +278,11 @@ class ScrollableImage(SrcImageMixin, Element, base_style_layer='image'):
         raise RuntimeError('Grid is not currently supported for images')
 
     def pack_into(self, row: Row):
-        resized = self._src_image.as_size(self.size, **self._resize_kwargs)
-        width, height = size = resized.size
+        opts = self._resize_opts
+        resized = self._src_image.as_size(
+            self.size, keep_ratio=opts.keep_ratio, resample=opts.resample, use_cache=opts.use_cache
+        )
+        width, height = resized.size
         # log.debug(f'Packing {resized=} into row with {width=}, {height=}')
         kwargs = {
             'width': width,
@@ -279,7 +293,7 @@ class ScrollableImage(SrcImageMixin, Element, base_style_layer='image'):
             'style': self.style,
             **self.style_config,
         }
-        self.size = size
+        self.size = resized.size
         self.widget = ScrollableImageWidget(resized.as_tk_image(), parent=row.frame, **kwargs)
         self.pack_widget()
 
@@ -298,10 +312,13 @@ class ScrollableImage(SrcImageMixin, Element, base_style_layer='image'):
         self.widget.resize(width, height)
 
     def resize(self, width: int, height: int) -> ResizedImage:
-        resized = self._src_image.as_size((width, height), **self._resize_kwargs)
-        self.size = size = resized.size
+        opts = self._resize_opts
+        resized = self._src_image.as_size(
+            (width, height), keep_ratio=opts.keep_ratio, resample=opts.resample, use_cache=opts.use_cache
+        )
+        self.size = resized.size
         # log.debug(f'resize: {size=}, {self}')
-        self.widget.replace_image(resized.as_tk_image(), size)
+        self.widget.replace_image(resized.as_tk_image(), resized.size)
         return resized
 
 

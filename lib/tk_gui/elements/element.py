@@ -10,7 +10,7 @@ import logging
 import tkinter.constants as tkc
 from abc import ABC, abstractmethod
 from itertools import count
-from typing import TYPE_CHECKING, Optional, Callable, Union, Any, overload
+from typing import TYPE_CHECKING, Any, Callable, overload
 
 from tk_gui.caching import ClearableCachedPropertyMixin, cached_property
 from tk_gui.enums import StyleState, Anchor, Justify, Side, BindTargets
@@ -36,17 +36,17 @@ _INHERITABLES = {'size', 'auto_size_text'}
 _BASIC = frozenset({'anchor', 'style', 'pad', 'side', 'fill', 'expand', 'allow_focus', 'ignore_grab'})
 _basic_keys = _BASIC.intersection
 
-_Anchor = Union[str, Anchor]
-_Justify = Union[str, Justify]
-_Side = Union[str, Side]
+_Anchor = str | Anchor
+_Justify = str | Justify
+_Side = str | Side
 
 
 class ElementBase(ClearableCachedPropertyMixin, ABC):
     _style_config: dict[str, Any]
     _base_style_layer: str = None
     id: str
-    parent: Optional[RowBase | HasFrame] = None
-    widget: Optional[Widget] = None
+    parent: RowBase | HasFrame | None = None
+    widget: Widget | None = None
     fill: TkFill = None
     expand: bool = None
     allow_focus: bool = False
@@ -104,16 +104,14 @@ class ElementBase(ClearableCachedPropertyMixin, ABC):
 
     @property
     def size_and_pos(self) -> tuple[XY, XY]:
-        widget = self.widget
-        size, pos = widget.winfo_geometry().split('+', 1)
+        size, pos = self.widget.winfo_geometry().split('+', 1)
         w, h = size.split('x', 1)
         x, y = pos.split('+', 1)
         return (int(w), int(h)), (int(x), int(y))
 
     @cached_property
     def widgets(self) -> list[BaseWidget]:
-        widget = self.widget
-        return [widget, *find_descendants(widget)]
+        return [self.widget, *find_descendants(self.widget)]
 
     @property
     def was_packed(self) -> bool:
@@ -181,14 +179,13 @@ class ElementBase(ClearableCachedPropertyMixin, ABC):
     # endregion
 
     def configure_widget(self, outer: Bool = False, **kwargs):
-        widget = self.widget
         if outer:
-            config_func = widget.configure
-        else:
-            try:
-                config_func = widget.configure_inner_widget  # noqa  # ScrollableWidget
-            except AttributeError:
-                config_func = widget.configure
+            return self.widget.configure(**kwargs)
+
+        try:
+            config_func = self.widget.configure_inner_widget  # noqa  # ScrollableWidget
+        except AttributeError:
+            config_func = self.widget.configure
 
         return config_func(**kwargs)
 
@@ -206,14 +203,13 @@ class ElementBase(ClearableCachedPropertyMixin, ABC):
 
     @property
     def base_style_layer_and_state(self) -> tuple[StyleLayer, StyleState]:
-        if base_style_layer := self._base_style_layer:
-            return self.style[base_style_layer], StyleState.DEFAULT
+        if self._base_style_layer:
+            return self.style[self._base_style_layer], StyleState.DEFAULT
         return self.style.base, StyleState.DEFAULT
 
     def apply_style(self):
-        style_cfg = self.style_config
-        # log.debug(f'{self}: Updating style: {style_cfg}')
-        self.configure_widget(**style_cfg)
+        # log.debug(f'{self}: Updating style: {self.style_config}')
+        self.configure_widget(**self.style_config)
 
     def update_style(self, style: StyleSpec = None, **kwargs):
         if style:
@@ -226,12 +222,12 @@ class ElementBase(ClearableCachedPropertyMixin, ABC):
 
 
 class Element(BindMixin, ElementBase, ABC):
-    _key: Optional[Key] = None
-    _tooltip: Optional[ToolTip] = None
+    _key: Key | None = None
+    _tooltip: ToolTip | None = None
     _pack_settings: dict[str, Any] = None
-    tooltip_text: Optional[str] = None
-    right_click_menu: Optional[Menu] = None
-    left_click_cb: Optional[Callable] = None
+    tooltip_text: str | None = None
+    right_click_menu: Menu | None = None
+    left_click_cb: Callable | None = None
     data: Any = None                                            # Any data that needs to be stored with the element
 
     size: XY = Inheritable('element_size', default=None)
@@ -288,21 +284,19 @@ class Element(BindMixin, ElementBase, ABC):
             self.binds.add('<ButtonRelease-3>', self.handle_right_click, add=True)
 
     def __repr__(self) -> str:
-        key, size, visible = self._key, self.size, self._visible
-        key_str = f'{key=}, ' if key else ''
+        size, visible = self.size, self._visible
+        key_str = f'key={self._key!r}' if self._key else ''
         return f'<{self.__class__.__name__}[id={self.id}, {key_str}{size=}, {visible=}]>'
 
     @property
     def key(self) -> Key:
-        if key := self._key:
-            return key
-        return self.id
+        return self._key or self.id
 
     @key.setter
     def key(self, value: Key):
         self._key = value
-        if parent := self.parent:
-            parent.window.register_element(value, self)
+        if self.parent:
+            self.parent.window.register_element(value, self)
 
     @property
     def value(self) -> Any:
@@ -312,12 +306,12 @@ class Element(BindMixin, ElementBase, ABC):
 
     def pack_into_row(self, row: RowBase):
         self.parent = row
-        if key := self._key:
-            row.window.register_element(key, self)
+        if self._key:
+            row.window.register_element(self._key, self)
         self.pack_into(row)
         self.apply_binds()
-        if tooltip := self.tooltip_text:
-            self.add_tooltip(tooltip)
+        if self.tooltip_text:
+            self.add_tooltip(self.tooltip_text)
 
     def pack_widget(
         self, *, expand: bool = None, fill: TkFill = None, focus: bool = False, widget: Widget = None, **kwargs
@@ -345,7 +339,7 @@ class Element(BindMixin, ElementBase, ABC):
         }
         widget.pack(**pack_kwargs)
         if not self._visible:
-            self._pack_settings = widget.pack_info()
+            self._pack_settings = widget.pack_info()  # noqa
             # log.debug(f'Hiding {self} - saved pack settings={self._pack_settings}')
             widget.pack_forget()
 
@@ -358,12 +352,12 @@ class Element(BindMixin, ElementBase, ABC):
 
     def grid_into_frame(self, parent: HasFrame, row: int, column: int, **kwargs):
         self.parent = parent
-        if key := self._key:
-            parent.window.register_element(key, self)
+        if self._key:
+            parent.window.register_element(self._key, self)
         self.grid_into(parent, row, column, **kwargs)
         self.apply_binds()
-        if tooltip := self.tooltip_text:
-            self.add_tooltip(tooltip)
+        if self.tooltip_text:
+            self.add_tooltip(self.tooltip_text)
 
     # endregion
 
@@ -374,10 +368,9 @@ class Element(BindMixin, ElementBase, ABC):
         return self._visible
 
     def hide(self):
-        widget = self.widget
-        self._pack_settings = widget.pack_info()
+        self._pack_settings = self.widget.pack_info()  # noqa
         # log.debug(f'Hiding {self} - saved pack settings={self._pack_settings}')
-        widget.pack_forget()
+        self.widget.pack_forget()
         self._visible = False
 
     def show(self):
@@ -417,9 +410,9 @@ class Element(BindMixin, ElementBase, ABC):
             cb = BindTargets(cb)
         if isinstance(cb, BindTargets):
             if cb == BindTargets.EXIT:
-                cb = self.window.close
+                return self.window.close
             elif cb == BindTargets.INTERRUPT:
-                cb = self.trigger_interrupt
+                return self.trigger_interrupt
             else:
                 raise ValueError(f'Invalid {cb=} for {self}')
         elif not isinstance(cb, Callable):
@@ -451,7 +444,7 @@ class Element(BindMixin, ElementBase, ABC):
 
 
 class InteractiveMixin:
-    widget: Optional[Widget]
+    widget: Widget | None
     style: Style
     _base_style_layer: str | None
     disabled: bool = False
@@ -477,8 +470,8 @@ class InteractiveMixin:
 
     @property
     def base_style_layer_and_state(self) -> tuple[StyleLayer, StyleState]:
-        if base_style_layer := self._base_style_layer:
-            return self.style[base_style_layer], self.style_state
+        if self._base_style_layer:
+            return self.style[self._base_style_layer], self.style_state
         return self.style.base, self.style_state
 
     def pack_widget(self, *, expand: bool = False, fill: TkFill = tkc.NONE, **kwargs):

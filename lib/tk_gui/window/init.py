@@ -8,6 +8,7 @@ from weakref import finalize
 
 from ..caching import cached_property
 from ..monitors import Monitor, monitor_manager
+from ..utils import timer
 from ..widgets.scroll import ScrollableToplevel
 from ..widgets.utils import get_req_size
 
@@ -152,7 +153,10 @@ class WindowInitializer:
 
         max_outer_height = monitor.work_area.height - 50
 
-        inner.update_idletasks()
+        with timer('Updated inner idle tasks to determine target window size'):
+            # This step can be very slow if there are many images
+            inner.update_idletasks()
+
         width = self.window.x_config.target_size(inner)
         if (height := inner.winfo_reqheight()) > max_outer_height / 3:
             max_inner_height = max_outer_height - 50

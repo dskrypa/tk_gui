@@ -21,7 +21,7 @@ from tk_gui.event_handling import EventState, event_handler, delayed_event_handl
 from tk_gui.geometry import Box
 from tk_gui.images.wrapper import ImageWrapper, SourceImage, ResizedImage
 from tk_gui.popups.about import AboutPopup
-from tk_gui.popups import SaveAs, pick_file_popup, popup_warning
+from tk_gui.popups import pick_file_popup, popup_warning
 from tk_gui.utils import readable_bytes
 from .view import View
 

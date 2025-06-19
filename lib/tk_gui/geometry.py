@@ -74,7 +74,8 @@ class Sized(ABC):
 
     # region Resize
 
-    def target_size(self, size: OptXYF, keep_ratio: bool = True) -> XY:
+    # noinspection PyInconsistentReturns
+    def target_size(self, size: OptXYF, keep_ratio: bool = True) -> XY:  # noqa
         dst_w, dst_h = size
         if dst_w is dst_h is None:
             return self.size

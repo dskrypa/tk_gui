@@ -116,11 +116,11 @@ class RowBase(Generic[E], ABC):
 
 
 class Row(RowBase[E]):
-    _anchor: Optional[Anchor] = None
+    _anchor: Anchor | None = None
     ignore_grab: bool = False
-    frame: Optional[Frame] = None       # This satisfies the abstract property req while letting it be assigned in pack
-    expand: Optional[bool] = None       # Set to True only for Column elements
-    fill: Optional[bool] = None         # Changes for Column, Separator, StatusBar
+    frame: Frame | None = None          # This satisfies the abstract property req while letting it be assigned in pack
+    expand: bool | None = None          # Set to True only for Column elements
+    fill: TkFill = None                 # Changes for Column, Separator, StatusBar
     elements: tuple[E, ...] = ()        # This satisfies the abstract property req while letting it be assigned in init
 
     def __init__(self, parent: RowContainer, elements: Iterable[E]):
@@ -176,8 +176,8 @@ class Row(RowBase[E]):
 
     @property
     def anchor(self) -> Anchor:
-        if (anchor := self._anchor) is not None:
-            return anchor
+        if self._anchor is not None:
+            return self._anchor
         return self.anchor_elements
 
     def _anchor_expand_and_fill(self) -> tuple[Anchor, bool, TkFill]:
@@ -194,7 +194,7 @@ class Row(RowBase[E]):
                 expand = anchor.is_abs_center
         if fill is None:
             fill = anchor.abs_fill_axis if expand else tkc.NONE
-        return anchor, expand, fill
+        return anchor, expand, fill  # noqa
 
     def pack(self, parent_rc: RowContainer, debug: Bool = False):
         # log.debug(f'Packing row {self.num} in {self.parent=} {self.parent.tk_container=}')
@@ -215,7 +215,7 @@ class Row(RowBase[E]):
 
         # log.debug(f'Packing row with {anchor=}, {center=}, {expand=}, {fill=}')
         # log.debug(f'Packing {self!r}', extra={'color': 14})
-        frame.pack(side=tkc.TOP, anchor=anchor.value, padx=0, pady=0, expand=expand, fill=fill)
+        frame.pack(side=tkc.TOP, anchor=anchor.value, padx=0, pady=0, expand=expand, fill=fill)  # noqa
 
     def apply_style(self):
         if bg := self.style.base.bg.default:

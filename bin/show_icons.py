@@ -4,7 +4,6 @@ import logging
 
 from cli_command_parser import Command, Counter, main
 
-from tk_gui.__version__ import __author_email__, __version__, __author__, __url__  # noqa
 from tk_gui.elements import Text, VerticalSeparator, Image
 from tk_gui.images import IconSourceImage, Icons
 from tk_gui.window import Window
@@ -31,7 +30,7 @@ class IconViewer(Command):
                 layout.append(row[:-1])
                 row = []
 
-            iw = IconSourceImage(icons, name, icon, init_size=3000)
+            iw = IconSourceImage(icons, name, icon, popup_size=3000)
             row += [Image(iw, popup=True), Text(name, size=(30, 1)), VerticalSeparator()]
 
         if row:

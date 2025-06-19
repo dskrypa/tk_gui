@@ -41,12 +41,16 @@ class Separator(ElementBase, base_style_layer='separator'):
         style = self.style
         name, ttk_style = style.make_ttk_style('.Line.TSeparator')
         ttk_style.configure(name, background=style.separator.bg.default)
-        self.widget = TtkSeparator(tk_container, orient=self.orientation, style=name, takefocus=int(self.allow_focus))
+        self.widget = TtkSeparator(
+            tk_container, orient=self.orientation, style=name, takefocus=int(self.allow_focus)  # noqa
+        )
 
     def pack_into(self, row: Row):
         self._init_widget(row.frame)
-        fill, expand = (tkc.X, True) if self.orientation == tkc.HORIZONTAL else (tkc.Y, False)
-        self.pack_widget(fill=fill, expand=expand)
+        if self.orientation == tkc.HORIZONTAL:
+            self.pack_widget(fill=tkc.X, expand=True)
+        else:
+            self.pack_widget(fill=tkc.Y, expand=False)
 
 
 class HorizontalSeparator(Separator):

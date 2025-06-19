@@ -166,6 +166,7 @@ class ClickHighlighter:
                 unbind(supports_bind, self.press_key, bind_id)
             else:
                 supports_bind.unbind(self.press_key, bind_id)
+
             self._bind_id = None
 
     # endregion
@@ -173,12 +174,13 @@ class ClickHighlighter:
     # region Bind Sequence
 
     def _key(self, action: str):
-        if modifier := self.modifier:
-            return f'<{modifier}-{action}-{self.button_num}>'
+        if self.modifier:
+            return f'<{self.modifier}-{action}-{self.button_num}>'
         return f'<{action}-{self.button_num}>'
 
     @property
     def press_key(self) -> str:
+        # TODO: Refactor to support multiple mouse buttons at once
         return self._key('ButtonPress')
 
     @property
@@ -210,11 +212,13 @@ class ClickHighlighter:
         except (AttributeError, TclError):
             self._maybe_log_event(event)
             return
+
         self._maybe_log_event(event, widget)
         try:
             old_widget_color = widget.configure()[self.attr][-1]
         except KeyError:
             return
+
         widget.configure({self.attr: self.color})
 
         release_bind_id = orig_widget.bind(self.release_key, partial(self.on_button_release, orig_widget), add=True)

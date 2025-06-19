@@ -6,9 +6,10 @@ Type annotations for the Tkinter GUI package.
 
 from __future__ import annotations
 
+import tkinter.constants as tkc
 from abc import abstractmethod
 from typing import TYPE_CHECKING, Protocol, TypeVar, Any, Union, Callable, Iterable, Optional, runtime_checkable
-from typing import Hashable, Iterator, Literal
+from typing import Hashable, Literal
 
 if TYPE_CHECKING:
     from pathlib import Path  # noqa
@@ -54,12 +55,16 @@ OptXY = tuple[OptInt, OptInt]
 OptXYF = tuple[OptFloat, OptFloat]
 SelectionPos = XY | tuple[XY, XY] | tuple[None, None] | tuple[str, str]
 Axis = Literal['x', 'y']
-Orientation = Literal['horizontal', 'vertical']
+# Orientation = Literal['horizontal', 'vertical']
+Orientation = Literal[tkc.HORIZONTAL, tkc.VERTICAL]  # noqa
 GrabAnywhere = Union[bool, Literal['control']]
 
-TkFill = Union[Literal['none', 'x', 'y', 'both'], None, bool]
-TkSide = Literal['left', 'right', 'top', 'bottom']
-TkJustify = Literal['left', 'center', 'right']
+# TkFill = Union[Literal['none', 'x', 'y', 'both'], None, bool]
+# TkSide = Literal['left', 'right', 'top', 'bottom']
+# TkJustify = Literal['left', 'center', 'right']
+TkFill = Union[Literal[tkc.NONE, tkc.X, tkc.Y, tkc.BOTH], None, bool]  # noqa
+TkSide = Literal[tkc.LEFT, tkc.RIGHT, tkc.TOP, tkc.BOTTOM]  # noqa
+TkJustify = Literal[tkc.LEFT, tkc.CENTER, tkc.RIGHT]  # noqa
 
 TkScrollWhat = Literal['units', 'pages', 'pixels']
 ScrollWhat = Union['ScrollUnit', TkScrollWhat]
@@ -115,19 +120,10 @@ class ProvidesEventCallback(Protocol):
         pass
 
 
-class _Layout(Protocol[E]):
-    __slots__ = ()
-
-    @abstractmethod
-    def __iter__(self) -> Iterator[ElementRow | Row[E]]:
-        pass
-
-
-# I thought just the Protocol should be enough, but PyCharm started to get confused by lists of lists of elements...
 if TYPE_CHECKING:
-    Layout = Union[_Layout, list[ElementRow | Row[E]]]
+    Layout = Iterable[Union[ElementRow, Row[E]]]
 else:
-    Layout = Union[_Layout, list[ElementRow]]
+    Layout = Iterable[ElementRow]
 
 
 @runtime_checkable

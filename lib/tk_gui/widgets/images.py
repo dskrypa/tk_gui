@@ -8,7 +8,7 @@ import logging
 from tkinter import BaseWidget, Frame, Image as TkBaseImage
 from typing import TYPE_CHECKING, Union, Optional, Any, Iterator
 
-from PIL.ImageTk import PhotoImage
+from PIL.ImageTk import PhotoImage as PilPhotoImage
 
 from tk_gui.geometry import Box
 from .scroll import ComplexScrollable
@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 __all__ = ['ScrollableImage']
 log = logging.getLogger(__name__)
 
-TkImage = Union[TkBaseImage, PhotoImage]
+TkImage = Union[TkBaseImage, PilPhotoImage]
 
 
 class ScrollableImage(ComplexScrollable, Frame):
@@ -117,5 +117,5 @@ class ScrollableImage(ComplexScrollable, Frame):
             self.update_scroll_region()
 
     def _widgets(self) -> Iterator[BaseWidget]:
-        yield self.inner_widget
+        yield self.inner_widget  # noqa
         yield from super()._widgets()

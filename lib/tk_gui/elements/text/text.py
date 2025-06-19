@@ -96,6 +96,7 @@ class TextValueMixin(TraceCallbackMixin):
             value = str(value)
             if self.strip:
                 value = value.strip()
+
         self._value = value
         try:
             self.string_var.set(value)
@@ -136,24 +137,28 @@ class TextValueMixin(TraceCallbackMixin):
         else:
             return width, size
 
-        return self._calc_size(font, multiline) if self._auto_size else None
+        if self._auto_size:
+            return self._calc_size(font, multiline)
+        else:
+            return None
 
     def _calc_size(self, font: Font, multiline: bool = False) -> Optional[XY]:
-        if not (text := self._value):
+        if not self._value:
             return None
 
         if multiline:
-            lines = text.splitlines()
+            lines = self._value.splitlines()
             width = max(map(len, lines))
             height = len(lines) + self._pad_width
         else:
-            width = len(text) + self._pad_width
+            width = len(self._value) + self._pad_width
             height = 1
 
         if (font and 'bold' in font) or not (self.expand and self.fill in ('x', 'both', True)):
             # TODO: The expand/fill condition seems to only be necessary when the value contains a thin char like
             #  lower-case L
             width += 1
+
         return width, height
 
 
@@ -289,13 +294,14 @@ class Label(TextValueMixin, LinkableMixin, Element, base_style_layer='text'):
         pad_width: int = 0,
         strip: Bool = False,
         change_cb: TraceCallback = None,
+        tooltip: str = None,
         **kwargs,
     ):
         if justify is anchor_info is None:
             justify = Justify.LEFT
             anchor_info = justify.as_anchor()
         self.init_text_value(value, strip, justify, change_cb, auto_size, pad_width)
-        self.init_linkable(link, link_bind, kwargs.pop('tooltip', None))
+        self.init_linkable(link, link_bind, tooltip)
         super().__init__(**kwargs)
         if anchor_info:
             self.anchor_info = Anchor(anchor_info)
@@ -351,11 +357,12 @@ class Text(TextValueMixin, LinkableMixin, Element):
         use_input_style: Bool = False,
         strip: Bool = False,
         change_cb: TraceCallback = None,
+        tooltip: str = None,
         **kwargs,
     ):
         self.init_text_value(value, strip, justify, change_cb, auto_size, pad_width)
         # TODO: Also bind link to middle click
-        self.init_linkable(link, link_bind, kwargs.pop('tooltip', None))
+        self.init_linkable(link, link_bind, tooltip)
         super().__init__(**kwargs)
         self._use_input_style = use_input_style
 
@@ -487,8 +494,8 @@ class Input(TextValueMixin, LinkableMixin, InteractiveText, disabled_state='read
 
         self.widget = entry = Entry(tk_container, **kwargs)
         entry.bind('<FocusOut>', partial(_clear_selection, entry), add=True)  # Prevents ghost selections
-        if (callback := self._callback) is not None:
-            entry.bind('<Key>', self.normalize_callback(callback), add=True)
+        if self._callback is not None:
+            entry.bind('<Key>', self.normalize_callback(self._callback), add=True)
 
     def update(
         self,

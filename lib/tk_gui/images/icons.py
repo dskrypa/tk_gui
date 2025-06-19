@@ -93,10 +93,6 @@ class Icons:
           element to be included in a layout.
         """
         font, size = self._font_and_size(size)
-        # from PIL.ImageDraw import ImageDraw
-        # image: PILImage = new_image('RGBA', size, color_to_rgb(bg))
-        # ImageDraw(image).text((0, 0), icon, fill=color_to_rgb(color), font=font)
-        # return image
         return draw_icon(size, self._normalize(icon), color_to_rgb(color), color_to_rgb(bg), font)
 
     def draw_many(
@@ -165,10 +161,9 @@ def draw_icon(size: XY, text: str, fg: RGB | RGBA, bg: RGB | RGBA, font: FreeTyp
     ink = draw.draw_ink(fg)         # replaces a call to the ImageDraw._getink helper that normalizes to this
     # The remaining steps replace the `draw_text` function defined inside `ImageDraw.text`
     # They also replace the call to `FreeTypeFont.getmask2` inside `draw_text`, which defines a `fill` function
-    f = font.font
-    f_size, offset = f.getsize(text, 'L')  # noqa  # replaces a step performed in font.render
+    f_size, offset = font.font.getsize(text, 'L')  # noqa  # replaces a step performed in font.render
     mask: ImagingCore = _core_fill('L', f_size, 0)  # replaces the `fill` func defined inside `FreeTypeFont.getmask2`
-    f.render(
+    font.font.render(
         text,               # text
         lambda *a: mask,    # noqa  # fill (expects callable that accepts mode(str) + size(2-tuple))
         'L',                # mode
