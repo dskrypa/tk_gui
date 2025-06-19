@@ -283,8 +283,9 @@ def mapping_repr(
 
 
 @contextmanager
-def timer(prefix: str, log_lvl: int = logging.DEBUG):
+def timer(prefix: str, log_lvl: int = logging.DEBUG, hide_below: float | None = None):
     start = monotonic()
     yield
     elapsed = monotonic() - start
-    log.log(log_lvl, f'{prefix} in seconds={elapsed:,.3f}')
+    if not hide_below or hide_below < elapsed:
+        log.log(log_lvl, f'{prefix} in seconds={elapsed:,.3f}')

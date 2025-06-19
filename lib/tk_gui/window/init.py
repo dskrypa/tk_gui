@@ -153,7 +153,7 @@ class WindowInitializer:
 
         max_outer_height = monitor.work_area.height - 50
 
-        with timer('Updated inner idle tasks to determine target window size'):
+        with timer('Updated inner idle tasks to determine target window size', hide_below=0.4):
             # This step can be very slow if there are many images
             inner.update_idletasks()
 
