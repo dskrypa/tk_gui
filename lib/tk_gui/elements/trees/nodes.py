@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 from stat import S_ISDIR
-from typing import TYPE_CHECKING, Any, Iterable, Self, Sequence, Hashable, TypeVar, Generic
+from typing import TYPE_CHECKING, Any, Iterable, Self, Sequence, Hashable, TypeVar, Generic, Collection
 
 from tk_gui.images.wrapper import ImageWrapper, SourceImage
 from tk_gui.utils import readable_bytes
@@ -52,6 +52,35 @@ class TreeNode(Generic[K]):
     def update_children(self, nodes: Iterable[TreeNode]):
         for node in nodes:
             self.children[node.key] = node
+
+    @property
+    def parent_iid(self) -> str:
+        try:
+            return self.parent.iid
+        except AttributeError:
+            return ''
+
+    def has_any_ancestor(self, iids: Collection[str]) -> bool:
+        if not self.parent:
+            return False
+        try:
+            if self.parent.iid in iids:
+                return True
+        except AttributeError:
+            return False
+        else:
+            return self.parent.has_any_ancestor(iids)
+
+    def has_ancestor(self, iid: str) -> bool:
+        if not self.parent:
+            return False
+        try:
+            if self.parent.iid == iid:
+                return True
+        except AttributeError:
+            return False
+        else:
+            return self.parent.has_ancestor(iid)
 
 
 class RootPathNode(TreeNode[Path]):

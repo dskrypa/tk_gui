@@ -10,7 +10,7 @@ import logging
 from pathlib import Path
 from tkinter import TclError
 from tkinter.ttk import Treeview
-from typing import TYPE_CHECKING, Iterable, Sequence, TypeVar, Generic, Collection, Hashable
+from typing import TYPE_CHECKING, Callable, Iterable, Sequence, TypeVar, Generic, Collection, Hashable
 
 from tk_gui.enums import Anchor
 from tk_gui.widgets.scroll import ScrollableTreeview
@@ -118,7 +118,7 @@ class BaseTree(TreeViewBase, Generic[N], base_style_layer='tree'):
             parent_iid = ''
 
         node.iid = self.tree_view.insert(
-            parent_iid, 'end', text=node.text, values=node.values, image=self._get_image(node)  # noqa
+            parent_iid, 'end', text=node.text, values=node.values, image=self._get_image(node), open=False  # noqa
         )
         self._iid_node_map[node.iid] = node
         self._key_node_map[node.key] = node
@@ -167,7 +167,16 @@ class BaseTree(TreeViewBase, Generic[N], base_style_layer='tree'):
             return []
 
     def _get_selected_nodes(self) -> list[N]:
-        return [self._iid_node_map[iid] for iid in self._get_selected_iids()]
+        # Get the nodes that were selected, but filter out children of nodes that are closed.
+        # When selecting multiple items with shift, the children of closed items are included in the selection
+        keep = {}
+        item = self.tree_view.item
+        for iid in self._get_selected_iids():
+            node = self._iid_node_map[iid]
+            if not node.has_any_ancestor(keep) or (node.parent_iid and item(node.parent_iid, 'open')):  # noqa
+                keep[iid] = node
+
+        return list(keep.values())
 
     def _clear_nodes(self):
         for node in self._root.children.values():
@@ -199,22 +208,54 @@ class PathTree(BaseTree[PathNode]):
     _root: RootPathNode | PathNode
     _tree_icons: PathTreeIcons
 
-    def __init__(self, path: Path, rows: int, *, binds: BindMapping = None, **kwargs):
+    def __init__(
+        self,
+        path: Path,
+        rows: int,
+        *,
+        binds: BindMapping = None,
+        bind_enter: bool = False,
+        root_changed_cb: Callable[[Path], ...] = None,
+        **kwargs,
+    ):
         handlers = {
             '<<TreeviewSelect>>': self._handle_node_selected,
-            '<Double-1>': self._handle_root_change,
-            '<Return>': self._handle_root_change,
+            '<Double-1>': self._handle_root_change,  # TODO: Separate handling for files to submit
+            '<Space>': self._handle_root_change,
         }
+        if bind_enter:
+            handlers['<Return>'] = self._handle_root_change
         if not binds:
             binds = handlers
         else:
             binds |= handlers
         columns = [Column('#0', 'Name', width=30), Column('Size', width=20, anchor_values=Anchor.MID_RIGHT)]
         super().__init__(RootPathNode(path), columns, rows=rows, binds=binds, **kwargs)
+        self._root_changed_cb = root_changed_cb
 
     @property
     def value(self) -> list[Path]:
         return [node.key for node in self._get_selected_nodes()]
+
+    @property
+    def root_dir(self) -> Path:
+        return self._root.key
+
+    @root_dir.setter
+    def root_dir(self, path: Path):
+        self.change_root_dir(path)
+
+    def change_root_dir(self, path: Path):
+        if self.widget is None:  # Element not been displayed yet
+            self._root.key = path
+            return
+
+        self._clear_nodes()
+        self._root = RootPathNode(path)
+        self._root.add_dir_contents(self._tree_icons)
+        self._insert_nodes(self._root.children.values())
+        if self._root_changed_cb is not None:
+            self._root_changed_cb(self._root.key)
 
     def _populate_tree(self):
         self._tree_icons = PathTreeIcons(self.style)
@@ -243,3 +284,5 @@ class PathTree(BaseTree[PathNode]):
         self._clear_nodes()
         self._root = nodes[0].promote_to_root()
         self._insert_nodes(self._root.children.values())
+        if self._root_changed_cb is not None:
+            self._root_changed_cb(self._root.key)

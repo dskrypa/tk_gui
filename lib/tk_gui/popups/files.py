@@ -14,12 +14,14 @@ from shutil import copyfile, copystat
 from time import monotonic
 from typing import TYPE_CHECKING, Union, Collection, Mapping, Iterator
 
-from ..elements import Text, ProgressBar
+from tk_gui.event_handling import event_handler, button_handler
+from tk_gui.images.icons import Icons
+from ..elements import Text, Button, ProgressBar, PathTree, ButtonAction
 from ..utils import readable_bytes
 from .base import Popup
 
 if TYPE_CHECKING:
-    from ..typing import Layout
+    from ..typing import Layout, PathLike
 
 __all__ = ['CopyFilesPopup']
 log = logging.getLogger(__name__)
@@ -202,6 +204,51 @@ class CopyFilesPopup(Popup):
             copied += file_node.size
             elapsed = (monotonic() - start) or 1
             self.speed_text.update(readable_bytes(copied / elapsed, rate=True))
+
+
+class PathPopup(Popup):
+    def __init__(
+        self,
+        initial_dir: PathLike = None,
+        *,
+        multiple: bool = False,
+        files: bool = True,
+        dirs: bool = True,
+        title: str = None,
+        rows: int = 30,
+        submit_text: str = 'Submit',
+        **kwargs,
+    ):
+        super().__init__(title=title, **kwargs)
+        self.initial_dir = Path(initial_dir) if initial_dir else Path.home()
+        self.multiple = multiple
+        self.allow_files = files
+        self.allow_dirs = dirs
+        self._tree_rows = rows
+        self._submit_text = submit_text
+
+    @cached_property
+    def _path_field(self) -> Text:
+        return Text(self.initial_dir)
+
+    @cached_property
+    def _path_tree(self) -> PathTree:
+        return PathTree(self.initial_dir, self._tree_rows, root_changed_cb=self._handle_root_changed, key='path_tree')
+
+    def get_pre_window_layout(self) -> Layout:
+        icon = Icons(15).draw_with_transparent_bg('caret-left-fill')
+        yield [Button('', icon, shortcut='<Alt-Left>', cb=self._handle_back), self._path_field]
+        yield [self._path_tree]
+        yield [Button(self._submit_text, side='right', action=ButtonAction.SUBMIT, bind_enter=True)]
+
+    def _handle_back(self, event=None):
+        self._path_tree.root_dir = self._path_tree.root_dir.parent
+
+    def _handle_root_changed(self, path: Path):
+        self._path_field.update(path.as_posix(), auto_resize=True)
+
+    def get_results(self) -> list[Path]:
+        return super().get_results().get('path_tree', [])
 
 
 def path_repr(path: Path) -> str:

@@ -12,6 +12,7 @@ from tk_gui.popups.about import AboutPopup
 from tk_gui.popups.basic_prompts import TextPromptPopup, LoginPromptPopup
 from tk_gui.popups.choices import ChooseImagePopup, choose_item
 from tk_gui.popups.common import popup_warning, popup_error, popup_yes_no, popup_no_yes, popup_ok
+from tk_gui.popups.files import PathPopup
 from tk_gui.popups.style import StylePopup
 
 
@@ -127,6 +128,11 @@ class GuiPopupTest(Command):
     def choices(self):
         items = [f'Letter: {c}' for c in 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ']
         result = choose_item(items, item_name='Letter')
+        print(f'{result=}')
+
+    @action
+    def path(self):
+        result = PathPopup().run()
         print(f'{result=}')
 
 
