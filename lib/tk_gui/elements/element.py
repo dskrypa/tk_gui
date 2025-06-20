@@ -43,7 +43,7 @@ _Side = str | Side
 
 class ElementBase(ClearableCachedPropertyMixin, ABC):
     _style_config: dict[str, Any]
-    _base_style_layer: str = None
+    _base_style_layer: Layer = None
     id: str
     parent: RowBase | HasFrame | None = None
     widget: Widget | None = None
@@ -446,7 +446,7 @@ class Element(BindMixin, ElementBase, ABC):
 class InteractiveMixin:
     widget: Widget | None
     style: Style
-    _base_style_layer: str | None
+    _base_style_layer: Layer
     disabled: bool = False
     focus: bool = False
     valid: bool = True

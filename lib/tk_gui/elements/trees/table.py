@@ -9,21 +9,17 @@ from __future__ import annotations
 import logging
 from itertools import chain
 from tkinter import TclError
-from tkinter.ttk import Treeview, Style as TtkStyle
+from tkinter.ttk import Treeview
 from typing import TYPE_CHECKING, Union
 
 from tk_gui.widgets.scroll import ScrollableTreeview
 from .base import TreeViewBase, Column
-from .utils import _style_map_data
 
 if TYPE_CHECKING:
-    from tk_gui.styles.typing import Font, Layer
     from tk_gui.typing import TkContainer, TreeSelectModes
 
 __all__ = ['Table']
 log = logging.getLogger(__name__)
-
-XGROUND_DEFAULT_HIGHLIGHT_COLOR_MAP = {'foreground': 'SystemHighlightText', 'background': 'SystemHighlight'}
 
 TableRow = dict[str, Union[str, int]]
 TableRows = list[TableRow]
@@ -84,28 +80,6 @@ class Table(TreeViewBase, base_style_layer='table'):
                 self.set_focus_on_row(i)
                 return
         raise ValueError(f'Unable to find row with {key=} {value=}')
-
-    def _ttk_style(self) -> tuple[str, TtkStyle]:
-        style = self.style
-        # name, ttk_style = style.make_ttk_style('customtable.Treeview')
-        name, ttk_style = style.make_ttk_style('tk_gui_table.Treeview')
-        ttk_style.configure(name, rowheight=self.row_height or style.char_height('table'))
-
-        if base := self._tk_style_config(ttk_style, name, 'table'):
-            if (selected_row_color := self.selected_row_color) and ('foreground' in base or 'background' in base):
-                for i, (xground, default) in enumerate(XGROUND_DEFAULT_HIGHLIGHT_COLOR_MAP.items()):
-                    if xground in base and (selected := selected_row_color[i]) is not None:
-                        ttk_style.map(name, **{xground: _style_map_data(ttk_style, name, xground, selected or default)})
-
-        self._tk_style_config(ttk_style, f'{name}.Heading', 'table_header')
-        return name, ttk_style
-
-    def _tk_style_config(self, ttk_style: TtkStyle, name: str, layer: Layer) -> dict[str, Font | str | None]:
-        style_cfg = self.style.get_map(layer, foreground='fg', background='bg', font='font')
-        if layer == 'table' and (bg := style_cfg.get('background')):
-            style_cfg['fieldbackground'] = bg
-        ttk_style.configure(name, **style_cfg)
-        return style_cfg
 
     def _init_widget(self, tk_container: TkContainer):
         columns, style = self.columns, self.style

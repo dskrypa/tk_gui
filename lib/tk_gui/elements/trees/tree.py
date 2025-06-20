@@ -8,21 +8,17 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from tkinter.ttk import Treeview, Style as TtkStyle
+from tkinter.ttk import Treeview
 from typing import TYPE_CHECKING, Any, Iterable, Self, Sequence
 
 from tk_gui.widgets.scroll import ScrollableTreeview
 from .base import TreeViewBase, Column
-from .utils import _style_map_data
 
 if TYPE_CHECKING:
-    from tk_gui.styles.typing import Font, Layer
     from tk_gui.typing import TkContainer, TreeSelectModes, ImageType
 
 __all__ = ['TreeNode', 'Tree']
 log = logging.getLogger(__name__)
-
-XGROUND_DEFAULT_HIGHLIGHT_COLOR_MAP = {'foreground': 'SystemHighlightText', 'background': 'SystemHighlight'}
 
 
 class TreeNode:
@@ -49,6 +45,16 @@ class TreeNode:
 
 
 class PathNode(TreeNode):
+    """
+    Icon candidates for related things?
+    file-earmark-fill, file-earmark-text-fill, file-earmark-music-fill, file-earmark-zip-fill
+    file-earmark, file-earmark-text, file-earmark-music, file-earmark-zip
+    folder, folder-fill, folder-symlink-fill, folder-symlink, folder2-open
+    funnel-fill, funnel
+    music-note-beamed, music-note
+    arrow-90deg-left, arrow-left, arrow-left-circle, arrow-left-short
+    """
+
     __slots__ = ('path',)
 
     def __init__(self, parent: PathNode | None, path: Path, icon: ImageType = None):
@@ -101,27 +107,6 @@ class Tree(TreeViewBase, base_style_layer='tree'):
         #         return
         raise ValueError(f'Unable to find row with {key=} {value=}')
 
-    def _ttk_style(self) -> tuple[str, TtkStyle]:
-        style = self.style
-        name, ttk_style = style.make_ttk_style('tk_gui_tree.Treeview')
-        ttk_style.configure(name, rowheight=self.row_height or style.char_height('tree'))
-
-        if base := self._tk_style_config(ttk_style, name, 'tree'):
-            if (selected_row_color := self.selected_row_color) and ('foreground' in base or 'background' in base):
-                for i, (xground, default) in enumerate(XGROUND_DEFAULT_HIGHLIGHT_COLOR_MAP.items()):
-                    if xground in base and (selected := selected_row_color[i]) is not None:
-                        ttk_style.map(name, **{xground: _style_map_data(ttk_style, name, xground, selected or default)})
-
-        self._tk_style_config(ttk_style, f'{name}.Heading', 'tree_header')
-        return name, ttk_style
-
-    def _tk_style_config(self, ttk_style: TtkStyle, name: str, layer: Layer) -> dict[str, Font | str | None]:
-        style_cfg = self.style.get_map(layer, foreground='fg', background='bg', font='font')
-        if layer == 'tree' and (bg := style_cfg.get('background')):
-            style_cfg['fieldbackground'] = bg
-        ttk_style.configure(name, **style_cfg)
-        return style_cfg
-
     def _init_widget(self, tk_container: TkContainer):
         columns, style = self.columns, self.style
         kwargs = {
@@ -151,6 +136,8 @@ class Tree(TreeViewBase, base_style_layer='tree'):
         tree_view.configure(style=self._ttk_style()[0])
 
     def _insert_nodes(self, nodes: Iterable[TreeNode]):
+        # A path/file-specific tree type is likely necessary, with on-select callbacks
+        # to populate/cache children of directories
         for node in nodes:
             parent_iid = self._key_iid_map.get(node.parent.key, '')
             iid = self.tree_view.insert(parent_iid, 'end', text=node.text, values=node.values)  # noqa

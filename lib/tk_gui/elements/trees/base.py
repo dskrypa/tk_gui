@@ -2,17 +2,18 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from tkinter.ttk import Treeview
+from tkinter.ttk import Treeview, Style as TtkStyle
 from typing import TYPE_CHECKING, Any, Union, Callable, Mapping, Iterable
 
 from tk_gui.caching import cached_property
 from tk_gui.elements.element import Interactive
 from tk_gui.enums import Anchor
 from tk_gui.widgets.scroll import ScrollableTreeview
-from .utils import mono_width
+from .utils import _style_map_data, mono_width
 
 if TYPE_CHECKING:
     from tkinter import BaseWidget
+    from tk_gui.styles.typing import Font, Layer
     from tk_gui.pseudo_elements import Row
 
 __all__ = ['TreeViewBase', 'Column']
@@ -21,11 +22,15 @@ log = logging.getLogger(__name__)
 _Width = Union[float, Mapping[Any, Mapping[str, Any]], Iterable[Union[Mapping[str, Any], Any]]]
 FormatFunc = Callable[[Any], str]
 
+XGROUND_DEFAULT_HIGHLIGHT_COLOR_MAP = {'foreground': 'SystemHighlightText', 'background': 'SystemHighlight'}
+
 
 class TreeViewBase(Interactive, ABC):
     widget: Treeview | ScrollableTreeview
     tree_view: Treeview
-    _init_focus_row: int | tuple[str, str | int] | None = 0,
+    _init_focus_row: int | tuple[str, str | int] | None = 0
+    row_height: int | None = None
+    selected_row_color: tuple[str, str] | None = None
 
     @abstractmethod
     def set_focus_on_value(self, key: str, value: str | int):
@@ -66,6 +71,28 @@ class TreeViewBase(Interactive, ABC):
             return widget.widgets
         except AttributeError:
             return [widget]
+
+    def _ttk_style(self) -> tuple[str, TtkStyle]:
+        style = self.style
+        # name, ttk_style = style.make_ttk_style('customtable.Treeview')
+        name, ttk_style = style.make_ttk_style(f'tk_gui_{self._base_style_layer}.Treeview')
+        ttk_style.configure(name, rowheight=self.row_height or style.char_height(self._base_style_layer))
+
+        if base := self._tk_style_config(ttk_style, name, self._base_style_layer):
+            if (selected_row_color := self.selected_row_color) and ('foreground' in base or 'background' in base):
+                for i, (xground, default) in enumerate(XGROUND_DEFAULT_HIGHLIGHT_COLOR_MAP.items()):
+                    if xground in base and (selected := selected_row_color[i]) is not None:
+                        ttk_style.map(name, **{xground: _style_map_data(ttk_style, name, xground, selected or default)})
+
+        self._tk_style_config(ttk_style, f'{name}.Heading', f'{self._base_style_layer}_header')  # noqa
+        return name, ttk_style
+
+    def _tk_style_config(self, ttk_style: TtkStyle, name: str, layer: Layer) -> dict[str, Font | str | None]:
+        style_cfg = self.style.get_map(layer, foreground='fg', background='bg', font='font')
+        if layer == self._base_style_layer and (bg := style_cfg.get('background')):
+            style_cfg['fieldbackground'] = bg
+        ttk_style.configure(name, **style_cfg)
+        return style_cfg
 
 
 class Column:
