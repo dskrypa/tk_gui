@@ -11,11 +11,15 @@ from pathlib import Path
 from tkinter.ttk import Treeview
 from typing import TYPE_CHECKING, Any, Iterable, Self, Sequence
 
+from tk_gui.images.wrapper import ImageWrapper, SourceImage
 from tk_gui.widgets.scroll import ScrollableTreeview
 from .base import TreeViewBase, Column
 
 if TYPE_CHECKING:
+    from PIL.ImageTk import PhotoImage
     from tk_gui.typing import TkContainer, TreeSelectModes, ImageType
+
+    Image = ImageType | ImageWrapper  # noqa
 
 __all__ = ['TreeNode', 'Tree']
 log = logging.getLogger(__name__)
@@ -23,13 +27,14 @@ log = logging.getLogger(__name__)
 
 class TreeNode:
     __slots__ = ('parent', 'key', 'text', 'values', 'icon', 'children')
+    icon: SourceImage
 
-    def __init__(self, parent: Self | None, key: str, text: str = '', values: Sequence[Any] = (), icon: ImageType = None):
+    def __init__(self, parent: Self | None, key: str, text: str = '', values: Sequence[Any] = (), icon: Image = None):
         self.parent = parent
         self.key = key
         self.text = text
         self.values = values
-        self.icon = icon
+        self.icon = SourceImage.from_image(icon) if icon else None
         self.children = []
 
     def __repr__(self) -> str:
@@ -38,7 +43,7 @@ class TreeNode:
     def get_parent(self) -> Self | None:
         return self.parent
 
-    def add_child(self, key: str, text: str, values: Sequence[Any] = (), icon: ImageType = None) -> TreeNode:
+    def add_child(self, key: str, text: str, values: Sequence[Any] = (), icon: Image = None) -> TreeNode:
         node = TreeNode(self, key, text, values, icon)
         self.children.append(node)
         return node
@@ -99,6 +104,7 @@ class Tree(TreeViewBase, base_style_layer='tree'):
         self._init_focus_row = init_focus_row
         self._iid_node_map = {}
         self._key_iid_map = {}
+        self._image_cache = {}
 
     def set_focus_on_value(self, key: str, value: str | int):
         # for i, row in enumerate(self.data):
@@ -140,8 +146,20 @@ class Tree(TreeViewBase, base_style_layer='tree'):
         # to populate/cache children of directories
         for node in nodes:
             parent_iid = self._key_iid_map.get(node.parent.key, '')
-            iid = self.tree_view.insert(parent_iid, 'end', text=node.text, values=node.values)  # noqa
+            iid = self.tree_view.insert(
+                parent_iid, 'end', text=node.text, values=node.values, image=self._get_image(node)  # noqa
+            )
             self._iid_node_map[iid] = node
             self._key_iid_map[node.key] = iid
             if node.children:
                 self._insert_nodes(node.children)
+
+    def _get_image(self, node: TreeNode) -> PhotoImage | None:
+        if not node.icon:
+            return None
+        try:
+            return self._image_cache[node.icon.sha256sum]
+        except KeyError:
+            pass
+        self._image_cache[node.icon.sha256sum] = image = node.icon.as_tk_image()
+        return image
