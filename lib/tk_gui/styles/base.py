@@ -1,4 +1,4 @@
-from .colors import BLACK, GREY_L_1, CYAN_0, YLW_L_0
+from .colors import BLACK, GREY_L_1, CYAN_0, YLW_L_0, GLD_M_1
 from .style import Style
 
 DEFAULT_FONT = ('Helvetica', 10)
@@ -12,6 +12,8 @@ _common = {
     'link_font': (*DEFAULT_FONT, 'underline'),
     'scroll_bar_width': 14,     # [ttk default: 12] If < arrow_width, it is automatically set to arrow_width by tk
     'scroll_arrow_width': 14,   # Note: This should match the bar_width value, otherwise it will look weird
+    'path_tree_dir_color': GLD_M_1,
+    'path_tree_file_color': BLACK,
 }
 # Style('SystemDefault', **_common, table_alt_bg='#cccdcf')
 SystemDefault = Style(

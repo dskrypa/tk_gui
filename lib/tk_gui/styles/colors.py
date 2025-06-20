@@ -35,5 +35,6 @@ GRN_L_1 = '#88ff00'     # Chartreuse (tertiary color)
 
 # endregion
 
+GLD_M_1 = '#e1af00'     # Gold (medium orange)
 ORN_M_1 = '#ff8000'     # Orange
 PNK_L_0 = '#ff8080'     # Peach

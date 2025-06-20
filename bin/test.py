@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 import logging
-from functools import cached_property
 from pathlib import Path
 
 from cli_command_parser import Command, Action, Counter, Flag, main
@@ -14,14 +13,12 @@ from tk_gui.elements.menu.items import CopySelection, GoogleSelection, SearchKpo
 from tk_gui.elements.menu.items import ToUpperCase, ToTitleCase, ToLowerCase, OpenFileLocation, OpenFile
 from tk_gui.elements.menu.items import CloseWindow
 from tk_gui.elements.text import Multiline, gui_log_handler
-from tk_gui.elements.trees.tree import Tree, Column, TreeNode
+from tk_gui.elements.trees.tree import PathTree
 from tk_gui.event_handling import ClickHighlighter
 from tk_gui.images import Icons, ICONS_DIR
 from tk_gui.popups.about import AboutPopup
 from tk_gui.popups.raw import PickColor
-from tk_gui.styles.colors import BLU_ML_0, WHITE
 from tk_gui.window import Window
-from tk_gui.utils import readable_bytes
 
 
 class BaseRightClickMenu(Menu):
@@ -76,37 +73,12 @@ class GuiTest(Command):
         window = Window(layout, 'Auto Max Size Test', exit_on_esc=True)
         self._run_window(window)
 
-    @cached_property
-    def _dir_and_file_icons(self):
-        icons = Icons(14)
-        dir_icon = icons.draw_alpha_cropped('folder-fill', color=BLU_ML_0)
-        file_icon = icons.draw_alpha_cropped('file-earmark-fill', color=WHITE)
-        return dir_icon, file_icon
-
     @action
     def file_tree(self):
-        dir_icon, file_icon = self._dir_and_file_icons
-        cwd = Path.cwd()
-        contents = sorted(cwd.iterdir())
-        root = TreeNode(None, key=cwd.as_posix(), text=cwd.name, values=[f'{len(contents)} items'], icon=dir_icon)
-        self._add_dir(root, contents, 3)
-
-        tree = Tree(root, [Column('#0', 'Name', width=30), Column('Size', width=20)], rows=20)
+        tree = PathTree(Path.cwd(), 20)
+        # window = Window([[tree]], 'File Tree Test', exit_on_esc=True, style='SystemDefault')
         window = Window([[tree]], 'File Tree Test', exit_on_esc=True)
         self._run_window(window)
-
-    def _add_dir(self, root: TreeNode, dir_items: list[Path], recurse: int = 0):
-        dir_icon, file_icon = self._dir_and_file_icons
-        for path in dir_items:
-            if path.is_dir():
-                if recurse:
-                    child_items = sorted(path.iterdir())
-                    child = root.add_child(path.as_posix(), path.name, [f'{len(child_items)} items'], icon=dir_icon)
-                    self._add_dir(child, child_items, recurse - 1)
-                else:
-                    root.add_child(path.as_posix(), path.name, ['? items'], icon=dir_icon)
-            else:
-                root.add_child(path.as_posix(), path.name, [readable_bytes(path.stat().st_size)], icon=file_icon)
 
     @action(default=True)
     def window(self):

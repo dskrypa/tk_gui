@@ -3,7 +3,7 @@ from .colors import (
 )
 from .style import Style
 
-_dark_base = Style('_dark_base', parent='__base__', insert_bg=WHITE)
+_dark_base = Style('_dark_base', parent='__base__', insert_bg=WHITE, path_tree_file_color=WHITE)
 
 # States: (default, disabled, invalid, active, highlight (may be interpreted as 'selected' for some uses))
 
@@ -37,4 +37,5 @@ DarkGrey10 = Style(
     scroll_trough_color=BLU_MD_0,
     scroll_bg=GREY_D_1,
     scroll_arrow_color=GREY_L_0,
+    path_tree_dir_color=BLU_ML_0,
 )

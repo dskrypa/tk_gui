@@ -10,7 +10,7 @@ from .choices import Radio, RadioGroup, Combo, ComboMap, Dropdown, CheckBox, Lis
 from .images import Image, ScrollableImage, Animation, SpinnerImage, ClockImage
 from .menu import Menu, MenuGroup, MenuItem, MenuProperty
 from .misc import SizeGrip, Spacer, InfoBar
-from .trees import table, Table, Column, Tree, TreeNode
+from .trees import table, Table, Column, Tree, TreeNode, PathTree, PathNode
 from .text import Text, Link, Input, Multiline, Label
 
 __all__ = [
@@ -64,6 +64,8 @@ __all__ = [
     'Table',
     'Tree',
     'TreeNode',
+    'PathNode',
+    'PathTree',
     'Text',
     'Link',
     'Input',

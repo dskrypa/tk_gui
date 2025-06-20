@@ -28,31 +28,8 @@ XGROUND_DEFAULT_HIGHLIGHT_COLOR_MAP = {'foreground': 'SystemHighlightText', 'bac
 class TreeViewBase(Interactive, ABC):
     widget: Treeview | ScrollableTreeview
     tree_view: Treeview
-    _init_focus_row: int | tuple[str, str | int] | None = 0
     row_height: int | None = None
     selected_row_color: tuple[str, str] | None = None
-
-    @abstractmethod
-    def set_focus_on_value(self, key: str, value: str | int):
-        raise NotImplementedError
-
-    def set_focus_on_row(self, n: int):
-        tree_view = self.tree_view
-        child_id = tree_view.get_children()[n]
-        tree_view.selection_set(child_id)
-        tree_view.focus(child_id)
-
-    def take_focus(self, force: bool = False):
-        if force:
-            self.tree_view.focus_force()
-        else:
-            self.tree_view.focus_set()
-
-        if (focus_row := self._init_focus_row) is not None:
-            try:
-                self.set_focus_on_value(*focus_row)
-            except TypeError:
-                self.set_focus_on_row(focus_row)
 
     def enable(self):
         pass
@@ -63,6 +40,10 @@ class TreeViewBase(Interactive, ABC):
     def pack_into(self, row: Row):
         self._init_widget(row.frame)
         self.pack_widget(expand=True)
+
+    @property
+    def _bind_widget(self) -> BaseWidget | None:
+        return self.tree_view
 
     @cached_property
     def widgets(self) -> list[BaseWidget]:

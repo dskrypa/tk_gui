@@ -9,13 +9,14 @@ from tk_gui.typing import OptInt, OptStr
 Layer = Literal[
     'base', 'insert', 'scroll', 'arrows', 'radio', 'checkbox', 'frame', 'combo', 'progress', 'image', 'tooltip', 'text',
     'button', 'listbox', 'link', 'selected', 'input', 'table', 'table_header', 'table_alt', 'slider', 'menu',
-    'checkbox_label', 'tree', 'tree_header',
+    'checkbox_label', 'tree', 'tree_header', 'path_tree'
 ]
 
 StateName = Literal['default', 'disabled', 'invalid', 'active', 'highlight']
 StyleAttr = Literal[
     'font', 'tk_font', 'fg', 'bg', 'border_width', 'relief',
-    'frame_color', 'trough_color', 'arrow_color', 'arrow_width', 'bar_width',
+    'frame_color', 'trough_color', 'arrow_color', 'arrow_width', 'bar_width',  # Scroll bar options
+    'dir_color', 'file_color',  # path_tree
 ]
 StyleOptions = Mapping[str, Any]
 StyleSpec = Union[str, 'Style', StyleOptions, tuple[str, StyleOptions], None]

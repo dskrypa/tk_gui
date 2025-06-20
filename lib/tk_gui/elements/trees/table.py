@@ -26,6 +26,7 @@ TableRows = list[TableRow]
 
 
 class Table(TreeViewBase, base_style_layer='table'):
+    _init_focus_row: int | tuple[str, str | int] | None = 0
     columns: dict[str, Column]
 
     def __init__(
@@ -73,6 +74,24 @@ class Table(TreeViewBase, base_style_layer='table'):
         keys = {k: None for k in chain.from_iterable(data)}  # dict retains key order, but set does not
         columns = [Column(key, key.replace('_', ' ').title(), data) for key in keys]
         return cls(*columns, data=data, **kwargs)
+
+    def take_focus(self, force: bool = False):
+        if force:
+            self.tree_view.focus_force()
+        else:
+            self.tree_view.focus_set()
+
+        if (focus_row := self._init_focus_row) is not None:
+            try:
+                self.set_focus_on_value(*focus_row)
+            except TypeError:
+                self.set_focus_on_row(focus_row)
+
+    def set_focus_on_row(self, n: int):
+        tree_view = self.tree_view
+        child_id = tree_view.get_children()[n]
+        tree_view.selection_set(child_id)
+        tree_view.focus(child_id)
 
     def set_focus_on_value(self, key: str, value: str | int):
         for i, row in enumerate(self.data):

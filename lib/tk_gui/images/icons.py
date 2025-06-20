@@ -27,6 +27,8 @@ __all__ = ['Icons', 'PlaceholderCache', 'placeholder_icon_cache', 'icon_path']
 
 ICONS_DIR = files('tk_gui.icons')
 ICON_DIR = ICONS_DIR.joinpath('bootstrap')
+BLACK = (0, 0, 0)
+WHITE = (255, 255, 255)
 
 Icon = Union[str, int]
 IMG = TypeVar('IMG', bound='ImageType')
@@ -82,7 +84,7 @@ class Icons:
             size = (font_size, font_size)
         return font, size
 
-    def draw(self, icon: Icon, size: XY = None, color: Color = (0, 0, 0), bg: Color = (255, 255, 255)) -> PILImage:
+    def draw(self, icon: Icon, size: XY = None, color: Color = BLACK, bg: Color = WHITE) -> PILImage:
         """
         :param icon: The name of the icon stored in :meth:`.char_names` to render.
         :param size: The font size to use, in pixels, if different from the size used to initialize this :class:`Icons`.
@@ -95,8 +97,11 @@ class Icons:
         font, size = self._font_and_size(size)
         return draw_icon(size, self._normalize(icon), color_to_rgb(color), color_to_rgb(bg), font)
 
+    def draw_with_transparent_bg(self, icon: Icon, size: XY = None, color: Color = BLACK, bg: Color = None) -> PILImage:
+        return self.draw(icon, size, color, pick_transparent_bg(color, bg))
+
     def draw_many(
-        self, icons: Iterable[Icon], size: XY = None, color: Color = (0, 0, 0), bg: Color = (255, 255, 255)
+        self, icons: Iterable[Icon], size: XY = None, color: Color = BLACK, bg: Color = WHITE
     ) -> Iterator[tuple[PILImage, Icon]]:
         font, size = self._font_and_size(size)
         bg, fg = color_to_rgb(bg), color_to_rgb(color)
@@ -108,7 +113,7 @@ class Icons:
         self.draw(*args, **kwargs).save(bio, 'PNG')
         return b64encode(bio.getvalue())
 
-    def draw_alpha_cropped(self, icon: Icon, size: XY = None, color: Color = (0, 0, 0), bg: Color = None) -> PILImage:
+    def draw_alpha_cropped(self, icon: Icon, size: XY = None, color: Color = BLACK, bg: Color = None) -> PILImage:
         """
         Draws the specified icon with an automatically selected background color that will be rendered transparent, and
         crops the image so that the visible icon will reach the edges of the canvas.
@@ -122,14 +127,7 @@ class Icons:
         :return: The specified icon as a PIL Image object.  It will need to be wrapped in a :class:`.images.Image`
           element to be included in a layout.
         """
-        if not bg:
-            fg = tuple(color_to_rgb(color)[:3])  # Ensure rgb and not rgba
-            bg = (*find_unused_color(fg), 0)
-        else:
-            bg = color_to_rgb(bg)
-            if len(bg) != 3:
-                bg = (*bg, 0)
-
+        bg = pick_transparent_bg(color, bg)
         # While the image will need to be drawn twice, the extra step is unavoidable to be able to produce an image
         # that matches the expected size due to differences in shapes between icons.
         image = self.draw(icon, size, color, bg)
@@ -140,6 +138,24 @@ class Icons:
         image = self.draw(icon, target_size, color, bg)
         bbox = image.getbbox()
         return image.crop(bbox)
+
+
+def pick_transparent_bg(fg: Color, bg: Color = None) -> RGBA:
+    """
+    :param fg: The foreground being used.
+    :param bg: The background color to use.  For the background to be 100% transparent, the alpha value should be 0,
+      e.g., ``#ffffff00`` or ``(255, 255, 255, 0)``.  If not specified, a value will automatically be chosen that
+      is different than the specified foreground color.
+    """
+    if not bg:
+        fg = tuple(color_to_rgb(fg)[:3])  # Ensure rgb and not rgba
+        bg = (*find_unused_color(fg), 0)
+    else:
+        bg = color_to_rgb(bg)
+        if len(bg) != 3:
+            bg = (*bg, 0)
+
+    return bg
 
 
 def draw_icon(size: XY, text: str, fg: RGB | RGBA, bg: RGB | RGBA, font: FreeTypeFont) -> PILImage:

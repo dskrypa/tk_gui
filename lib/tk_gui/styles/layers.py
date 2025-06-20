@@ -31,6 +31,9 @@ class StyleLayer:
     arrow_color: StateValues[OptStr] = LayerStateValues()   # Color for the arrows at either end of scroll bars
     arrow_width: StateValues[OptInt] = LayerStateValues()   # Width of scroll bar arrows in px
     bar_width: StateValues[OptInt] = LayerStateValues()     # Width of scroll bars in px
+    # path_tree options
+    dir_color: StateValues[OptStr] = LayerStateValues()     # Directory icon color
+    file_color: StateValues[OptStr] = LayerStateValues()    # File icon color
 
     @overload
     def __init__(
@@ -49,6 +52,8 @@ class StyleLayer:
         arrow_width: OptIntVals = None,
         bar_width: OptIntVals = None,
         relief: OptStrVals = None,
+        dir_color: OptStrVals = None,
+        file_color: OptStrVals = None,
     ):
         ...
 

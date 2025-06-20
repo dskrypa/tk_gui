@@ -12,9 +12,11 @@ Notes:
         - ButtonPress / Button, ButtonRelease, MouseWheel, Motion
         - KeyPress / Key, KeyRelease
             - Valid keysym values: https://tcl.tk/man/tcl8.6.13/TkCmd/keysyms.htm
-            - Some keysym values are not obvious.  It is possible to bind ``<Key>`` with no keysym to a callback that
-              prints the event to determine the value to use for any key.
+            - Some keysym values are not obvious.
+            - To find the correct keysym for any key, bind ``<Key>`` (literally) to a callback that prints the event
+              to determine the value to use for any key.
             - Some non-obvious keysyms (as ``keysym``: common name):
+                - ``Return``: Enter (carriage return)
                 - ``Prior``: Page Up
                 - ``Next``: Page Down
                 - ``App``: Menu key (usually opens the right-click menu)
