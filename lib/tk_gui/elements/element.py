@@ -104,10 +104,15 @@ class ElementBase(ClearableCachedPropertyMixin, ABC):
 
     @property
     def size_and_pos(self) -> tuple[XY, XY]:
-        size, pos = self.widget.winfo_geometry().split('+', 1)
+        size, x, y = self.widget.winfo_geometry().split('+', 2)
         w, h = size.split('x', 1)
-        x, y = pos.split('+', 1)
         return (int(w), int(h)), (int(x), int(y))
+
+    @property
+    def relative_mouse_position(self) -> XY:
+        """Relative position of the mouse cursor relative to the primary widget in this element"""
+        mx, my = self.widget.winfo_pointerxy()  # Absolute position of the mouse cursor on to the desktop
+        return mx - self.widget.winfo_rootx(), my - self.widget.winfo_rooty()
 
     @cached_property
     def widgets(self) -> list[BaseWidget]:
