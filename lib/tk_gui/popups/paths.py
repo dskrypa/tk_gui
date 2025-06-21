@@ -11,8 +11,8 @@ from functools import cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from tk_gui.enums import CallbackAction, TreeSelectMode, TreeShowMode
-from tk_gui.event_handling import event_handler, button_handler
+from tk_gui.enums import TreeSelectMode
+from tk_gui.event_handling import ENTER_KEYSYMS, event_handler, button_handler
 from tk_gui.images.icons import Icons
 from ..elements import Button, Input, Text, PathTree, ButtonAction
 from ..elements.trees.nodes import PathNode
@@ -93,14 +93,18 @@ class PathPopup(Popup):
         self._path_field.update(path.as_posix(), auto_resize=True)
 
     @button_handler('submit')
-    def _handle_submit(self, event, key):
+    def _handle_submit(self, event, key=None):
         if self.allow_dirs and self.allow_files:
             self._submitted = True
-            return CallbackAction.INTERRUPT
+            # Need to call this instead of returning CallbackAction.INTERRUPT to support both binds and buttons
+            self.window.interrupt(event, self._path_tree)
+            return
+
         paths = self._path_tree.value
         if not paths:
             self._submitted = True
-            return CallbackAction.INTERRUPT
+            self.window.interrupt(event, self._path_tree)
+            return
         elif self.allow_files and (n_dirs := sum(p.is_dir() for p in paths)):
             if self.allow_multiple:
                 d_str = 'a directory' if n_dirs == 1 else f'{n_dirs} directories'
@@ -115,8 +119,7 @@ class PathPopup(Popup):
                 popup_error('A directory is expected, but you selected a file')
         else:
             self._submitted = True
-            return CallbackAction.INTERRUPT
-        return None
+            self.window.interrupt(event, self._path_tree)
 
     def get_results(self) -> list[Path]:
         return super().get_results().get('path_tree', [])
@@ -146,7 +149,10 @@ class SaveAsPopup(PathPopup):
 
     @cached_property
     def _name_input(self) -> Input:
-        return Input(self.initial_name, key='filename', size=(40, 1), change_cb=self._handle_name_input_changed)
+        binds = {key: self._handle_submit for key in ENTER_KEYSYMS}
+        return Input(
+            self.initial_name, key='filename', size=(40, 1), change_cb=self._handle_name_input_changed, binds=binds
+        )
 
     def _path_tree_kwargs(self) -> dict[str, Any]:
         return {
