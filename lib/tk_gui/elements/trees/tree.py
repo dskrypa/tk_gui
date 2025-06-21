@@ -8,15 +8,16 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from tkinter import TclError
+from tkinter import TclError, EventType
 from tkinter.ttk import Treeview
 from typing import TYPE_CHECKING, Callable, Iterable, Sequence, TypeVar, Generic, Collection, Hashable
 
-from tk_gui.enums import Anchor
+from tk_gui.enums import Anchor, TreeSelectMode
 from tk_gui.widgets.scroll import ScrollableTreeview
+from tk_gui.event_handling.utils import ENTER_KEYSYMS
 from .base import TreeViewBase, Column
 from .nodes import TreeNode, RootPathNode, PathNode
-from .utils import PathTreeIcons
+from .utils import PathTreeConfig
 
 if TYPE_CHECKING:
     from tkinter import Event
@@ -34,6 +35,7 @@ class BaseTree(TreeViewBase, Generic[N], base_style_layer='tree'):
     _iid_node_map: dict[str, N]
     _key_node_map: dict[Hashable, N]
     _root: N
+    _enter_submits: bool = False
 
     def __init__(
         self,
@@ -43,25 +45,35 @@ class BaseTree(TreeViewBase, Generic[N], base_style_layer='tree'):
         *,
         row_height: int = None,
         selected_row_color: tuple[str, str] = None,  # fg, bg
-        select_mode: TreeSelectModes = None,
+        select_mode: TreeSelectModes = TreeSelectMode.EXTENDED.value,
+        binds: BindMapping = None,
+        enter_submits: bool = False,
         scroll_y: bool = True,
         scroll_x: bool = False,
         init_focus_key: Hashable | None = None,
+        allow_shift_select_all: bool = False,
         **kwargs,
     ):
-        super().__init__(**kwargs)
+        binds = self._prepare_binds(binds, enter_submits)
+        super().__init__(binds=binds, **kwargs)
         self._root = root
         self.columns = {col.key: col for col in columns}
         self.num_rows = rows
         self.row_height = row_height
         self.selected_row_color = selected_row_color
-        self.select_mode = select_mode
+        self.select_mode = select_mode.value if isinstance(select_mode, TreeSelectMode) else select_mode
         self.scroll_x = scroll_x
         self.scroll_y = scroll_y
         self._init_focus_key = init_focus_key
         self._iid_node_map = {}
         self._key_node_map = {}
         self._image_cache = {}
+        self.__shift_is_active = [False, False]
+        self.__previous_selection = None
+        self._allow_shift_select_all = allow_shift_select_all
+        self.__enter_iid = None
+
+    # region Focus
 
     def take_focus(self, force: bool = False):
         if force:
@@ -76,6 +88,10 @@ class BaseTree(TreeViewBase, Generic[N], base_style_layer='tree'):
         if node := self._key_node_map.get(key):
             self.tree_view.selection_set(node.iid)
             self.tree_view.focus(node.iid)
+
+    # endregion
+
+    # region Initialize Widget
 
     def _init_widget(self, tk_container: TkContainer):
         style = self.style
@@ -109,16 +125,13 @@ class BaseTree(TreeViewBase, Generic[N], base_style_layer='tree'):
     def _populate_tree(self):
         self._insert_nodes(self._root.children.values())
 
+    # endregion
+
     # region Insert / Update
 
     def _insert_node(self, node: N):
-        try:
-            parent_iid = node.parent.iid
-        except AttributeError:
-            parent_iid = ''
-
         node.iid = self.tree_view.insert(
-            parent_iid, 'end', text=node.text, values=node.values, image=self._get_image(node), open=False  # noqa
+            node.parent_iid, 'end', text=node.text, values=node.values, image=self._get_image(node), open=False  # noqa
         )
         self._iid_node_map[node.iid] = node
         self._key_node_map[node.key] = node
@@ -157,27 +170,6 @@ class BaseTree(TreeViewBase, Generic[N], base_style_layer='tree'):
         self._image_cache[node.icon.sha256sum] = image = node.icon.as_tk_image()
         return image
 
-    # endregion
-
-    def _get_selected_iids(self) -> Collection[str]:
-        try:
-            return self.tree_view.selection()
-        except TclError as e:
-            log.debug(f'Error determining tree view selection: {e}')
-            return []
-
-    def _get_selected_nodes(self) -> list[N]:
-        # Get the nodes that were selected, but filter out children of nodes that are closed.
-        # When selecting multiple items with shift, the children of closed items are included in the selection
-        keep = {}
-        item = self.tree_view.item
-        for iid in self._get_selected_iids():
-            node = self._iid_node_map[iid]
-            if not node.has_any_ancestor(keep) or (node.parent_iid and item(node.parent_iid, 'open')):  # noqa
-                keep[iid] = node
-
-        return list(keep.values())
-
     def _clear_nodes(self):
         for node in self._root.children.values():
             self.tree_view.delete(node.iid)
@@ -185,6 +177,114 @@ class BaseTree(TreeViewBase, Generic[N], base_style_layer='tree'):
         self._root.children.clear()
         self._iid_node_map.clear()
         self._key_node_map.clear()
+
+    # endregion
+
+    # region Selection
+
+    def _get_selected_iids(self) -> Collection[str]:
+        try:
+            if self._allow_shift_select_all:
+                return self.tree_view.selection()
+            return self.__get_selected_iids()
+        except TclError as e:
+            log.debug(f'Error determining tree view selection: {e}')
+            return []
+
+    def __get_selected_iids(self) -> Collection[str]:
+        """
+        After clicking a single item, then holding down shift, and clicking the same item again, ttk seems to interpret
+        that as the user wanting to select (nearly) everything below that item.  This method seeks to work around that
+        behavior.
+        """
+        previous: list[str] = self.__previous_selection
+        self.__previous_selection = iids = self.tree_view.selection()
+        if not any(self.__shift_is_active) or len(iids) <= 2:
+            # Shift was not active, or the number of selected items doesn't warrant further attention
+            return iids
+        elif not (mouse_iid := self.tree_view.identify_row(self.relative_mouse_position[1])):
+            # No item could be identified at the current mouse position
+            return iids
+        elif mouse_iid == iids[-1]:  # The last selected item matches the one under the mouse cursor
+            return iids
+        elif previous and (previous[-1] == iids[-1] or previous[0] == iids[-1]):
+            # iids[-1] is the bottom selected item.
+            # When the previous bottom selected item matches, it indicates that the latest selected item is above the
+            # previous/initial selection.
+            # When the previous top selected item matches, it indicates that the previous selection was top->down, and
+            # that with shift still held, a different selection was made with an entry above the initial selection.
+            # In either case, it is not the problematic behavior that this method is attempting to work around.
+            return iids
+
+        try:
+            index = iids.index(mouse_iid)
+        except ValueError:
+            return iids
+        else:
+            log.debug('Detected bad shift selection - resetting selection')
+            self.__previous_selection = iids = iids[:index + 1]
+            self.tree_view.selection_set(*iids)
+            return iids
+
+    def _get_selected_nodes(self) -> list[N]:
+        """
+        When multiple items are selected while holding down shift, the children of closed items end up being included
+        in the raw selection.  This method translates the selected iids into node objects, and filters out the children
+        of nodes that were closed.
+        """
+        keep = {}
+        for iid in self._get_selected_iids():
+            node = self._iid_node_map[iid]
+            if not node.has_any_ancestor(keep) or self.__is_parent_open(node):
+                # It is a top-level node, or its parent and all ancestors are open
+                keep[iid] = node
+
+        return list(keep.values())
+
+    def __is_parent_open(self, node: PathNode) -> bool:
+        if not (parent_iid := node.parent_iid):
+            return False
+        elif parent_iid == self.__enter_iid:
+            # self._enter_submits is True and the node's parent was selected when Enter/Return was pressed
+            return False
+        else:
+            return self.tree_view.item(parent_iid, 'open')
+
+    # endregion
+
+    # region Event Handling
+
+    def _prepare_binds(self, binds: BindMapping | None, enter_submits: bool = False):
+        handlers = {
+            '<KeyPress-Shift_L>': self._handle_shift,
+            '<KeyRelease-Shift_L>': self._handle_shift,
+            '<KeyPress-Shift_R>': self._handle_shift,
+            '<KeyRelease-Shift_R>': self._handle_shift,
+        }
+        if enter_submits:
+            self._enter_submits = enter_submits
+            for key in ENTER_KEYSYMS:
+                handlers[key] = self._handle_return
+
+        if not binds:
+            return handlers
+        else:
+            return binds | handlers  # noqa
+
+    def _handle_shift(self, event: Event):
+        # This event won't be triggered until the first time the tree view event receives focus
+        # log.debug(f'_handle_shift: {event}, {event.__dict__}')
+        # Shift_L = 65505, Shift_R = 65506; type = EventType.KeyPress (2) or EventType.KeyRelease (3)
+        self.__shift_is_active[event.keysym_num - 65505] = event.type == EventType.KeyPress
+
+    def _handle_return(self, event: Event):
+        # log.debug(f'_handle_return: {event}')
+        if self._enter_submits:
+            self.__enter_iid = self.tree_view.focus()
+            # log.debug(f'Storing enter_iid={self.__enter_iid!r}')
+            self.window.interrupt(event, self)
+
+    # endregion
 
 
 class Tree(BaseTree[N]):
@@ -206,36 +306,38 @@ class Tree(BaseTree[N]):
 
 class PathTree(BaseTree[PathNode]):
     _root: RootPathNode | PathNode
-    _tree_icons: PathTreeIcons
+    _pt_config: PathTreeConfig
 
     def __init__(
         self,
         path: Path,
         rows: int,
         *,
-        binds: BindMapping = None,
-        bind_enter: bool = False,
+        files: bool = True,
+        dirs: bool = True,
         root_changed_cb: Callable[[Path], ...] = None,
         **kwargs,
     ):
-        handlers = {
-            '<<TreeviewSelect>>': self._handle_node_selected,
-            '<Double-1>': self._handle_root_change,  # TODO: Separate handling for files to submit
-            '<Space>': self._handle_root_change,
-        }
-        if bind_enter:
-            handlers['<Return>'] = self._handle_root_change
-        if not binds:
-            binds = handlers
-        else:
-            binds |= handlers
         columns = [Column('#0', 'Name', width=30), Column('Size', width=20, anchor_values=Anchor.MID_RIGHT)]
-        super().__init__(RootPathNode(path), columns, rows=rows, binds=binds, **kwargs)
+        super().__init__(RootPathNode(path), columns, rows=rows, enter_submits=True, **kwargs)
         self._root_changed_cb = root_changed_cb
+        self._files = files
+        self._dirs = dirs
 
     @property
     def value(self) -> list[Path]:
         return [node.key for node in self._get_selected_nodes()]
+
+    # region Initialize Widget
+
+    def _populate_tree(self):
+        self._pt_config = PathTreeConfig(self.style, self._files, self._dirs)
+        self._root.add_dir_contents(self._pt_config)
+        self._insert_nodes(self._root.children.values())
+
+    # endregion
+
+    # region Get/Set Root Dir
 
     @property
     def root_dir(self) -> Path:
@@ -251,16 +353,48 @@ class PathTree(BaseTree[PathNode]):
             return
 
         self._clear_nodes()
-        self._root = RootPathNode(path)
-        self._root.add_dir_contents(self._tree_icons)
+        self._change_root_node(RootPathNode.with_dir_contents(path, self._pt_config))
+
+    def _change_root_node(self, node: PathNode | RootPathNode):
+        # Note: self._clear_nodes must be called before promoting a node to root, so it must be called before
+        # calling this method
+        self._root = node
         self._insert_nodes(self._root.children.values())
         if self._root_changed_cb is not None:
             self._root_changed_cb(self._root.key)
 
-    def _populate_tree(self):
-        self._tree_icons = PathTreeIcons(self.style)
-        self._root.add_dir_contents(self._tree_icons)
-        self._insert_nodes(self._root.children.values())
+    def _promote_to_root(self, node: PathNode):
+        self._clear_nodes()
+        self._change_root_node(node.promote_to_root())
+
+    # endregion
+
+    # region Event Handling
+
+    def _prepare_binds(self, binds: BindMapping | None, enter_submits: bool = False):
+        binds = super()._prepare_binds(binds, enter_submits)
+        handlers = {
+            '<<TreeviewSelect>>': self._handle_node_selected,
+            # '<<TreeviewOpen>>': self._handle_node_opened,
+            # '<<TreeviewClose>>': self._handle_node_closed,
+            '<Double-1>': self._handle_double_click,
+            '<space>': self._handle_chdir,
+        }
+        return binds | handlers
+
+    def _get_selected_node(self, action: str) -> PathNode | None:
+        nodes = self._get_selected_nodes()
+        if len(nodes) == 1:
+            return nodes[0]
+        else:
+            log.debug(f'Ignoring {action} - found {len(nodes)} selected nodes')
+            return None
+
+    # def _handle_node_opened(self, event: Event):
+    #     log.debug(f'_handle_node_opened: {event}', extra={'color': 10})
+    #
+    # def _handle_node_closed(self, event: Event):
+    #     log.debug(f'_handle_node_closed: {event}', extra={'color': 11})
 
     def _handle_node_selected(self, event: Event):
         """
@@ -269,20 +403,23 @@ class PathTree(BaseTree[PathNode]):
             - Move selection via up/down arrow keys
             - Expand/collapse via left/right arrow keys
         """
+        # log.debug(f'_handle_node_selected: {event}', extra={'color': 14})
         if nodes := self._get_selected_nodes():
             for node in nodes:
                 if node.expand():
                     self._update_node(node)
 
-    def _handle_root_change(self, event: Event):
-        """Triggered by double-click or the Enter/Return key."""
-        nodes = self._get_selected_nodes()
-        if len(nodes) != 1:
-            log.debug(f'Unable to change root dir - found {len(nodes)} selected nodes')
-            return
+    def _handle_double_click(self, event: Event):
+        if node := self._get_selected_node('double-click'):
+            if node.is_dir:
+                self._promote_to_root(node)
+            elif self._pt_config.files:
+                self.trigger_interrupt(event)
 
-        self._clear_nodes()
-        self._root = nodes[0].promote_to_root()
-        self._insert_nodes(self._root.children.values())
-        if self._root_changed_cb is not None:
-            self._root_changed_cb(self._root.key)
+    def _handle_chdir(self, event: Event):
+        """Triggered by space"""
+        if node := self._get_selected_node(f'chdir via {event}'):
+            if node.is_dir:
+                self._promote_to_root(node)
+
+    # endregion

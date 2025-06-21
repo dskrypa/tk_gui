@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from abc import ABC, abstractmethod
+from abc import ABC
 from tkinter.ttk import Treeview, Style as TtkStyle
 from typing import TYPE_CHECKING, Any, Union, Callable, Mapping, Iterable
 
@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from tkinter import BaseWidget
     from tk_gui.styles.typing import Font, Layer
     from tk_gui.pseudo_elements import Row
+    from tk_gui.typing import XY
 
 __all__ = ['TreeViewBase', 'Column']
 log = logging.getLogger(__name__)
@@ -74,6 +75,12 @@ class TreeViewBase(Interactive, ABC):
             style_cfg['fieldbackground'] = bg
         ttk_style.configure(name, **style_cfg)
         return style_cfg
+
+    @property
+    def relative_mouse_position(self) -> XY:
+        """Relative position of the mouse cursor relative to this widget"""
+        mx, my = self.tree_view.winfo_pointerxy()  # Absolute position of the mouse cursor on to the desktop
+        return mx - self.tree_view.winfo_rootx(), my - self.tree_view.winfo_rooty()
 
 
 class Column:

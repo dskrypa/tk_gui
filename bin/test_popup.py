@@ -14,6 +14,9 @@ from tk_gui.popups.choices import ChooseImagePopup, choose_item
 from tk_gui.popups.common import popup_warning, popup_error, popup_yes_no, popup_no_yes, popup_ok
 from tk_gui.popups.files import PathPopup
 from tk_gui.popups.style import StylePopup
+from tk_gui.utils import tcl_version
+
+log = logging.getLogger(__name__)
 
 
 class GuiPopupTest(Command):
@@ -23,12 +26,14 @@ class GuiPopupTest(Command):
     def _init_command_(self):
         logging.getLogger('PIL.PngImagePlugin').setLevel(50)
         try:
-            from ds_tools.logging import init_logging
+            from ds_tools.logging import init_logging, ENTRY_FMT_DETAILED
         except ImportError:
             log_fmt = '%(asctime)s %(levelname)s %(name)s %(lineno)d %(message)s' if self.verbose > 1 else '%(message)s'
             logging.basicConfig(level=logging.DEBUG if self.verbose else logging.INFO, format=log_fmt)
         else:
-            init_logging(self.verbose, log_path=None, names=None)
+            init_logging(self.verbose, log_path=None, names=None, entry_fmt=ENTRY_FMT_DETAILED)
+
+        log.debug(f'Popup Test using tcl version: {tcl_version()}')
 
     @action
     def about(self):

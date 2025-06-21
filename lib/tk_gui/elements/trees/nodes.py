@@ -16,7 +16,7 @@ from tk_gui.utils import readable_bytes
 
 if TYPE_CHECKING:
     from tk_gui.typing import ImageType
-    from .utils import PathTreeIcons
+    from .utils import PathTreeIcons, PathTreeConfig
 
     Image = ImageType | ImageWrapper  # noqa
 
@@ -40,9 +40,12 @@ class TreeNode(Generic[K]):
         self.values = values
         self.icon = SourceImage.from_image(icon) if icon else None
         self.children = {}
+        self.iid = ''
 
     def __repr__(self) -> str:
-        return f'<{self.__class__.__name__}(key={self.key!r}, text={self.text!r}, values={self.values})>'
+        return (
+            f'<{self.__class__.__name__}(iid={self.iid!r}, key={self.key!r}, text={self.text!r}, values={self.values})>'
+        )
 
     def add_child(self, key: K, text: str, values: Sequence[Any] = (), icon: Image = None) -> TreeNode:
         node = TreeNode(self, key, text, values, icon)
@@ -61,26 +64,15 @@ class TreeNode(Generic[K]):
             return ''
 
     def has_any_ancestor(self, iids: Collection[str]) -> bool:
-        if not self.parent:
-            return False
-        try:
-            if self.parent.iid in iids:
+        if parent_iid := self.parent_iid:
+            if parent_iid in iids:
                 return True
-        except AttributeError:
-            return False
-        else:
             return self.parent.has_any_ancestor(iids)
+        else:
+            return False
 
     def has_ancestor(self, iid: str) -> bool:
-        if not self.parent:
-            return False
-        try:
-            if self.parent.iid == iid:
-                return True
-        except AttributeError:
-            return False
-        else:
-            return self.parent.has_ancestor(iid)
+        return self.has_any_ancestor({iid})
 
 
 class RootPathNode(TreeNode[Path]):
@@ -94,49 +86,58 @@ class RootPathNode(TreeNode[Path]):
             path = path.parent
         super().__init__(None, path)
 
-    def add_dir_contents(self, tree_icons: PathTreeIcons):
-        self.children = PathNode._for_dir(self, self.key, tree_icons)
+    @classmethod
+    def with_dir_contents(cls, path: Path, pt_config: PathTreeConfig) -> RootPathNode:
+        self = cls(path)
+        self.add_dir_contents(pt_config)
+        return self
+
+    def add_dir_contents(self, pt_config: PathTreeConfig):
+        self.children = PathNode._for_dir(self, self.key, pt_config)
 
 
 class PathNode(TreeNode[Path]):
-    __slots__ = ('is_dir', '_tree_icons', '_expanded')
+    __slots__ = ('is_dir', '_pt_config', '_expanded')
     children: dict[Path, PathNode]
     is_dir: bool
     key: Path
     _expanded: bool
 
     def __init__(
-        self, parent: RootPathNode | PathNode | None, path: Path, tree_icons: PathTreeIcons, depth: int = 1
+        self, parent: RootPathNode | PathNode | None, path: Path, pt_config: PathTreeConfig, depth: int = 1
     ):
-        is_dir, size, icon = _path_info(path, tree_icons)
+        is_dir, size, icon = _path_info(path, pt_config.tree_icons)
         super().__init__(parent, path, path.name, [size], icon=icon)
         self.is_dir = is_dir
-        self._tree_icons = tree_icons
+        self._pt_config = pt_config
         self._expanded = False
         if is_dir and depth:
             self._refresh_children(depth - 1)
 
     @classmethod
     def _for_dir(
-        cls, parent: RootPathNode | PathNode, directory: Path, tree_icons: PathTreeIcons, depth: int = 1
+        cls, parent: RootPathNode | PathNode, directory: Path, pt_config: PathTreeConfig, depth: int = 1
     ) -> dict[Path, PathNode]:
-        # nodes = {path: cls(parent, path, tree_icons, depth) for path in _dir_contents(directory)}
         dirs, files = {}, {}
         # Paths were sorted by name by _dir_contents, so these dicts will be populated in already sorted order
         for path in _dir_contents(directory):
-            node = cls(parent, path, tree_icons, depth)
+            node = cls(parent, path, pt_config, depth)
             if node.is_dir:
                 dirs[path] = node
             else:
                 files[path] = node
 
-        return dirs | files  # Sort dirs above files
+        if pt_config.files:
+            # Both directories and files should be displayed, regardless of whether dirs are acceptable selections
+            return dirs | files  # Sort dirs above files
+        else:
+            return dirs
 
     def add_child(self, *args, **kwargs):
         raise NotImplementedError
 
     def _refresh_children(self, depth: int = 1):
-        self.children = self._for_dir(self, self.key, self._tree_icons, depth)
+        self.children = self._for_dir(self, self.key, self._pt_config, depth)
         self.values = ['1 item' if len(self.children) == 1 else f'{len(self.children):,d} items']
 
     def expand(self) -> bool:

@@ -14,7 +14,7 @@ from shutil import copyfile, copystat
 from time import monotonic
 from typing import TYPE_CHECKING, Union, Collection, Mapping, Iterator
 
-from tk_gui.event_handling import event_handler, button_handler
+from tk_gui.event_handling import event_handler
 from tk_gui.images.icons import Icons
 from ..elements import Text, Button, ProgressBar, PathTree, ButtonAction
 from ..utils import readable_bytes
@@ -212,18 +212,21 @@ class PathPopup(Popup):
         initial_dir: PathLike = None,
         *,
         multiple: bool = False,
-        files: bool = True,
-        dirs: bool = True,
+        allow_files: bool = True,
+        allow_dirs: bool = True,
         title: str = None,
-        rows: int = 30,
+        rows: int = 25,
         submit_text: str = 'Submit',
+        bind_esc: bool = True,
         **kwargs,
     ):
-        super().__init__(title=title, **kwargs)
+        if not allow_files and not allow_dirs:
+            raise ValueError('At least one of allow_files or allow_dirs must be enabled/True')
+        super().__init__(title=title, bind_esc=bind_esc, **kwargs)
         self.initial_dir = Path(initial_dir) if initial_dir else Path.home()
-        self.multiple = multiple
-        self.allow_files = files
-        self.allow_dirs = dirs
+        self.allow_multiple = multiple
+        self.allow_files = allow_files
+        self.allow_dirs = allow_dirs
         self._tree_rows = rows
         self._submit_text = submit_text
 
@@ -233,14 +236,26 @@ class PathPopup(Popup):
 
     @cached_property
     def _path_tree(self) -> PathTree:
-        return PathTree(self.initial_dir, self._tree_rows, root_changed_cb=self._handle_root_changed, key='path_tree')
+        return PathTree(
+            self.initial_dir,
+            self._tree_rows,
+            key='path_tree',
+            root_changed_cb=self._handle_root_changed,
+            files=self.allow_files,
+            dirs=self.allow_dirs,
+        )
 
     def get_pre_window_layout(self) -> Layout:
         icon = Icons(15).draw_with_transparent_bg('caret-left-fill')
-        yield [Button('', icon, shortcut='<Alt-Left>', cb=self._handle_back), self._path_field]
+        yield [Button('', icon, cb=self._handle_back), self._path_field]
         yield [self._path_tree]
-        yield [Button(self._submit_text, side='right', action=ButtonAction.SUBMIT, bind_enter=True)]
+        yield [Button(self._submit_text, side='right', action=ButtonAction.SUBMIT)]
 
+    # @event_handler('<Key>')
+    # def _handle_any(self, event):
+    #     log.info(f'Event: {event}')
+
+    @event_handler('<Alt-Left>', '<Mod1-Left>')
     def _handle_back(self, event=None):
         self._path_tree.root_dir = self._path_tree.root_dir.parent
 

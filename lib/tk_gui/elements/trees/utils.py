@@ -71,3 +71,17 @@ class PathTreeIcons:
             return 'file-earmark-text-fill'
         else:
             return 'file-earmark-text'
+
+
+class PathTreeConfig:
+    __slots__ = ('files', 'dirs', 'tree_icons')
+    files: bool
+    dirs: bool
+    tree_icons: PathTreeIcons
+
+    def __init__(self, style: Style, files: bool = True, dirs: bool = True):
+        if not files and not dirs:
+            raise ValueError('At least one of files or dirs must be enabled/True')
+        self.files = files
+        self.dirs = dirs
+        self.tree_icons = PathTreeIcons(style)
