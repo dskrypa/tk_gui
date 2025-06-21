@@ -299,7 +299,7 @@ class BaseTree(TreeViewBase, Generic[N], base_style_layer='tree'):
         if self._enter_submits:
             if self._selection_is_submissible():
                 self._submitted = True
-                self.window.interrupt(event, self)
+                self.trigger_interrupt(event)
             else:
                 log.debug('Skipping submit - selection is not submissible')
 
@@ -472,6 +472,7 @@ class PathTree(BaseTree[PathNode]):
             if node.is_dir:
                 self._promote_to_root(node)
             elif self._pt_config.files:
+                self._submitted = True
                 self.trigger_interrupt(event)
 
     def _handle_chdir(self, event: Event):

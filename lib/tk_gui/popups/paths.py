@@ -155,10 +155,7 @@ class SaveAsPopup(PathPopup):
         )
 
     def _path_tree_kwargs(self) -> dict[str, Any]:
-        return {
-            'selection_changed_cb': self._handle_selection_changed,
-            'include_children': False,
-        }
+        return {'selection_changed_cb': self._handle_selection_changed, 'include_children': False}
 
     def get_pre_window_layout(self) -> Layout:
         icon = Icons(15).draw_with_transparent_bg('caret-left-fill')
@@ -189,7 +186,7 @@ class SaveAsPopup(PathPopup):
         except IndexError:
             return None
 
-        if path.is_dir():
-            return path.joinpath(self._name_input.value)
+        if name := self._name_input.value:
+            return path.joinpath(name) if path.is_dir() else path.parent.joinpath(name)
         else:
-            return path.parent.joinpath(self._name_input.value)
+            return None
