@@ -19,7 +19,7 @@ from ..elements.menu import Menu
 from ..enums import BindTargets, Anchor, Justify, Side, BindEvent, CallbackAction
 from ..event_handling import BindMixin, BindMapping, BindMap, BindManager
 from ..event_handling.decorators import delayed_event_handler, _tk_event_handler
-from ..event_handling.utils import MotionTracker, Interrupt
+from ..event_handling.utils import ENTER_KEYSYMS, MotionTracker, Interrupt
 from ..exceptions import DuplicateKeyError
 from ..monitors import Monitor, Rectangle, monitor_manager
 from ..pseudo_elements.row_container import RowContainer
@@ -514,6 +514,7 @@ class Window(BindMixin, RowContainer):
 
     @property
     def mouse_position(self) -> XY:
+        """The absolute position of the mouse cursor on the desktop"""
         return self.root.winfo_pointerxy()
 
     # endregion
@@ -834,12 +835,13 @@ class Window(BindMixin, RowContainer):
             yield from cbs
 
     def _maybe_bind_return_key(self, cb: BindCallback) -> bool:
-        tk_event = '<Return>'
-        if tk_event in self._bound_for_events:
-            return False
-        self.bind(tk_event, cb)
-        self._bound_for_events.add(tk_event)
-        return True
+        bound_any = False
+        for tk_event in ENTER_KEYSYMS:
+            if tk_event not in self._bound_for_events:
+                self.bind(tk_event, cb)
+                self._bound_for_events.add(tk_event)
+                bound_any = True
+        return bound_any
 
     # endregion
 

@@ -8,7 +8,7 @@ import logging
 from abc import ABCMeta
 from contextvars import ContextVar
 from functools import partial
-from typing import TYPE_CHECKING, Any, Callable, Type, Iterator
+from typing import TYPE_CHECKING, Any, Callable, Generic, Iterator, Type, TypeVar
 
 from tk_gui.caching import cached_property
 from tk_gui.enums import BindEvent
@@ -25,11 +25,15 @@ log = logging.getLogger(__name__)
 
 _stack = ContextVar('tk_gui.event_handling.stack', default=[])
 
+CB = TypeVar('CB')
+E_CB = TypeVar('E_CB', bound='BindCallback')  # Event handling callback
+B_CB = TypeVar('B_CB', bound='ButtonEventCB')  # Button event handling callback
+
 
 # region Decorators
 
 
-def event_handler(*binds: str, method: bool = True, add: bool = True) -> Callable[[BindCallback], EventHandler]:
+def event_handler(*binds: str, method: bool = True, add: bool = True) -> Callable[[E_CB], E_CB]:
     """
     Decorator that registers the decorated function/method as the handler for the specified bind events.  The function
     must accept a single positional :class:`python:tkinter.Event` argument.
@@ -45,7 +49,7 @@ def event_handler(*binds: str, method: bool = True, add: bool = True) -> Callabl
     return _event_handler
 
 
-def button_handler(*keys: str, method: bool = True, add: bool = False) -> Callable[[ButtonEventCB], ButtonHandler]:
+def button_handler(*keys: str, method: bool = True, add: bool = False) -> Callable[[B_CB], B_CB]:
     """
     Decorator that registers the decorated function/method as the handler for the specified buttons.  The function
     must accept two positional args - a :class:`python:tkinter.Event`, and the key of the :class:`Button` that was
@@ -61,10 +65,11 @@ def button_handler(*keys: str, method: bool = True, add: bool = False) -> Callab
     return _button_handler
 
 
-class EventHandler:
+class _EventHandler(Generic[CB]):
     __slots__ = ('handler', 'binds', 'method', 'add')
+    handler: CB
 
-    def __init__(self, handler: BindCallback, binds: tuple[str, ...], method: bool = True, add: bool = True):
+    def __init__(self, handler: CB, binds: tuple[str, ...], method: bool = True, add: bool = True):
         self.handler = handler
         self.binds = binds
         self.method = method
@@ -80,6 +85,10 @@ class EventHandler:
             yield bind, add
 
 
+class EventHandler(_EventHandler['BindCallback']):
+    __slots__ = ()
+
+
 class ButtonEventHandler(EventHandler):
     __slots__ = ()
 
@@ -87,7 +96,7 @@ class ButtonEventHandler(EventHandler):
         super().__init__(handler, (BindEvent.BUTTON_CLICKED.value,))
 
 
-class ButtonHandler(EventHandler):
+class ButtonHandler(_EventHandler['ButtonEventCB']):
     __slots__ = ('keys',)
 
     def __init__(self, handler: ButtonEventCB, keys: tuple[str, ...], method: bool = True, add: bool = False):

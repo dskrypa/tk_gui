@@ -6,6 +6,10 @@ Notes:
       be skipped.
     - `Bind modifiers <https://tcl.tk/man/tcl8.6.13/TkCmd/bind.htm#M6>`__:
         - Control, Alt, Shift, Lock, Extended, Command, Option, Meta / M, Mod[1-5] / M[1-5]
+            - On Linux (at least), left/right Alt keys are separated as ``Alt_L`` / ``Alt_R`` *keysyms*, and the
+              modifier for use with other keysyms is ``Mod1``
+            - On Linux (at least), when NumLock is engaged, numpad keys (including Enter) have the modifier ``Mod2``.
+              When NumLock is off, that modifier is not present.
         - Button[1-5] / B[1-5]
         - Double, Triple, Quadruple
     - `Event types <https://tcl.tk/man/tcl8.6.13/TkCmd/bind.htm#M7>`__:
@@ -22,6 +26,7 @@ Notes:
                 - ``App``: Menu key (usually opens the right-click menu)
                 - ``Win_L``: Left Windows key
                 - ``Win_R``: Right Windows key (if present)
+                - ``KP_Enter``: Numpad Enter (carriage return) (may have state/modifier ``Mod2`` while NumLock is on)
         - Activate, Deactivate, Enter, Leave, FocusIn, FocusOut
         - Configure, Destroy, Visibility
 """
@@ -41,8 +46,10 @@ if TYPE_CHECKING:
     from tk_gui.elements.element import ElementBase, Element
     from tk_gui.typing import Color, SupportsBind, Bool, XY
 
-__all__ = ['EventState', 'ClickHighlighter', 'Interrupt', 'MotionTracker']
+__all__ = ['ENTER_KEYSYMS', 'EventState', 'ClickHighlighter', 'Interrupt', 'MotionTracker']
 log = logging.getLogger(__name__)
+
+ENTER_KEYSYMS = ('<Return>', '<KP_Enter>')
 
 
 class EventState(IntFlag):
