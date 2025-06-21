@@ -1,6 +1,6 @@
 repos:
   - repo: https://github.com/dskrypa/incr_version
-    rev: 813d3dc4b9d796eadf0878299c0e9f3b072da0c6
+    rev: 20c64597e6d9cb9e368e2a710fa389b8ffd5517f
     hooks:
       - id: incr_version
         args: ['-f', 'lib/tk_gui/__version__.py']

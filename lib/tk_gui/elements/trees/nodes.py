@@ -93,7 +93,7 @@ class RootPathNode(TreeNode[Path]):
         return self
 
     def add_dir_contents(self, pt_config: PathTreeConfig):
-        self.children = PathNode._for_dir(self, self.key, pt_config)
+        self.children = PathNode._for_dir(self, self.key, pt_config)[0]
 
 
 class PathNode(TreeNode[Path]):
@@ -117,7 +117,7 @@ class PathNode(TreeNode[Path]):
     @classmethod
     def _for_dir(
         cls, parent: RootPathNode | PathNode, directory: Path, pt_config: PathTreeConfig, depth: int = 1
-    ) -> dict[Path, PathNode]:
+    ) -> tuple[dict[Path, PathNode], int]:
         dirs, files = {}, {}
         # Paths were sorted by name by _dir_contents, so these dicts will be populated in already sorted order
         for path in _dir_contents(directory):
@@ -127,18 +127,19 @@ class PathNode(TreeNode[Path]):
             else:
                 files[path] = node
 
+        entry_count = len(dirs) + len(files)
         if pt_config.files:
             # Both directories and files should be displayed, regardless of whether dirs are acceptable selections
-            return dirs | files  # Sort dirs above files
+            return dirs | files, entry_count  # Sort dirs above files
         else:
-            return dirs
+            return dirs, entry_count
 
     def add_child(self, *args, **kwargs):
         raise NotImplementedError
 
     def _refresh_children(self, depth: int = 1):
-        self.children = self._for_dir(self, self.key, self._pt_config, depth)
-        self.values = ['1 item' if len(self.children) == 1 else f'{len(self.children):,d} items']
+        self.children, entry_count = self._for_dir(self, self.key, self._pt_config, depth)
+        self.values = ['1 item' if entry_count == 1 else f'{entry_count:,d} items']
 
     def expand(self) -> bool:
         if self._expanded or not self.is_dir:
