@@ -209,6 +209,12 @@ class TreeSelectMode(MissingMixin, Enum):
     EXTENDED = tkc.EXTENDED     #: Select multiple items
 
 
+class TreeShowMode(MissingMixin, Enum):
+    TREE = 'tree'
+    HEADINGS = 'headings'
+    BOTH = 'tree headings'
+
+
 class ScrollUnit(MissingMixin, Enum):
     UNITS = 'units'     # Supports int values
     PAGES = 'pages'     # Supports int values

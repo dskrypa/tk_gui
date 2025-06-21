@@ -12,7 +12,7 @@ from tk_gui.popups.about import AboutPopup
 from tk_gui.popups.basic_prompts import TextPromptPopup, LoginPromptPopup
 from tk_gui.popups.choices import ChooseImagePopup, choose_item
 from tk_gui.popups.common import popup_warning, popup_error, popup_yes_no, popup_no_yes, popup_ok
-from tk_gui.popups.paths import PathPopup
+from tk_gui.popups.paths import PathPopup, SaveAsPopup
 from tk_gui.popups.style import StylePopup
 from tk_gui.utils import tcl_version
 
@@ -160,6 +160,10 @@ class GuiPopupTest(Command):
         result = PathPopup(allow_files=False, multiple=True).run()
         print(f'{result=}')
 
+    @action
+    def save_as(self):
+        result = SaveAsPopup().run()
+        print(f'{result=}')
 
 
 if __name__ == '__main__':

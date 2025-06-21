@@ -12,7 +12,7 @@ from tkinter import TclError, EventType
 from tkinter.ttk import Treeview
 from typing import TYPE_CHECKING, Callable, Iterable, Sequence, TypeVar, Generic, Collection, Hashable
 
-from tk_gui.enums import Anchor, TreeSelectMode
+from tk_gui.enums import Anchor, TreeSelectMode, TreeShowMode
 from tk_gui.widgets.scroll import ScrollableTreeview
 from tk_gui.event_handling.utils import ENTER_KEYSYMS
 from .base import TreeViewBase, Column
@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from tkinter import Event
     from PIL.ImageTk import PhotoImage
     from tk_gui.event_handling.containers import BindMapping
-    from tk_gui.typing import TkContainer, TreeSelectModes
+    from tk_gui.typing import TkContainer, TreeSelectModes, TreeShowModes
 
 __all__ = ['Tree', 'PathTree']
 log = logging.getLogger(__name__)
@@ -47,12 +47,14 @@ class BaseTree(TreeViewBase, Generic[N], base_style_layer='tree'):
         row_height: int = None,
         selected_row_color: tuple[str, str] = None,  # fg, bg
         select_mode: TreeSelectModes = TreeSelectMode.EXTENDED.value,
+        show_mode: TreeShowModes = TreeShowMode.BOTH.value,
         binds: BindMapping = None,
         enter_submits: bool = False,
         scroll_y: bool = True,
         scroll_x: bool = False,
         init_focus_key: Hashable | None = None,
         allow_shift_select_all: bool = False,
+        include_children: bool = True,
         **kwargs,
     ):
         binds = self._prepare_binds(binds, enter_submits)
@@ -63,9 +65,11 @@ class BaseTree(TreeViewBase, Generic[N], base_style_layer='tree'):
         self.row_height = row_height
         self.selected_row_color = selected_row_color
         self.select_mode = select_mode.value if isinstance(select_mode, TreeSelectMode) else select_mode
+        self.show_mode = show_mode.value if isinstance(show_mode, TreeShowMode) else show_mode
         self.scroll_x = scroll_x
         self.scroll_y = scroll_y
         self._init_focus_key = init_focus_key
+        self._include_children = include_children
         self._iid_node_map = {}
         self._key_node_map = {}
         self._iid_open_map = {}
@@ -102,7 +106,7 @@ class BaseTree(TreeViewBase, Generic[N], base_style_layer='tree'):
             'columns': [col.key for col in columns],
             'displaycolumns': [col.key for col in columns if col.show],
             'height': self.num_rows if self.num_rows else self.size[1] if self.size else len(self.data),
-            'show': 'tree headings',
+            'show': self.show_mode,
             'selectmode': self.select_mode,
             'takefocus': int(self.allow_focus),
             **self.style_config,
@@ -137,12 +141,12 @@ class BaseTree(TreeViewBase, Generic[N], base_style_layer='tree'):
         )
         self._iid_node_map[node.iid] = node
         self._key_node_map[node.key] = node
-        if node.children:
+        if self._include_children and node.children:
             self._insert_nodes(node.children.values())
 
     def _update_node(self, node: N):
         self.tree_view.item(node.iid, text=node.text, values=node.values, image=self._get_image(node))  # noqa
-        if node.children:
+        if self._include_children and node.children:
             self._insert_or_update_nodes(node.children.values())
 
     def _insert_nodes(self, nodes: Iterable[N]):
@@ -331,11 +335,13 @@ class PathTree(BaseTree[PathNode]):
         files: bool = True,
         dirs: bool = True,
         root_changed_cb: Callable[[Path], ...] = None,
+        selection_changed_cb: Callable[[list[PathNode]], ...] = None,
         **kwargs,
     ):
-        columns = [Column('#0', 'Name', width=30), Column('Size', width=20, anchor_values=Anchor.MID_RIGHT)]
+        columns = [Column('#0', 'Name', width=35), Column('Size', width=10, anchor_values=Anchor.MID_RIGHT)]
         super().__init__(RootPathNode(path), columns, rows=rows, enter_submits=True, **kwargs)
         self._root_changed_cb = root_changed_cb
+        self._selection_changed_cb = selection_changed_cb
         self._files = files
         self._dirs = dirs
 
@@ -354,6 +360,27 @@ class PathTree(BaseTree[PathNode]):
             return [self.root_dir]
         else:
             return []
+
+    def set_selection(self, path_or_name: str | Path | None | Collection[str | Path]):
+        if not path_or_name:
+            if iids := self.tree_view.selection():
+                self.tree_view.selection_remove(*iids)
+        elif nodes := self._find_nodes(path_or_name):
+            self.tree_view.selection_set(*(node.iid for node in nodes))
+
+    def _find_nodes(self, path_or_name: str | Path | Collection[str | Path]):
+        if isinstance(path_or_name, (str, Path)):
+            path_or_name = (path_or_name,)
+
+        nodes = []
+        for p_or_n in path_or_name:
+            if isinstance(p_or_n, str):
+                if node := self._key_node_map.get(self.root_dir / p_or_n):
+                    nodes.append(node)
+            elif node := self._key_node_map.get(p_or_n):
+                nodes.append(node)
+
+        return nodes
 
     # region Initialize Widget
 
@@ -436,6 +463,9 @@ class PathTree(BaseTree[PathNode]):
             for node in nodes:
                 if node.expand():
                     self._update_node(node)
+
+            if self._selection_changed_cb is not None:
+                self._selection_changed_cb(nodes)
 
     def _handle_double_click(self, event: Event):
         if node := self._get_selected_node('double-click'):
