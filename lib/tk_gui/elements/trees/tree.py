@@ -349,7 +349,11 @@ class PathTree(BaseTree[PathNode]):
         selection_changed_cb: Callable[[list[PathNode]], ...] = None,
         **kwargs,
     ):
-        columns = [Column('#0', 'Name', width=35), Column('Size', width=10, anchor_values=Anchor.MID_RIGHT)]
+        columns = [
+            Column('#0', 'Name', width=35),
+            Column('Size', width=7, anchor_values=Anchor.MID_RIGHT),
+            Column('Modified', width=15),
+        ]
         super().__init__(RootPathNode(path), columns, rows=rows, enter_submits=True, **kwargs)
         self._root_changed_cb = root_changed_cb
         self._selection_changed_cb = selection_changed_cb

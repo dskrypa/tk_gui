@@ -7,6 +7,7 @@ Node classes for Tree GUI elements
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from pathlib import Path
 from stat import S_ISDIR
 from typing import TYPE_CHECKING, Any, Iterable, Self, Sequence, Hashable, TypeVar, Generic, Collection
@@ -15,6 +16,7 @@ from tk_gui.images.wrapper import ImageWrapper, SourceImage
 from tk_gui.utils import readable_bytes
 
 if TYPE_CHECKING:
+    from PIL.Image import Image as PILImage
     from tk_gui.typing import ImageType
     from .utils import PathTreeIcons, PathTreeConfig
 
@@ -99,6 +101,7 @@ class RootPathNode(TreeNode[Path]):
 class PathNode(TreeNode[Path]):
     __slots__ = ('is_dir', '_pt_config', '_expanded')
     children: dict[Path, PathNode]
+    values: list[str]
     is_dir: bool
     key: Path
     _expanded: bool
@@ -106,8 +109,8 @@ class PathNode(TreeNode[Path]):
     def __init__(
         self, parent: RootPathNode | PathNode | None, path: Path, pt_config: PathTreeConfig, depth: int = 1
     ):
-        is_dir, size, icon = _path_info(path, pt_config.tree_icons)
-        super().__init__(parent, path, path.name, [size], icon=icon)
+        is_dir, size, modified, icon = _path_info(path, pt_config.tree_icons)
+        super().__init__(parent, path, path.name, [size, modified], icon=icon)
         self.is_dir = is_dir
         self._pt_config = pt_config
         self._expanded = False
@@ -139,7 +142,7 @@ class PathNode(TreeNode[Path]):
 
     def _refresh_children(self, depth: int = 1):
         self.children, entry_count = self._for_dir(self, self.key, self._pt_config, depth)
-        self.values = ['1 item' if entry_count == 1 else f'{entry_count:,d} items']
+        self.values[0] = '1 item' if entry_count == 1 else f'{entry_count:,d} items'
 
     def expand(self) -> bool:
         if self._expanded or not self.is_dir:
@@ -161,17 +164,18 @@ class PathNode(TreeNode[Path]):
         return self
 
 
-def _path_info(path: Path, tree_icons: PathTreeIcons):
+def _path_info(path: Path, tree_icons: PathTreeIcons) -> tuple[bool, str, str, PILImage]:
     try:
         stat_obj = path.stat()
     except OSError as e:
         log.error(f'Error obtaining stat info for path={path.as_posix()!r}: {e}')
-        return False, '???', tree_icons.error_icon
+        return False, '???', '', tree_icons.error_icon
 
+    modified = datetime.fromtimestamp(int(stat_obj.st_mtime)).isoformat(' ')
     if S_ISDIR(stat_obj.st_mode):
-        return True, '? items', tree_icons.dir_icon
+        return True, '? items', modified, tree_icons.dir_icon
     else:
-        return False, readable_bytes(stat_obj.st_size), tree_icons.file_icon
+        return False, readable_bytes(stat_obj.st_size), modified, tree_icons.file_icon
 
 
 def _dir_contents(directory: Path) -> list[Path]:

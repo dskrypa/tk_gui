@@ -51,6 +51,8 @@ class PathPopup(Popup):
         self._submit_text = submit_text
         self._submitted = False
 
+    # region Elements
+
     @cached_property
     def _path_field(self) -> Text:
         return Text(self.initial_dir)
@@ -66,6 +68,8 @@ class PathPopup(Popup):
             dirs=self.allow_dirs,
             select_mode=TreeSelectMode.EXTENDED if self.allow_multiple else TreeSelectMode.BROWSE,
             focus=True,
+            fill=True,
+            expand=True,
             **self._path_tree_kwargs()
         )
 
@@ -76,11 +80,16 @@ class PathPopup(Popup):
     def _submit_button(self) -> Button:
         return Button(self._submit_text, key='submit', side='right', action=ButtonAction.BIND_EVENT)
 
+    # endregion
+
     def get_pre_window_layout(self) -> Layout:
         icon = Icons(15).draw_with_transparent_bg('caret-left-fill')
         yield [Button('', icon, cb=self._handle_back), self._path_field]
         yield [self._path_tree]
+        # TODO: Include location / full path text field in all path popups to accept a path to navigate to?
         yield [self._submit_button]
+
+    # region Event Handling
 
     # @event_handler('<Key>')
     # def _handle_any(self, event):
@@ -121,6 +130,8 @@ class PathPopup(Popup):
         else:
             self._submitted = True
             self.window.interrupt(event, self._path_tree)
+
+    # endregion
 
     def get_results(self) -> list[Path]:
         return self._path_tree.get_values(self._submitted, root_fallback=True)

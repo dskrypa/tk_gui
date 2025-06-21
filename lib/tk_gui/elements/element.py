@@ -452,6 +452,7 @@ class InteractiveMixin:
     widget: Widget | None
     style: Style
     _base_style_layer: Layer
+    fill: TkFill | None
     disabled: bool = False
     focus: bool = False
     valid: bool = True
@@ -479,7 +480,9 @@ class InteractiveMixin:
             return self.style[self._base_style_layer], self.style_state
         return self.style.base, self.style_state
 
-    def pack_widget(self, *, expand: bool = False, fill: TkFill = tkc.NONE, **kwargs):
+    def pack_widget(self, *, expand: bool = False, fill: TkFill = None, **kwargs):
+        if fill is None:
+            fill = tkc.NONE if self.fill is None else self.fill
         super().pack_widget(expand=expand, fill=fill, focus=self.focus, **kwargs)  # noqa
 
     def enable(self):
