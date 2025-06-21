@@ -54,6 +54,9 @@ def button_handler(*keys: str, method: bool = True, add: bool = False) -> Callab
     Decorator that registers the decorated function/method as the handler for the specified buttons.  The function
     must accept two positional args - a :class:`python:tkinter.Event`, and the key of the :class:`Button` that was
     activated.
+
+    To close the window or interrupt it / submit a form, the decorated function should return a
+    :class:`~.CallbackAction`.  Any other returned values are ignored.
     """
     if not keys:
         raise ValueError('At least one Button key is required to bind to')

@@ -1,5 +1,5 @@
 """
-Tkinter GUI popups: basic prompts
+Tkinter GUI popups: File-related prompts
 
 :author: Doug Skrypa
 """
@@ -14,14 +14,12 @@ from shutil import copyfile, copystat
 from time import monotonic
 from typing import TYPE_CHECKING, Union, Collection, Mapping, Iterator
 
-from tk_gui.event_handling import event_handler
-from tk_gui.images.icons import Icons
-from ..elements import Text, Button, ProgressBar, PathTree, ButtonAction
+from ..elements import Text, ProgressBar
 from ..utils import readable_bytes
 from .base import Popup
 
 if TYPE_CHECKING:
-    from ..typing import Layout, PathLike
+    from ..typing import Layout
 
 __all__ = ['CopyFilesPopup']
 log = logging.getLogger(__name__)
@@ -204,66 +202,6 @@ class CopyFilesPopup(Popup):
             copied += file_node.size
             elapsed = (monotonic() - start) or 1
             self.speed_text.update(readable_bytes(copied / elapsed, rate=True))
-
-
-class PathPopup(Popup):
-    def __init__(
-        self,
-        initial_dir: PathLike = None,
-        *,
-        multiple: bool = False,
-        allow_files: bool = True,
-        allow_dirs: bool = True,
-        title: str = None,
-        rows: int = 25,
-        submit_text: str = 'Submit',
-        bind_esc: bool = True,
-        **kwargs,
-    ):
-        if not allow_files and not allow_dirs:
-            raise ValueError('At least one of allow_files or allow_dirs must be enabled/True')
-        super().__init__(title=title, bind_esc=bind_esc, **kwargs)
-        self.initial_dir = Path(initial_dir) if initial_dir else Path.home()
-        self.allow_multiple = multiple
-        self.allow_files = allow_files
-        self.allow_dirs = allow_dirs
-        self._tree_rows = rows
-        self._submit_text = submit_text
-
-    @cached_property
-    def _path_field(self) -> Text:
-        return Text(self.initial_dir)
-
-    @cached_property
-    def _path_tree(self) -> PathTree:
-        return PathTree(
-            self.initial_dir,
-            self._tree_rows,
-            key='path_tree',
-            root_changed_cb=self._handle_root_changed,
-            files=self.allow_files,
-            dirs=self.allow_dirs,
-        )
-
-    def get_pre_window_layout(self) -> Layout:
-        icon = Icons(15).draw_with_transparent_bg('caret-left-fill')
-        yield [Button('', icon, cb=self._handle_back), self._path_field]
-        yield [self._path_tree]
-        yield [Button(self._submit_text, side='right', action=ButtonAction.SUBMIT)]
-
-    # @event_handler('<Key>')
-    # def _handle_any(self, event):
-    #     log.info(f'Event: {event}')
-
-    @event_handler('<Alt-Left>', '<Mod1-Left>')
-    def _handle_back(self, event=None):
-        self._path_tree.root_dir = self._path_tree.root_dir.parent
-
-    def _handle_root_changed(self, path: Path):
-        self._path_field.update(path.as_posix(), auto_resize=True)
-
-    def get_results(self) -> list[Path]:
-        return super().get_results().get('path_tree', [])
 
 
 def path_repr(path: Path) -> str:

@@ -34,6 +34,7 @@ N = TypeVar('N', bound=TreeNode)
 class BaseTree(TreeViewBase, Generic[N], base_style_layer='tree'):
     _iid_node_map: dict[str, N]
     _key_node_map: dict[Hashable, N]
+    _iid_open_map: dict[str, bool]
     _root: N
     _enter_submits: bool = False
 
@@ -67,11 +68,12 @@ class BaseTree(TreeViewBase, Generic[N], base_style_layer='tree'):
         self._init_focus_key = init_focus_key
         self._iid_node_map = {}
         self._key_node_map = {}
+        self._iid_open_map = {}
         self._image_cache = {}
         self.__shift_is_active = [False, False]
         self.__previous_selection = None
         self._allow_shift_select_all = allow_shift_select_all
-        self.__enter_iid = None
+        self._submitted = False
 
     # region Focus
 
@@ -155,7 +157,7 @@ class BaseTree(TreeViewBase, Generic[N], base_style_layer='tree'):
 
     def _insert_or_update_nodes(self, nodes: Iterable[N]):
         for node in nodes:
-            if hasattr(node, 'iid'):
+            if node.iid:
                 self._update_node(node)
             else:
                 self._insert_node(node)
@@ -177,6 +179,7 @@ class BaseTree(TreeViewBase, Generic[N], base_style_layer='tree'):
         self._root.children.clear()
         self._iid_node_map.clear()
         self._key_node_map.clear()
+        self._iid_open_map.clear()
 
     # endregion
 
@@ -235,20 +238,14 @@ class BaseTree(TreeViewBase, Generic[N], base_style_layer='tree'):
         keep = {}
         for iid in self._get_selected_iids():
             node = self._iid_node_map[iid]
-            if not node.has_any_ancestor(keep) or self.__is_parent_open(node):
+            if not node.has_any_ancestor(keep) or self._iid_open_map.get(node.parent_iid, False):  # noqa
                 # It is a top-level node, or its parent and all ancestors are open
                 keep[iid] = node
 
         return list(keep.values())
 
-    def __is_parent_open(self, node: PathNode) -> bool:
-        if not (parent_iid := node.parent_iid):
-            return False
-        elif parent_iid == self.__enter_iid:
-            # self._enter_submits is True and the node's parent was selected when Enter/Return was pressed
-            return False
-        else:
-            return self.tree_view.item(parent_iid, 'open')
+    def _selection_is_submissible(self) -> bool:
+        return True
 
     # endregion
 
@@ -256,6 +253,8 @@ class BaseTree(TreeViewBase, Generic[N], base_style_layer='tree'):
 
     def _prepare_binds(self, binds: BindMapping | None, enter_submits: bool = False):
         handlers = {
+            '<<TreeviewOpen>>': self._handle_node_opened,
+            '<<TreeviewClose>>': self._handle_node_closed,
             '<KeyPress-Shift_L>': self._handle_shift,
             '<KeyRelease-Shift_L>': self._handle_shift,
             '<KeyPress-Shift_R>': self._handle_shift,
@@ -271,6 +270,20 @@ class BaseTree(TreeViewBase, Generic[N], base_style_layer='tree'):
         else:
             return binds | handlers  # noqa
 
+    def _handle_node_opened(self, event: Event):
+        iid = self.tree_view.focus()
+        # node = self._iid_node_map.get(iid)
+        # log.debug(f'_handle_node_opened: {event}, {iid=}, {node=}', extra={'color': 10})
+        if not self._submitted:  # Prevent enter used to submit from toggling open status
+            self._iid_open_map[iid] = True
+
+    def _handle_node_closed(self, event: Event):
+        iid = self.tree_view.focus()
+        # node = self._iid_node_map.get(iid)
+        # log.debug(f'_handle_node_closed: {event}, {iid=}, {node=}', extra={'color': 11})
+        if not self._submitted:  # Prevent enter used to submit from toggling open status
+            self._iid_open_map[iid] = False
+
     def _handle_shift(self, event: Event):
         # This event won't be triggered until the first time the tree view event receives focus
         # log.debug(f'_handle_shift: {event}, {event.__dict__}')
@@ -278,11 +291,13 @@ class BaseTree(TreeViewBase, Generic[N], base_style_layer='tree'):
         self.__shift_is_active[event.keysym_num - 65505] = event.type == EventType.KeyPress
 
     def _handle_return(self, event: Event):
-        # log.debug(f'_handle_return: {event}')
+        # log.debug(f'_handle_return: {event}', extra={'color': 9})
         if self._enter_submits:
-            self.__enter_iid = self.tree_view.focus()
-            # log.debug(f'Storing enter_iid={self.__enter_iid!r}')
-            self.window.interrupt(event, self)
+            if self._selection_is_submissible():
+                self._submitted = True
+                self.window.interrupt(event, self)
+            else:
+                log.debug('Skipping submit - selection is not submissible')
 
     # endregion
 
@@ -327,6 +342,18 @@ class PathTree(BaseTree[PathNode]):
     @property
     def value(self) -> list[Path]:
         return [node.key for node in self._get_selected_nodes()]
+
+    def get_values(self, submitted: bool, root_fallback: bool = False) -> list[Path]:
+        if not submitted and not self._submitted:
+            # This element did not trigger form submission, and the parent window didn't either, so treat it as a
+            # cancel / exit via escape/close.
+            return []
+        elif nodes := self._get_selected_nodes():
+            return [node.key for node in nodes]
+        elif root_fallback:
+            return [self.root_dir]
+        else:
+            return []
 
     # region Initialize Widget
 
@@ -375,8 +402,6 @@ class PathTree(BaseTree[PathNode]):
         binds = super()._prepare_binds(binds, enter_submits)
         handlers = {
             '<<TreeviewSelect>>': self._handle_node_selected,
-            # '<<TreeviewOpen>>': self._handle_node_opened,
-            # '<<TreeviewClose>>': self._handle_node_closed,
             '<Double-1>': self._handle_double_click,
             '<space>': self._handle_chdir,
         }
@@ -390,11 +415,14 @@ class PathTree(BaseTree[PathNode]):
             log.debug(f'Ignoring {action} - found {len(nodes)} selected nodes')
             return None
 
-    # def _handle_node_opened(self, event: Event):
-    #     log.debug(f'_handle_node_opened: {event}', extra={'color': 10})
-    #
-    # def _handle_node_closed(self, event: Event):
-    #     log.debug(f'_handle_node_closed: {event}', extra={'color': 11})
+    def _selection_is_submissible(self) -> bool:
+        # Note: single/multiple is handled via select_mode
+        if self._pt_config.files and self._pt_config.dirs:
+            return True
+        elif self._pt_config.files:
+            return all(not node.is_dir for node in self._get_selected_nodes())
+        else:
+            return all(node.is_dir for node in self._get_selected_nodes())
 
     def _handle_node_selected(self, event: Event):
         """

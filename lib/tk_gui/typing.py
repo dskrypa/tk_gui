@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from tkinter import Event, Toplevel, Frame, LabelFrame  # noqa
     from PIL.Image import Image as PILImage  # noqa
     from tk_gui.elements.element import Element, ElementBase  # noqa
-    from tk_gui.enums import BindTargets, BindEvent, ScrollUnit, ImageResizeMode, TreeSelectMode  # noqa
+    from tk_gui.enums import BindTargets, BindEvent, ScrollUnit, ImageResizeMode, TreeSelectMode, CallbackAction  # noqa
     from tk_gui.pseudo_elements import Row
     from tk_gui.widgets.scroll import ScrollableToplevel  # noqa
     from tk_gui.window import Window  # noqa
@@ -35,7 +35,7 @@ T_co = TypeVar('T_co', covariant=True)
 
 BindCallback = Callable[['Event'], Any]
 EventCallback = BindCallback | Callable[['Event', ...], Any]
-ButtonEventCB = Callable[['Event', 'Key'], Any]
+ButtonEventCB = Callable[['Event', 'Key'], Union['CallbackAction', None]]
 TraceCallback = Callable[[str, str, str], Any]
 Bindable = Union['BindEvent', str]
 BindTarget = Union[BindCallback, EventCallback, ButtonEventCB, 'BindTargets', str, None]

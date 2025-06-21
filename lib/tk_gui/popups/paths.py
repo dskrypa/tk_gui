@@ -1,0 +1,109 @@
+"""
+Tkinter GUI popups: Path-related prompts
+
+:author: Doug Skrypa
+"""
+
+from __future__ import annotations
+
+import logging
+from functools import cached_property
+from pathlib import Path
+from typing import TYPE_CHECKING
+
+from tk_gui.enums import TreeSelectMode, CallbackAction
+from tk_gui.event_handling import event_handler, button_handler
+from tk_gui.images.icons import Icons
+from ..elements import Text, Button, PathTree, ButtonAction
+from .base import Popup
+from .common import popup_error
+
+if TYPE_CHECKING:
+    from ..typing import Layout, PathLike
+
+__all__ = ['PathPopup']
+log = logging.getLogger(__name__)
+
+
+class PathPopup(Popup):
+    def __init__(
+        self,
+        initial_dir: PathLike = None,
+        *,
+        multiple: bool = False,
+        allow_files: bool = True,
+        allow_dirs: bool = True,
+        title: str = None,
+        rows: int = 25,
+        submit_text: str = 'Submit',
+        bind_esc: bool = True,
+        **kwargs,
+    ):
+        if not allow_files and not allow_dirs:
+            raise ValueError('At least one of allow_files or allow_dirs must be enabled/True')
+        super().__init__(title=title, bind_esc=bind_esc, **kwargs)
+        self.initial_dir = Path(initial_dir) if initial_dir else Path.home()
+        self.allow_multiple = multiple
+        self.allow_files = allow_files
+        self.allow_dirs = allow_dirs
+        self._tree_rows = rows
+        self._submit_text = submit_text
+
+    @cached_property
+    def _path_field(self) -> Text:
+        return Text(self.initial_dir)
+
+    @cached_property
+    def _path_tree(self) -> PathTree:
+        return PathTree(
+            self.initial_dir,
+            self._tree_rows,
+            key='path_tree',
+            root_changed_cb=self._handle_root_changed,
+            files=self.allow_files,
+            dirs=self.allow_dirs,
+            select_mode=TreeSelectMode.EXTENDED if self.allow_multiple else TreeSelectMode.BROWSE,
+        )
+
+    def get_pre_window_layout(self) -> Layout:
+        icon = Icons(15).draw_with_transparent_bg('caret-left-fill')
+        yield [Button('', icon, cb=self._handle_back), self._path_field]
+        yield [self._path_tree]
+        yield [Button(self._submit_text, key='submit', side='right', action=ButtonAction.BIND_EVENT)]
+
+    # @event_handler('<Key>')
+    # def _handle_any(self, event):
+    #     log.info(f'Event: {event}')
+
+    @event_handler('<Alt-Left>', '<Mod1-Left>')
+    def _handle_back(self, event=None):
+        self._path_tree.root_dir = self._path_tree.root_dir.parent
+
+    def _handle_root_changed(self, path: Path):
+        self._path_field.update(path.as_posix(), auto_resize=True)
+
+    @button_handler('submit')
+    def _handle_submit(self, event, key):
+        if self.allow_dirs and self.allow_files:
+            return CallbackAction.INTERRUPT
+        paths = self._path_tree.value
+        if not paths:
+            return CallbackAction.INTERRUPT
+        elif self.allow_files and (n_dirs := sum(p.is_dir() for p in paths)):
+            if self.allow_multiple:
+                d_str = 'a directory' if n_dirs == 1 else f'{n_dirs} directories'
+                popup_error(f'Only files are expected, but you selected {d_str}')
+            else:
+                popup_error('A file is expected, but you selected a directory')
+        elif self.allow_dirs and (n_files := sum(not p.is_dir() for p in paths)):
+            if self.allow_multiple:
+                f_str = 'a file' if n_files == 1 else f'{n_files} files'  # noqa
+                popup_error(f'Only directories are expected, but you selected {f_str}')
+            else:
+                popup_error('A directory is expected, but you selected a file')
+        else:
+            return CallbackAction.INTERRUPT
+        return None
+
+    def get_results(self) -> list[Path]:
+        return super().get_results().get('path_tree', [])
