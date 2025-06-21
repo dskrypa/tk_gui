@@ -47,6 +47,7 @@ Key = Hashable
 
 PathLike = Union['Path', str]
 OptStr = Optional[str]
+IterStrs = Iterable[str]
 OptInt = Optional[int]
 OptFloat = Optional[float]
 Bool = Union[bool, Any]

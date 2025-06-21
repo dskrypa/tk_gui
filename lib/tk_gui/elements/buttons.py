@@ -12,12 +12,12 @@ from enum import Enum
 from math import ceil
 from time import monotonic
 from tkinter import Event, Button as _Button
-from typing import TYPE_CHECKING, Union, Optional, Any
+from typing import TYPE_CHECKING, Any
 
 from PIL.ImageTk import PhotoImage
 
 from tk_gui.enums import Justify, Anchor
-from tk_gui.event_handling import BindMap, BindMapping, CustomEventResultsMixin
+from tk_gui.event_handling import ENTER_KEYSYMS, BindMap, BindMapping, CustomEventResultsMixin
 from tk_gui.images.wrapper import SourceImage, ResizedImage
 from tk_gui.utils import Inheritable
 from .element import Interactive
@@ -25,7 +25,7 @@ from .mixins import DisableableMixin
 
 if TYPE_CHECKING:
     from PIL.Image import Image as PILImage
-    from ..typing import XY, BindCallback, Bool, ImageType, Key, TkContainer
+    from ..typing import XY, BindCallback, Bool, ImageType, Key, TkContainer, OptStr, IterStrs
 
 __all__ = ['Button', 'OK', 'Cancel', 'Yes', 'No', 'Submit', 'EventButton']
 log = logging.getLogger(__name__)
@@ -60,10 +60,11 @@ class Button(CustomEventResultsMixin, DisableableMixin, Interactive, base_style_
         text: str = '',
         image: ImageType = None,
         *,
-        shortcut: str = None,
-        anchor_info: Union[str, Anchor] = None,
-        justify: Union[str, Justify, None] = Justify.CENTER,
-        action: Union[ButtonAction, str] = None,
+        shortcut: OptStr = None,
+        shortcuts: IterStrs = (),
+        anchor_info: str | Anchor = None,
+        justify: str | Justify | None = Justify.CENTER,
+        action: ButtonAction | str = None,
         binds: BindMapping = None,
         bind_enter: Bool = False,
         cb: BindCallback = None,
@@ -71,23 +72,8 @@ class Button(CustomEventResultsMixin, DisableableMixin, Interactive, base_style_
         focus: Bool = None,
         **kwargs,
     ):
-        binds = BindMap.normalize(binds)
-        if separate:
-            self.separate = True
-            binds.add('<ButtonPress-1>', self.handle_press)
-            binds.add('<ButtonRelease-1>', self.handle_release)
-        if shortcut:  # TODO: This does not activate (without focus?)
-            if len(shortcut) == 1:
-                shortcut = f'<{shortcut}>'
-            if not shortcut.startswith('<') or not shortcut.endswith('>'):
-                raise ValueError(f'Invalid keyboard {shortcut=}')
-            binds.add(shortcut, self.handle_activated)
-        if bind_enter:
-            self.bind_enter = True
-            binds.add('<Return>', self.handle_activated)
-        if focus is None:
-            focus = bind_enter
-        super().__init__(binds=binds, focus=focus, **kwargs)
+        binds = self._prepare_binds(binds, bind_enter, separate, shortcut=shortcut, shortcuts=shortcuts)
+        super().__init__(binds=binds, focus=bind_enter if focus is None else focus, **kwargs)
         self.text = text
         self.image = image
         self.justify = justify
@@ -101,8 +87,30 @@ class Button(CustomEventResultsMixin, DisableableMixin, Interactive, base_style_
         self._last_release = 0
         self._last_activated = 0
 
+    def _prepare_binds(
+        self, binds: BindMapping | None, bind_enter: Bool, separate: Bool, *, shortcut: OptStr, shortcuts: IterStrs,
+    ) -> BindMap:
+        binds = BindMap.normalize(binds)
+        if separate:
+            self.separate = True
+            binds.add('<ButtonPress-1>', self.handle_press)
+            binds.add('<ButtonRelease-1>', self.handle_release)
+
+        if shortcut:  # TODO: This does not activate (without focus?)
+            binds.add(_normalize_shortcut(shortcut), self.handle_activated)
+
+        for shortcut in shortcuts:
+            binds.add(_normalize_shortcut(shortcut), self.handle_activated)
+
+        if bind_enter:
+            self.bind_enter = True
+            for key in ENTER_KEYSYMS:
+                binds.add(key, self.handle_activated)
+
+        return binds
+
     @property
-    def image(self) -> Optional[PILImage]:
+    def image(self) -> PILImage | None:
         return self.__image.pil_image
 
     @image.setter
@@ -249,7 +257,7 @@ class Button(CustomEventResultsMixin, DisableableMixin, Interactive, base_style_
     # region Event Handling
 
     def _bind(self, event_pat: str, cb: BindCallback, add: Bool = True):
-        if self.bind_enter and event_pat == '<Return>' and self.window._maybe_bind_return_key(cb):
+        if self.bind_enter and event_pat in ENTER_KEYSYMS and self.window._maybe_bind_return_key(cb):
             return  # Skip bind on the button itself when it was bound on the window to avoid double activation
         super()._bind(event_pat, cb, add)
 
@@ -279,6 +287,14 @@ class Button(CustomEventResultsMixin, DisableableMixin, Interactive, base_style_
             log.warning(f'No action configured for button={self}')
 
     # endregion
+
+
+def _normalize_shortcut(shortcut: str) -> str:
+    if len(shortcut) == 1:
+        return f'<{shortcut}>'
+    elif shortcut.startswith('<') and shortcut.endswith('>'):
+        return shortcut
+    raise ValueError(f'Invalid keyboard {shortcut=}')
 
 
 def OK(text: str = 'OK', bind_enter: Bool = True, **kwargs) -> Button:
