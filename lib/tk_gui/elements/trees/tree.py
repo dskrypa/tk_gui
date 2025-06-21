@@ -81,19 +81,30 @@ class BaseTree(TreeViewBase, Generic[N], base_style_layer='tree'):
 
     # region Focus
 
-    def take_focus(self, force: bool = False):
+    def take_focus(self, force: bool = False, key_or_node: Hashable | TreeNode | None = None):
         if force:
             self.tree_view.focus_force()
         else:
             self.tree_view.focus_set()
 
-        if self._init_focus_key is not None:
+        if key_or_node is not None:
+            if isinstance(key_or_node, TreeNode):
+                self._set_focus_on_iid(key_or_node.iid)
+            else:
+                self.set_focus_on_key(key_or_node)
+        elif self._init_focus_key is not None:
             self.set_focus_on_key(self._init_focus_key)
+            self._init_focus_key = None
+        elif iid := next(iter(self._iid_node_map), None):
+            self._set_focus_on_iid(iid)
 
     def set_focus_on_key(self, key: Hashable):
         if node := self._key_node_map.get(key):
-            self.tree_view.selection_set(node.iid)
-            self.tree_view.focus(node.iid)
+            self._set_focus_on_iid(node.iid)
+
+    def _set_focus_on_iid(self, iid: str):
+        self.tree_view.selection_set(iid)
+        self.tree_view.focus(iid)
 
     # endregion
 
@@ -444,6 +455,7 @@ class PathTree(BaseTree[PathNode]):
 
     def _selection_is_submissible(self) -> bool:
         # Note: single/multiple is handled via select_mode
+        # TODO: Improve this and/or return handling so SaveAs can use enter to chdir
         if self._pt_config.files and self._pt_config.dirs:
             return True
         elif self._pt_config.files:

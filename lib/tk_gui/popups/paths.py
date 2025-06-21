@@ -22,7 +22,7 @@ from .common import popup_error
 if TYPE_CHECKING:
     from ..typing import Layout, PathLike
 
-__all__ = ['PathPopup']
+__all__ = ['PathPopup', 'PickDirectory', 'PickDirectories', 'PickFile', 'PickFiles', 'SaveAs']
 log = logging.getLogger(__name__)
 
 
@@ -65,6 +65,7 @@ class PathPopup(Popup):
             files=self.allow_files,
             dirs=self.allow_dirs,
             select_mode=TreeSelectMode.EXTENDED if self.allow_multiple else TreeSelectMode.BROWSE,
+            focus=True,
             **self._path_tree_kwargs()
         )
 
@@ -122,10 +123,84 @@ class PathPopup(Popup):
             self.window.interrupt(event, self._path_tree)
 
     def get_results(self) -> list[Path]:
-        return super().get_results().get('path_tree', [])
+        return self._path_tree.get_values(self._submitted, root_fallback=True)
 
 
-class SaveAsPopup(PathPopup):
+class PickDirectory(PathPopup):
+    def __init__(
+        self, initial_dir: PathLike = None, *, submit_text: str = 'Open', title: str = 'Open Directory', **kwargs,
+    ):
+        super().__init__(
+            initial_dir,
+            multiple=False,
+            allow_files=False,
+            allow_dirs=True,
+            submit_text=submit_text,
+            title=title,
+            **kwargs,
+        )
+
+    def get_results(self) -> Path | None:
+        paths = self._path_tree.get_values(self._submitted, root_fallback=True)
+        try:
+            return paths[0]
+        except IndexError:
+            return None
+
+
+class PickDirectories(PathPopup):
+    def __init__(
+        self, initial_dir: PathLike = None, *, submit_text: str = 'Open', title: str = 'Open Directories', **kwargs,
+    ):
+        super().__init__(
+            initial_dir,
+            multiple=True,
+            allow_files=False,
+            allow_dirs=True,
+            submit_text=submit_text,
+            title=title,
+            **kwargs,
+        )
+
+
+class PickFile(PathPopup):
+    def __init__(
+        self, initial_dir: PathLike = None, *, submit_text: str = 'Open', title: str = 'Open File', **kwargs,
+    ):
+        super().__init__(
+            initial_dir,
+            multiple=False,
+            allow_files=True,
+            allow_dirs=False,
+            submit_text=submit_text,
+            title=title,
+            **kwargs,
+        )
+
+    def get_results(self) -> Path | None:
+        paths = self._path_tree.get_values(self._submitted, root_fallback=False)
+        try:
+            return paths[0]
+        except IndexError:
+            return None
+
+
+class PickFiles(PathPopup):
+    def __init__(
+        self, initial_dir: PathLike = None, *, submit_text: str = 'Open', title: str = 'Open Files', **kwargs,
+    ):
+        super().__init__(
+            initial_dir,
+            multiple=True,
+            allow_files=True,
+            allow_dirs=False,
+            submit_text=submit_text,
+            title=title,
+            **kwargs,
+        )
+
+
+class SaveAs(PathPopup):
     def __init__(
         self,
         initial_dir: PathLike = None,
