@@ -308,9 +308,12 @@ class PathOption(PopupOption, opt_type='path'):
         else:
             return val
 
-    def validate(self, value) -> str:
+    def validate(self, value) -> str | None:
+        # log.debug(f'Validating Path option input={value!r}')
         if isinstance(value, str):
             value = value.strip()
+        if not value:
+            return None
         path = Path(value)
         if self.popup_cls is PickDirectory:
             if (self.must_exist and not path.is_dir()) or (path.exists() and not path.is_dir()):

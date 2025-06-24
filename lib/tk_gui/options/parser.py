@@ -88,6 +88,7 @@ class GuiOptions:
     # endregion
 
     def parse(self, data: dict[Key, Any]) -> dict[str, Any]:
+        # log.debug(f'Parsing GUI options from {data=}')
         errors = []
         parsed = {}
         defaults = []
@@ -119,6 +120,7 @@ class GuiOptions:
         for name in defaults:
             parsed[name] = self.options[name].default
 
+        # log.debug(f'Parsed GUI options: {parsed}')
         return parsed
 
     def _should_disable_all(self, disable_all: bool = None) -> bool:
