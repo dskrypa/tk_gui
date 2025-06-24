@@ -185,10 +185,11 @@ class GuiConfig:
                 return default
             value = self.__missing__(key)
 
-        if type is None or (isclass(type) and isinstance(value, type)):  # noqa
+        if (type is None or (isclass(type) and isinstance(value, type))) or (value is None and type is str):
             return value
-        elif value is None and type in (str, Path):
-            return value
+        elif not value and type is Path:
+            return None
+
         return type(value)
 
     def get(self, key: str, default: D = _NotSet, type: Callable[[Any], T] = None) -> T | D | None:  # noqa
