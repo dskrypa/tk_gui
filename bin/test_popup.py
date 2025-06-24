@@ -163,7 +163,8 @@ class GuiPopupTest(Command):
 
     @action
     def save_as(self):
-        result = SaveAs().run()
+        # result = SaveAs(style='SystemDefault').run()
+        result = SaveAs(default_ext='.txt').run()
         # result = RawSaveAs().run()
         print(f'{result=}')
 

@@ -212,10 +212,13 @@ class PickFiles(PathPopup):
 
 
 class SaveAs(PathPopup):
+    default_ext: str | None = None
+
     def __init__(
         self,
         initial_dir: PathLike = None,
-        initial_name: str = '',
+        initial_name: str | None = None,
+        default_ext: str | None = None,
         *,
         submit_text: str = 'Save',
         title: str = 'Save As',
@@ -230,7 +233,9 @@ class SaveAs(PathPopup):
             title=title,
             **kwargs,
         )
-        self.initial_name = initial_name
+        self.initial_name = initial_name or ''
+        if default_ext:
+            self.default_ext = default_ext if default_ext.startswith('.') else f'.{default_ext}'
         self.__last_selection = []
 
     @cached_property
@@ -272,7 +277,14 @@ class SaveAs(PathPopup):
         except IndexError:
             return None
 
-        if name := self._name_input.value:
-            return path.joinpath(name) if path.is_dir() else path.parent.joinpath(name)
-        else:
+        if not (name := self._name_input.value):
             return None
+
+        if path.is_dir():
+            path /= name
+        else:
+            path = path.parent.joinpath(name)
+
+        if self.default_ext and not path.suffix:
+            return path.with_suffix(self.default_ext)
+        return path
