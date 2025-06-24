@@ -28,6 +28,7 @@ DEFAULT_PATH = f'{DEFAULT_DIR}/{__title__}/{DEFAULT_NAME}'
 DEFAULT_SECTION = '__default__'
 
 T = TypeVar('T')
+D = TypeVar('D')
 
 
 class ConfigItem(Generic[T]):
@@ -176,7 +177,7 @@ class GuiConfig:
                 pass
         raise KeyError(key)
 
-    def _get(self, key: str, default=_NotSet, type: Callable[[Any], T] = None) -> T:  # noqa
+    def _get(self, key: str, default: D = _NotSet, type: Callable[[Any], T] = None) -> T | D | None:  # noqa
         try:
             value = self.data[key]
         except KeyError:
@@ -190,7 +191,7 @@ class GuiConfig:
             return value
         return type(value)
 
-    def get(self, key: str, default=_NotSet, type: Callable[[Any], T] = None) -> T:  # noqa
+    def get(self, key: str, default: D = _NotSet, type: Callable[[Any], T] = None) -> T | D | None:  # noqa
         try:
             return self._get(key, default, type)
         except KeyError:

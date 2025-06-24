@@ -12,12 +12,13 @@ from typing import TYPE_CHECKING, Any, Optional, Collection, Iterator, Mapping, 
 from tk_gui.caching import cached_property
 from tk_gui.elements import Text, Element, Button, Input, BasicRowFrame
 from tk_gui.elements.choices import Combo, ListBox, CheckBox
-from tk_gui.popups.base import AnyPopup
-from tk_gui.popups import PickFolder, popup_get_text
+from tk_gui.popups.common import popup_get_text
+from tk_gui.popups.paths import PickDirectory
 from .exceptions import SingleParsingError
 
 if TYPE_CHECKING:
     from tkinter import Event
+    from tk_gui.popups.base import AnyPopup
     from tk_gui.typing import TraceCallback, AnyEle, XY
 
 __all__ = [
@@ -311,7 +312,7 @@ class PathOption(PopupOption, opt_type='path'):
         if isinstance(value, str):
             value = value.strip()
         path = Path(value)
-        if self.popup_cls is PickFolder:
+        if self.popup_cls is PickDirectory:
             if (self.must_exist and not path.is_dir()) or (path.exists() and not path.is_dir()):
                 raise SingleParsingError(
                     self.value_key, self, f'Invalid {path=} for option={self.name!r} (not a directory)', path
@@ -328,7 +329,7 @@ class DirectoryOption(PathOption, opt_type='directory'):
         self,
         name: str,
         label: str,
-        popup_cls: Type[AnyPopup] = PickFolder,
+        popup_cls: Type[AnyPopup] = PickDirectory,
         button: str = 'Browse',
         default: Any = _NotSet,
         disabled: bool = False,
