@@ -10,7 +10,7 @@ import json
 import logging
 from inspect import isclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Type, Union, Optional, Callable, TypeVar, Generic, Mapping
+from typing import TYPE_CHECKING, Any, Type, Callable, TypeVar, Generic, Mapping
 
 from .__version__ import __title__
 
@@ -57,7 +57,7 @@ class ConfigItem(Generic[T]):
             f'<{self.__class__.__name__}[{name=}, {default=}, type={self.type!r}, {popup_dependent=}, {depends_on=}]>'
         )
 
-    def get(self, instance: GuiConfig) -> Optional[T]:
+    def get(self, instance: GuiConfig) -> T | None:
         try:
             value = instance._get(self.name, type=self.type)
         except KeyError:
@@ -69,7 +69,7 @@ class ConfigItem(Generic[T]):
             return self.default
         return value
 
-    def __get__(self, instance: Optional[GuiConfig], owner: Type[GuiConfig]) -> Union[T, None, ConfigItem]:
+    def __get__(self, instance: GuiConfig | None, owner: Type[GuiConfig]) -> T | None | ConfigItem:
         if instance is None:
             return self
         return self.get(instance)
@@ -92,7 +92,7 @@ class GuiConfig:
 
     def __init__(
         self,
-        name: Optional[str],
+        name: str | None,
         path: PathLike = None,
         defaults: dict[str, Any] = None,
         is_popup: bool = False,
@@ -130,7 +130,7 @@ class GuiConfig:
             self._changed = set()
         return self._all_data
 
-    def _get_section(self, name: Optional[str]) -> dict[str, Any]:
+    def _get_section(self, name: str | None) -> dict[str, Any]:
         if name is None:
             try:
                 return self.__data  # noqa
@@ -187,7 +187,7 @@ class GuiConfig:
 
         if type is None or (isclass(type) and isinstance(value, type)):  # noqa
             return value
-        elif value is None and type is str:
+        elif value is None and type in (str, Path):
             return value
         return type(value)
 
@@ -265,7 +265,7 @@ class WindowConfigProperty:
     def __set_name__(self, owner: Type[Window], name: str):
         self.name = name
 
-    def __get__(self, window: Optional[Window], window_cls: Type[Window]) -> GuiConfig:
+    def __get__(self, window: Window | None, window_cls: Type[Window]) -> GuiConfig:
         try:
             return window.__dict__[self.name]
         except KeyError:
@@ -290,7 +290,7 @@ class GuiConfigProperty:
     def __set_name__(self, owner: Type[ConfigContainer], name: str):
         self.name = name
 
-    def __get__(self, inst: Optional[ConfigContainer], cls: Type[ConfigContainer]) -> GuiConfig:
+    def __get__(self, inst: ConfigContainer | None, cls: Type[ConfigContainer]) -> GuiConfig:
         try:
             return inst.__dict__[self.name]
         except KeyError:
@@ -301,7 +301,7 @@ class GuiConfigProperty:
         return config
 
 
-def normalize_path(path: Union[PathLike, None]) -> Path:
+def normalize_path(path: PathLike | None) -> Path:
     if path is None:
         return Path(DEFAULT_PATH).expanduser()
 
