@@ -265,23 +265,21 @@ class SourceImage(ImageWrapper):
         return resized
 
     def save_as_with_prompt(self, event=None, init_dir: PathLike = None):
-        from tk_gui.popups.raw import SaveAs
+        from tk_gui.popups.paths import SaveAs
 
-        file_types = [
-            ('ALL Types', '*.*'),
-            ('BMP - Windows Bitmap', '*.bmp'),
-            ('JPG - JPG/JPEG Format', '*.jpg *.jpeg'),
-            ('PNG - Portable Network Graphics', '*.png'),
-        ]
-        kwargs: dict[str, Any] = {'file_types': file_types}
+        # file_types = [
+        #     ('ALL Types', '*.*'),
+        #     ('BMP - Windows Bitmap', '*.bmp'),
+        #     ('JPG - JPG/JPEG Format', '*.jpg *.jpeg'),
+        #     ('PNG - Portable Network Graphics', '*.png'),
+        # ]
+        # kwargs: dict[str, Any] = {'file_types': file_types}
         if path := self.path:
-            kwargs['initial_name'] = path.name
-            kwargs['default_ext'] = path.suffix
+            kwargs = {'initial_name': path.name, 'default_ext': path.suffix}
         else:
-            kwargs['default_ext'] = '.png' if self.pil_image.mode == 'RGBA' else '.jpg'
+            kwargs = {'default_ext': '.png' if self.pil_image.mode == 'RGBA' else '.jpg'}
 
         if path := SaveAs(init_dir, **kwargs).run():
-            # TODO: The `format` param needs to be explicitly provided to convert files, it seems
             log.info(f'Saving {self} as {path}')
             self.save_as(path)
 

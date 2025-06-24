@@ -233,6 +233,7 @@ class SaveAs(PathPopup):
             title=title,
             **kwargs,
         )
+        # TODO: Add support for file_types filter
         self.initial_name = initial_name or ''
         if default_ext:
             self.default_ext = default_ext if default_ext.startswith('.') else f'.{default_ext}'
@@ -271,13 +272,11 @@ class SaveAs(PathPopup):
         self._name_input.update(node.text)
 
     def get_results(self) -> Path | None:
-        paths = self._path_tree.get_values(self._submitted, root_fallback=True)
-        try:
-            path = paths[0]
-        except IndexError:
-            return None
-
         if not (name := self._name_input.value):
+            return None
+        try:
+            path = self._path_tree.get_values(self._submitted, root_fallback=True)[0]
+        except IndexError:
             return None
 
         if path.is_dir():
