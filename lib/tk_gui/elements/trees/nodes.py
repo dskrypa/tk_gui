@@ -175,7 +175,7 @@ def _path_info(path: Path, tree_icons: PathTreeIcons) -> tuple[bool, str, str, P
     if S_ISDIR(stat_obj.st_mode):
         return True, '? items', modified, tree_icons.dir_icon
     else:
-        return False, readable_bytes(stat_obj.st_size), modified, tree_icons.file_icon
+        return False, readable_bytes(stat_obj.st_size), modified, tree_icons.get_file_icon(path)
 
 
 def _dir_contents(directory: Path) -> list[Path]:

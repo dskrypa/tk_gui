@@ -21,7 +21,8 @@ from tk_gui.event_handling import EventState, event_handler, delayed_event_handl
 from tk_gui.geometry import Box
 from tk_gui.images.wrapper import ImageWrapper, SourceImage, ResizedImage
 from tk_gui.popups.about import AboutPopup
-from tk_gui.popups import pick_file_popup, popup_warning
+from tk_gui.popups.common import popup_warning
+from tk_gui.popups.paths import PickFile
 from tk_gui.utils import readable_bytes
 from .view import View
 
@@ -585,8 +586,9 @@ class ImageView(View):
     # region File Change / Directory Traversal
 
     @menu['File']['Open'].callback
-    def open_file(self, event):
-        if path := pick_file_popup(self.active_image.src_image.path.parent, title='Pick Image', parent=self.window):
+    def open_file(self, event: Event):
+        # if path := pick_file_popup(self.active_image.src_image.path.parent, title='Pick Image', parent=self.window):
+        if path := PickFile(self.active_image.src_image.path.parent, title='Pick Image', parent=self.window).run():
             self.update_active_image(path)
 
     @event_handler(r'<\>')
