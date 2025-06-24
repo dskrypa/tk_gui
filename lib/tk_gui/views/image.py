@@ -171,7 +171,7 @@ class DirPicker(View, is_popup=True):
         yield [Text('-> or space', size=(12, 1)), Text('= enter the folder')]
         yield [Text('<-', size=(12, 1)), Text('= previous folder level (..)')]
 
-    def _dirs(self) -> Iterator[str, int | str]:
+    def _dirs(self) -> Iterator[tuple[str, int | str]]:
         for path in sorted(self.image_dir.path.iterdir()):
             if path.is_dir():
                 try:
