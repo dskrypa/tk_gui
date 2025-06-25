@@ -36,6 +36,7 @@ class AboutPopup(Popup):
     def get_pre_window_layout(self) -> Layout:
         data = self.get_about_data()
         size = (max(map(len, data)), 1)
-        layout = [[Text(key, size=size), (Link if 'url' in key.lower() else Text)(val)] for key, val in data.items()]
-        layout.append([OK()])  # noqa
-        return layout
+        for key, val in data.items():
+            yield [Text(key, size=size), (Link if 'url' in key.lower() else Text)(val)]
+
+        yield [OK()]

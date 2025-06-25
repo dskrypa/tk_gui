@@ -5,7 +5,6 @@ import time
 
 from cli_command_parser import Command, Action, Counter, main
 
-from tk_gui.__version__ import __author_email__, __version__, __author__, __url__  # noqa
 from tk_gui.images.icons import Icons, ICONS_DIR
 from tk_gui.popups import ImagePopup, AnimatedPopup, SpinnerPopup, ClockPopup, BasicPopup
 from tk_gui.popups.about import AboutPopup
@@ -13,7 +12,6 @@ from tk_gui.popups.basic_prompts import TextPromptPopup, LoginPromptPopup
 from tk_gui.popups.choices import ChooseImagePopup, choose_item
 from tk_gui.popups.common import popup_warning, popup_error, popup_yes_no, popup_no_yes, popup_ok
 from tk_gui.popups.paths import PathPopup, SaveAs, PickFile, PickFiles, PickDirectory, PickDirectories
-# from tk_gui.popups.raw import SaveAs as RawSaveAs
 from tk_gui.popups.style import StylePopup
 from tk_gui.utils import tcl_version
 

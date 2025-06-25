@@ -7,6 +7,7 @@ Utils for the Tkinter GUI package.
 from __future__ import annotations
 
 import logging
+import re
 import sys
 from contextlib import contextmanager
 from getpass import getuser
@@ -18,9 +19,15 @@ from tempfile import gettempdir
 from time import monotonic
 from typing import TYPE_CHECKING, Any, Callable, Collection, Type, TypeVar, Iterable, Sequence, Mapping
 
+from cli_command_parser.core import get_top_level_commands
+from cli_command_parser.metadata import DistributionFinder
+
+from .caching import cached_property
 from .constants import STYLE_CONFIG_KEYS
 
 if TYPE_CHECKING:
+    from importlib.metadata import Distribution
+
     from .typing import HasParent, Bool
 
 __all__ = [
@@ -84,68 +91,76 @@ class Inheritable:
 # region Metadata
 
 
-class MetadataField:
-    __slots__ = ('name',)
-
-    def __set_name__(self, owner, name: str):
-        self.name = name
-
-    def __get__(self, instance, owner):
-        if instance is None:
-            return self
-        return instance.globals.get(f'__{self.name}__', instance.default)
-
-
 class ProgramMetadata:
-    __slots__ = ('installed_via_setup', 'globals', 'path', 'name', 'default')
-
-    author: str = MetadataField()
-    version: str = MetadataField()
-    url: str = MetadataField()
-    author_email: str = MetadataField()
-
     def __init__(self, default: str = '[unknown]'):
+        self._dist_finder = DistributionFinder()
         self.default = default
-        self.installed_via_setup, self.globals, self.path = self._get_top_level()
-        self.name = self._get_name()
 
-    def _get_top_level(self) -> tuple[bool, dict[str, Any], Path]:
+    @cached_property
+    def entry_point_path(self) -> Path:
+        return Path(stack()[-1].filename)
+
+    @cached_property
+    def name(self) -> str:
+        return self.entry_point_path.name
+
+    @cached_property
+    def _distribution(self) -> Distribution | None:
+        if self.entry_point_path.parent.joinpath('activate').exists():
+            # It's likely a generated entry point in a venv's bin/Scripts directory
+            # On Linux, uv and pip both include `import sys` and `from pkg.mod import func`; pip also imports `re`
+            import_pat = re.compile(r'^from (\S+) import .*')
+            for line in self.entry_point_path.read_text('utf-8').splitlines():
+                if m := import_pat.match(line):
+                    return self._dist_finder.dist_for_pkg(m.group(1).split('.', 1)[0])
+
+        if commands := get_top_level_commands():
+            for command in commands:
+                if dist := self._dist_finder.dist_for_obj(command):
+                    return dist
+
+        return None
+
+    @cached_property
+    def version(self) -> str:
+        return self._distribution.version if self._distribution else self.default
+
+    @cached_property
+    def _author_email(self) -> tuple[str | None, str | None]:
         try:
-            return self._get_real_top_level()
-        except Exception as e:  # noqa
-            log.debug(f'Error determining top-level program info: {e}')
-            try:
-                path = Path(sys.argv[0])
-            except IndexError:
-                path = Path.cwd().joinpath('[unknown]')
-            return False, {}, path
+            author_and_email = self._distribution.metadata['Author-email']
+        except (KeyError, AttributeError, TypeError):
+            return None, None
+        if m := re.match(r'^(.+)\s+<(.+)>$', author_and_email):
+            author, email = m.groups()
+            return author, email
+        elif '@' in author_and_email:
+            return None, author_and_email
+        else:
+            return author_and_email, None
 
-    # noinspection PyUnboundLocalVariable
-    def _get_real_top_level(self):  # noqa
-        _stack = stack()
-        top_level_frame_info = _stack[-1]
-        path = Path(top_level_frame_info.filename)
-        g = top_level_frame_info.frame.f_globals
-        if (installed_via_setup := 'load_entry_point' in g and 'main' not in g) or path.stem == 'runpy':
-            for level in reversed(_stack[:-1]):
-                g = level.frame.f_globals
-                if any(k in g for k in ('__author_email__', '__version__', '__url__')):
-                    return installed_via_setup, g, Path(level.filename)
+    @cached_property
+    def author(self) -> str:
+        try:
+            author = self._distribution.metadata['Author']
+        except (KeyError, AttributeError, TypeError):
+            return self._author_email[0] or self.default
+        else:
+            # Until the `Implicit None on return values is deprecated and will raise KeyErrors.` behavior is removed,
+            # the case where the value is None needs to be handled
+            return author or self._author_email[0] or self.default
 
-        if path.stem == 'runpy':
-            level = _stack[-3]
-            return installed_via_setup, level.frame.f_globals, Path(level.filename)
+    @cached_property
+    def email(self) -> str:
+        return self._author_email[1] or self.default
 
-        return installed_via_setup, g, path
-
-    def _get_name(self) -> str:
-        path = self.path
-        if self.installed_via_setup and path.name.endswith('-script.py'):
-            try:
-                return Path(sys.argv[0]).stem
-            except IndexError:
-                return path.stem[:-7]
-        return path.stem
+    @cached_property
+    def url(self) -> str:
+        if self._distribution and (urls := self._dist_finder.get_urls(self._distribution)):
+            for key in ('Source', 'Source Code', 'Home-page'):
+                if url := urls.get(key):
+                    return url
+        return self.default
 
 
 def tcl_version():
