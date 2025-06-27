@@ -593,19 +593,14 @@ class Window(BindMixin, RowContainer):
     def disable_title_bar(self):
         self.no_title_bar = True
         try:
-            # WindowData(self).log('Disabling title bar; before:', level=logging.INFO)
             if DISPLAY_SERVER == DisplayServer.X11:
-                # TODO: On linux, it seems like the window cannot hold focus when the title bar is disabled,
-                #  so key presses go to the terminal instead of being handled by bound methods
+                # Note: It does not seem possible for windows without title bars to hold focus, so methods bound to key
+                # presses will always be ignored.  Methods bound to mouse clicks will be handled, because the click
+                # causes the window/widget to take focus.
                 self._set_type_attr('dock')
-                # self.root.grab_set()
-                # self.root.grab_set_global()
-                # self.root.focus_force()
-                # self.root.focus_set()
             else:
                 # Instruct the window manager to ignore this widget (on Windows/Mac: hides the title bar)
                 self.root.wm_overrideredirect(True)
-            # WindowData(self).log('Disabled title bar; after:', level=logging.INFO)
         except (TclError, RuntimeError):
             log.warning('Error while disabling title bar:', exc_info=True)
 
@@ -615,15 +610,11 @@ class Window(BindMixin, RowContainer):
         root.wm_title(self.title)
         root.iconphoto(False, PhotoImage(data=self.icon))
         try:
-            # WindowData(self).log('Enabling title bar; before:', level=logging.INFO)
             if DISPLAY_SERVER == DisplayServer.X11:
                 self._set_type_attr('normal')
-                # TODO: When restoring the title bar after it has been disabled, the window position shifts (probably
-                #  by the size of the title bar)
             else:
                 # Instruct the window manager to stop ignoring this widget (on Windows/Mac: shows the title bar)
                 root.wm_overrideredirect(False)
-            # WindowData(self).log('Enabled title bar; after:', level=logging.INFO)
         except (TclError, RuntimeError):
             log.warning('Error while enabling title bar:', exc_info=True)
 
