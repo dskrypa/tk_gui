@@ -20,13 +20,13 @@ from tk_gui.window import Window
 if TYPE_CHECKING:
     from tk_gui.typing import Layout, Key, PathLike
 
-__all__ = ['WindowInitializer']
+__all__ = ['ViewWindowInitializer']
 log = logging.getLogger(__name__)
 
 _NotSet = object()
 
 
-class WindowInitializer(HandlesEvents, ABC):
+class ViewWindowInitializer(HandlesEvents, ABC):
     parent: Window | None = None
     title: str | None = None
     is_popup: bool = False
@@ -59,7 +59,7 @@ class WindowInitializer(HandlesEvents, ABC):
 
     def __init__(
         self,
-        parent: Union[WindowInitializer, Window] = _NotSet,
+        parent: Union[ViewWindowInitializer, Window] = _NotSet,
         *,
         title: str = None,
         config_name: str = None,
@@ -72,7 +72,7 @@ class WindowInitializer(HandlesEvents, ABC):
             self.parent = Window.get_active_window()
         elif parent is not None:
             # log.debug(f'{self.__class__.__name__} parent was explicitly provided: {parent}', extra={'color': 13})
-            self.parent = parent.window if isinstance(parent, WindowInitializer) else parent
+            self.parent = parent.window if isinstance(parent, ViewWindowInitializer) else parent
         # log.debug(f'Initializing {self.__class__.__name__} with parent={self.parent}', extra={'color': 13})
         if title is not None:
             self.title = title
@@ -156,7 +156,7 @@ class WindowInitializer(HandlesEvents, ABC):
                 except TypeError:  # It was not scrollable
                     pass
         if parent := self.parent:
-            if isinstance(parent, WindowInitializer):
+            if isinstance(parent, ViewWindowInitializer):
                 parent = parent.window
             parent.register_child_window(window)
             try:

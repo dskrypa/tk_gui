@@ -16,7 +16,7 @@ from tk_gui.elements import Button, Text, Image, Multiline
 from tk_gui.event_handling.futures import TkFuture
 from tk_gui.styles import Style
 from tk_gui.utils import max_line_len
-from tk_gui.views.base import WindowInitializer
+from tk_gui.views.base import ViewWindowInitializer
 from tk_gui.window import Window
 
 if TYPE_CHECKING:
@@ -95,7 +95,7 @@ class BasePopup(PopupMixin, ABC):
         return f'<{self.__class__.__name__}[title={self.title!r}]>'
 
 
-class Popup(PopupMixin, WindowInitializer, is_popup=True):
+class Popup(PopupMixin, ViewWindowInitializer, is_popup=True):
     def __init__(
         self,
         layout: Layout = (),

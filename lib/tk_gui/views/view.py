@@ -11,7 +11,7 @@ from abc import ABC
 from typing import TYPE_CHECKING, Any, Optional, Union, Type, Sequence, Mapping, Literal
 
 from tk_gui.enums import CallbackAction
-from .base import WindowInitializer
+from .base import ViewWindowInitializer
 from .spec import ViewSpec
 from .state import GuiState, Direction, NoNextView
 
@@ -25,7 +25,7 @@ RawViewSpec = tuple[Type['View'], Sequence[Any], Mapping[str, Any]]
 Dir = Union[Direction, Literal['reverse', 'forward', 'REVERSE', 'FORWARD', 0, 1]]
 
 
-class View(WindowInitializer, ABC):
+class View(ViewWindowInitializer, ABC):
     gui_state: GuiState
     default_window_kwargs: Optional[dict[str, Any]] = None
 
