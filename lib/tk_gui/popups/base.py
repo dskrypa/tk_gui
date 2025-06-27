@@ -104,11 +104,13 @@ class Popup(PopupMixin, ViewWindowInitializer, is_popup=True):
         bind_esc: Bool = False,
         keep_on_top: Bool = False,
         can_minimize: Bool = False,
+        modal: Bool = True,
         return_focus: Bool = None,
         **kwargs
     ):
         kwargs['keep_on_top'] = keep_on_top
         kwargs['can_minimize'] = can_minimize
+        kwargs['modal'] = modal
         super().__init__(title=title, **kwargs)
         if return_focus is not None:
             self.return_focus = return_focus

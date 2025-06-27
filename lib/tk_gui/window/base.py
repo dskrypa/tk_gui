@@ -16,8 +16,8 @@ from ..assets import PYTHON_LOGO
 from ..caching import cached_property
 from ..config import GuiConfig, WindowConfigProperty
 from ..elements.menu import Menu
-from ..enums import BindTargets, Anchor, Justify, Side, BindEvent, CallbackAction
-from ..environment import ON_LINUX, ON_WINDOWS
+from ..enums import BindTargets, Anchor, Justify, Side, BindEvent, CallbackAction, DisplayServer
+from ..environment import DISPLAY_SERVER, ON_LINUX, ON_WINDOWS
 from ..event_handling import BindMixin, BindMapping, BindMap, BindManager
 from ..event_handling.decorators import delayed_event_handler, _tk_event_handler
 from ..event_handling.utils import ENTER_KEYSYMS, MotionTracker, Interrupt
@@ -594,10 +594,14 @@ class Window(BindMixin, RowContainer):
         self.no_title_bar = True
         try:
             # WindowData(self).log('Disabling title bar; before:', level=logging.INFO)
-            if ON_LINUX:
+            if DISPLAY_SERVER == DisplayServer.X11:
                 # TODO: On linux, it seems like the window cannot hold focus when the title bar is disabled,
                 #  so key presses go to the terminal instead of being handled by bound methods
-                self.root.wm_attributes('-type', 'dock')
+                self._set_type_attr('dock')
+                # self.root.grab_set()
+                # self.root.grab_set_global()
+                # self.root.focus_force()
+                # self.root.focus_set()
             else:
                 # Instruct the window manager to ignore this widget (on Windows/Mac: hides the title bar)
                 self.root.wm_overrideredirect(True)
@@ -609,14 +613,11 @@ class Window(BindMixin, RowContainer):
         self.no_title_bar = False
         root = self.root
         root.wm_title(self.title)
-        root.tk.call('wm', 'iconphoto', root._w, PhotoImage(data=self.icon))  # noqa
+        root.iconphoto(False, PhotoImage(data=self.icon))
         try:
             # WindowData(self).log('Enabling title bar; before:', level=logging.INFO)
-            if ON_LINUX:
-                root.wm_attributes('-type', 'normal')
-                # The title bar doesn't get re-drawn unless the window is withdrawn and then deiconified
-                root.withdraw()
-                root.deiconify()
+            if DISPLAY_SERVER == DisplayServer.X11:
+                self._set_type_attr('normal')
                 # TODO: When restoring the title bar after it has been disabled, the window position shifts (probably
                 #  by the size of the title bar)
             else:
@@ -643,13 +644,25 @@ class Window(BindMixin, RowContainer):
             log.debug(f'Error setting window alpha color to {alpha!r}:', exc_info=True)
 
     def make_modal(self):
-        root = self.root
+        parent = self.parent
         try:  # Apparently this does not work on macs...
-            root.transient()
-            root.grab_set()
-            root.focus_force()
+            self.root.transient(parent.root if parent else None)  # This will have no effect if parent is not set
+            if not self._init_config.can_minimize and DISPLAY_SERVER == DisplayServer.X11:
+                self._set_type_attr('utility')  # This must happen after marking the Window as transient
+
+            self.root.grab_set()
+            self.root.focus_force()
         except (TclError, RuntimeError):
             log.error('Error configuring window to be modal:', exc_info=True)
+
+    def _set_type_attr(self, window_type: str):
+        if DISPLAY_SERVER != DisplayServer.X11:
+            return  # This is only supported on Linux with X11
+
+        # The title bar doesn't get re-drawn unless the window is withdrawn and then deiconified
+        self.root.wm_attributes('-type', window_type)
+        self.root.withdraw()
+        self.root.deiconify()
 
     @property
     def keep_on_top(self) -> bool:
@@ -985,6 +998,8 @@ class Window(BindMixin, RowContainer):
     def get_screenshot(self) -> PILImage:
         return ImageGrab.grab(self.outer_rect().as_bbox())
 
+    # region Window Instance Registration / Discovery
+
     @classmethod
     def _get_active_windows(cls, is_popup: Bool = None, *, sort_by_last_focus: bool = False) -> list[Window]:
         if is_popup is None:
@@ -1006,7 +1021,18 @@ class Window(BindMixin, RowContainer):
         return None
 
     def register_child_window(self, window: Window):
+        # log.debug(f'{self}: Registering child: {window}')
         self._child_windows.add(window)
+
+    @property
+    def parent(self) -> Window | None:
+        for window in self._get_active_windows():
+            if self in window._child_windows:
+                return window
+
+        return None
+
+    # endregion
 
 
 def _normalize_bind_event(event_pat: Bindable) -> Bindable:

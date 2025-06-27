@@ -124,18 +124,40 @@ class ViewWindowInitializer(HandlesEvents, ABC):
         return []
 
     def init_window(self) -> Window:
-        return Window(
+        kwargs = self.window_kwargs
+        if 'show' in kwargs:
+            kwargs = kwargs.copy()
+            show = kwargs.pop('show')
+        else:
+            show = True
+
+        window = Window(
             self.get_pre_window_layout(),
             title=self.title,
             binds=self.bind_map,
             config=self.config,
             is_popup=self.is_popup,
-            **self.window_kwargs,
+            show=False,
+            **kwargs,
         )
+        if self._parent_window:
+            self._parent_window.register_child_window(window)
+
+        if show and (window.rows or (isinstance(show, int) and show > 1)):  # Matches logic in Window.__init__
+            # This is deferred so the parent window can be registered before initialization code that depends on it
+            window.show()
+
+        return window
 
     @cached_property
     def window(self) -> Window:
         return self.init_window()
+
+    @cached_property
+    def _parent_window(self) -> Window | None:
+        if self.parent is not None:
+            return self.parent.window if isinstance(self.parent, ViewWindowInitializer) else self.parent
+        return None
 
     def finalize_window(self) -> Window:
         with timer(f'Rendered layout for {self.__class__.__name__}'):
@@ -155,14 +177,13 @@ class ViewWindowInitializer(HandlesEvents, ABC):
                     window.resize_scroll_region()
                 except TypeError:  # It was not scrollable
                     pass
-        if parent := self.parent:
-            if isinstance(parent, ViewWindowInitializer):
-                parent = parent.window
-            parent.register_child_window(window)
+
+        if self._parent_window:
             try:
-                window.move_to_center(parent)
+                window.move_to_center(self._parent_window)
             except AttributeError:
                 pass
+
         return window
 
     # endregion

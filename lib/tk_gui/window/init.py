@@ -102,8 +102,8 @@ class WindowInitializer:
                     root.attributes('-toolwindow', 1)  # Only available on Windows
                 except (TclError, RuntimeError) as e:
                     log.error(f'Unable to prevent window minimization: {e}')
-            # elif DISPLAY_SERVER == DisplayServer.X11:
-            #     pass  # None of the `root.attributes('-type', '...')` options seemed to work for this
+            elif DISPLAY_SERVER == DisplayServer.X11:
+                pass  # Handled in Window.make_modal
             else:
                 log.debug(f'Unable to prevent window minimization with {DISPLAY_SERVER=}')
 
