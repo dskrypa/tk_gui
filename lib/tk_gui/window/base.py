@@ -17,6 +17,7 @@ from ..caching import cached_property
 from ..config import GuiConfig, WindowConfigProperty
 from ..elements.menu import Menu
 from ..enums import BindTargets, Anchor, Justify, Side, BindEvent, CallbackAction
+from ..environment import ON_LINUX, ON_WINDOWS
 from ..event_handling import BindMixin, BindMapping, BindMap, BindManager
 from ..event_handling.decorators import delayed_event_handler, _tk_event_handler
 from ..event_handling.utils import ENTER_KEYSYMS, MotionTracker, Interrupt
@@ -24,7 +25,7 @@ from ..exceptions import DuplicateKeyError
 from ..monitors import Monitor, Rectangle, monitor_manager
 from ..pseudo_elements.row_container import RowContainer
 from ..styles import Style
-from ..utils import ON_LINUX, ON_WINDOWS, ProgramMetadata, extract_kwargs
+from ..utils import ProgramMetadata, extract_kwargs
 from ..widgets.utils import WidgetData, log_event_widget_data, get_root_widget, get_req_size  # noqa
 from .init import HiddenRoot, InitConfig, WindowInitializer, ensure_tk_is_initialized
 from .utils import WindowData  # noqa
@@ -537,6 +538,7 @@ class Window(BindMixin, RowContainer):
             self.root.state('zoomed')  # Only available on Windows/macOS
 
     def normal(self):
+        # Restore to a normal, non-maximized state from being maximized or minimized to the task bar
         if (state := self.root.state()) == 'iconic':
             self.root.deiconify()
         elif ON_LINUX:

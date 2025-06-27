@@ -16,9 +16,9 @@ from typing import TYPE_CHECKING, Type, Mapping, Union, Optional, Any, Iterator,
 
 from tk_gui.caching import cached_property
 from tk_gui.enums import ScrollUnit
+from tk_gui.environment import ON_WINDOWS
 from tk_gui.event_handling.decorators import delayed_event_handler
 from tk_gui.geometry import Box
-from tk_gui.utils import ON_WINDOWS
 from .configuration import AxisConfig
 from .utils import get_parent_or_none, get_root_widget
 

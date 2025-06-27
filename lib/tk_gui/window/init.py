@@ -7,6 +7,8 @@ from typing import TYPE_CHECKING
 from weakref import finalize
 
 from ..caching import cached_property
+from ..enums import DisplayServer
+from ..environment import ON_LINUX, DISPLAY_SERVER
 from ..monitors import Monitor, monitor_manager
 from ..utils import timer
 from ..widgets.scroll import ScrollableToplevel
@@ -80,30 +82,40 @@ class WindowInitializer:
         return root
 
     def _init_root_normal(self) -> Toplevel:
-        window = self.window
         pad_x, pad_y = self.init_config.margins
-        window.tk_container = root = Toplevel(padx=pad_x, pady=pad_y, **window.style.get_map(background='bg'))
+        self.window.tk_container = root = Toplevel(padx=pad_x, pady=pad_y, **self.window.style.get_map(background='bg'))
         return root
 
     # endregion
 
     def _configure_root(self, root: Top):
-        window, init_config = self.window, self.init_config
-        window.set_alpha(0)  # Hide window while building it
+        # Docs for some items here: https://www.tcl-lang.org/man/tcl8.6.14/TkCmd/wm.html
+        init_config = self.init_config
+        self.window.set_alpha(0)  # Hide window while building it
+
         if not init_config.resizable:
             root.resizable(False, False)
+
         if not init_config.can_minimize:
-            try:
-                root.attributes('-toolwindow', 1)
-            except (TclError, RuntimeError) as e:
-                log.error(f'Unable to prevent window minimization: {e}')
-        if window._keep_on_top:
+            if DISPLAY_SERVER == DisplayServer.DWM:  # Windows
+                try:
+                    root.attributes('-toolwindow', 1)  # Only available on Windows
+                except (TclError, RuntimeError) as e:
+                    log.error(f'Unable to prevent window minimization: {e}')
+            # elif DISPLAY_SERVER == DisplayServer.X11:
+            #     pass  # None of the `root.attributes('-type', '...')` options seemed to work for this
+            else:
+                log.debug(f'Unable to prevent window minimization with {DISPLAY_SERVER=}')
+
+        if self.window._keep_on_top:
             root.attributes('-topmost', 1)
+
         if (transparent_color := init_config.transparent_color) is not None:
             try:
                 root.attributes('-transparentcolor', transparent_color)
             except (TclError, RuntimeError):
                 log.error('Transparent window color not supported on this platform (Windows only)')
+
         if (scaling := init_config.scaling) is not None:
             root.tk.call('tk', 'scaling', scaling)
 

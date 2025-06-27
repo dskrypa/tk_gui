@@ -8,13 +8,11 @@ from __future__ import annotations
 
 import logging
 import re
-import sys
 from contextlib import contextmanager
 from getpass import getuser
 from inspect import stack
 from math import log as math_log
 from pathlib import Path
-from platform import system
 from tempfile import gettempdir
 from time import monotonic
 from typing import TYPE_CHECKING, Any, Callable, Collection, Type, TypeVar, Iterable, Sequence, Mapping
@@ -24,6 +22,7 @@ from cli_command_parser.metadata import DistributionFinder
 
 from .caching import cached_property
 from .constants import STYLE_CONFIG_KEYS
+from .environment import ON_WINDOWS
 
 if TYPE_CHECKING:
     from importlib.metadata import Distribution
@@ -31,17 +30,13 @@ if TYPE_CHECKING:
     from .typing import HasParent, Bool
 
 __all__ = [
-    'ON_WINDOWS', 'ON_LINUX', 'ON_MAC', 'Inheritable', 'ProgramMetadata',
+    'Inheritable', 'ProgramMetadata',
     'tcl_version', 'max_line_len', 'call_with_popped', 'extract_kwargs', 'get_user_temp_dir', 'readable_bytes',
     'mapping_repr', 'timer',
 ]
 log = logging.getLogger(__name__)
 
 _NotSet = object()
-_OS = system().lower()
-ON_WINDOWS = _OS == 'windows'
-ON_LINUX = _OS == 'linux'
-ON_MAC = _OS == 'darwin'
 
 T = TypeVar('T')
 

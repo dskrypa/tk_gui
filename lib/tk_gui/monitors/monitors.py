@@ -3,7 +3,7 @@
 """
 
 from tk_gui.caching import cached_property
-from tk_gui.utils import ON_WINDOWS
+from tk_gui.environment import ON_WINDOWS
 from .models import Monitor
 
 if ON_WINDOWS:

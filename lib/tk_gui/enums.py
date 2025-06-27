@@ -8,10 +8,10 @@ from __future__ import annotations
 
 import tkinter.constants as tkc
 from enum import Enum, IntEnum
+from platform import system
 from typing import TYPE_CHECKING, Type
 
 from .caching import cached_property
-from .utils import ON_MAC
 
 if TYPE_CHECKING:
     from .typing import TkFill
@@ -30,6 +30,8 @@ ANCHOR_ALIASES = {
 SIDE_STICKY_MAP = {tkc.LEFT: tkc.W, tkc.RIGHT: tkc.E, tkc.TOP: tkc.N, tkc.BOTTOM: tkc.S}
 JUSTIFY_TO_ANCHOR = {tkc.LEFT: tkc.W, tkc.CENTER: tkc.CENTER, tkc.RIGHT: tkc.E}
 # fmt: on
+
+_ON_MAC = system().lower() == 'darwin'  # Cannot import from environment due to circular dependency
 
 
 class MissingMixin:
@@ -69,7 +71,7 @@ class BindEvent(MissingMixin, Enum):
     POSITION_CHANGED = '<Configure>'
     SIZE_CHANGED = '<Configure>'
     LEFT_CLICK = '<ButtonRelease-1>'
-    RIGHT_CLICK = '<ButtonRelease-2>' if ON_MAC else '<ButtonRelease-3>'
+    RIGHT_CLICK = '<ButtonRelease-2>' if _ON_MAC else '<ButtonRelease-3>'
     MENU_RESULT = '<<Custom:MenuCallback>>'
     BUTTON_CLICKED = '<<Custom:ButtonCallback>>'
 
@@ -196,6 +198,9 @@ class StyleState(MissingMixin, IntEnum):
     HIGHLIGHT = 4
 
 
+# region Element Selection / Display Modes
+
+
 class ListBoxSelectMode(MissingMixin, Enum):
     BROWSE = tkc.BROWSE         #: Select 1 item; can drag mouse and selection will follow (tk default)
     SINGLE = tkc.SINGLE         #: Select 1 item; cannot drag mouse to move selection
@@ -215,6 +220,9 @@ class TreeShowMode(MissingMixin, Enum):
     BOTH = 'tree headings'
 
 
+# endregion
+
+
 class ScrollUnit(MissingMixin, Enum):
     UNITS = 'units'     # Supports int values
     PAGES = 'pages'     # Supports int values
@@ -225,3 +233,12 @@ class ImageResizeMode(MissingMixin, Enum):
     NONE = 'none'           # No special handling
     FIT_INSIDE = 'fit'      # Shrink to fit inside the given size if too large, otherwise take no action
     FILL = 'fill'           # Shrink if too large, or enlarge if too small
+
+
+class DisplayServer(MissingMixin, Enum):
+    # https://en.wikipedia.org/wiki/Windowing_system#Display_server
+    X11 = 'X11'                                 # X11 on Linux
+    WAYLAND = 'Wayland'                         # Wayland on Linux
+    DWM = 'Desktop Window Manager'              # Windows
+    QUARTZ_COMPOSITOR = 'Quartz Compositor'     # MacOS
+    OTHER = 'OTHER'

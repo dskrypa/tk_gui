@@ -15,7 +15,7 @@ from pathlib import Path
 from subprocess import Popen
 from typing import Optional, Union
 
-from tk_gui.utils import ON_LINUX, ON_WINDOWS
+from tk_gui.environment import ON_LINUX, ON_WINDOWS
 
 __all__ = ['normalize_underline', 'launch', 'explore']
 log = logging.getLogger(__name__)

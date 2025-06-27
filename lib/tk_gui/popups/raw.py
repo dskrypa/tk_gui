@@ -12,7 +12,7 @@ from tkinter.colorchooser import askcolor
 from tkinter.filedialog import Open, Directory, SaveAs as TkSaveAs
 from typing import TYPE_CHECKING, Collection
 
-from ..utils import ON_MAC
+from ..environment import ON_MAC
 from .base import BasePopup
 
 if TYPE_CHECKING:
