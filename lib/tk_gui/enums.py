@@ -187,6 +187,15 @@ class Anchor(MissingMixin, Enum, aliases=ANCHOR_ALIASES):
             return tkc.NONE  # noqa
 
 
+class Compound(MissingMixin, Enum, aliases={'l': 'LEFT', 'r': 'RIGHT', 't': 'TOP', 'b': 'BOTTOM'}):
+    NONE = None
+    LEFT = tkc.LEFT
+    RIGHT = tkc.RIGHT
+    TOP = tkc.TOP
+    BOTTOM = tkc.BOTTOM
+    CENTER = tkc.CENTER
+
+
 # endregion
 
 

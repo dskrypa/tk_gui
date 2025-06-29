@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Any
 
 from PIL.ImageTk import PhotoImage
 
-from tk_gui.enums import Justify, Anchor
+from tk_gui.enums import Justify, Anchor, Compound
 from tk_gui.event_handling import ENTER_KEYSYMS, BindMap, BindMapping, CustomEventResultsMixin
 from tk_gui.images.wrapper import SourceImage, ResizedImage
 from tk_gui.utils import Inheritable
@@ -25,10 +25,13 @@ from .mixins import DisableableMixin
 
 if TYPE_CHECKING:
     from PIL.Image import Image as PILImage
+    from ..styles.style import Style
     from ..typing import XY, BindCallback, Bool, ImageType, Key, TkContainer, OptStr, IterStrs
 
 __all__ = ['Button', 'OK', 'Cancel', 'Yes', 'No', 'Submit', 'EventButton']
 log = logging.getLogger(__name__)
+
+_NotSet = object()
 
 
 class ButtonAction(Enum):
@@ -47,6 +50,7 @@ class ButtonAction(Enum):
 class Button(CustomEventResultsMixin, DisableableMixin, Interactive, base_style_layer='button'):
     widget: _Button
     justify: Justify = Inheritable('text_justification', type=Justify)
+    compound: Compound
     separate: bool = False
     anchor_info: Anchor = Anchor.NONE
     bind_enter: bool = False
@@ -64,6 +68,7 @@ class Button(CustomEventResultsMixin, DisableableMixin, Interactive, base_style_
         shortcuts: IterStrs = (),
         anchor_info: str | Anchor = None,
         justify: str | Justify | None = Justify.CENTER,
+        compound: str | Compound | None = _NotSet,
         action: ButtonAction | str = None,
         binds: BindMapping = None,
         bind_enter: Bool = False,
@@ -77,6 +82,10 @@ class Button(CustomEventResultsMixin, DisableableMixin, Interactive, base_style_
         self.text = text
         self.image = image
         self.justify = justify
+        if compound is _NotSet:
+            self.compound = Compound.LEFT if text and image else Compound.CENTER
+        else:
+            self.compound = compound if isinstance(compound, Compound) else Compound(compound)
         if cb is not None:
             self.callback = cb
         if action is not None:
@@ -120,7 +129,7 @@ class Button(CustomEventResultsMixin, DisableableMixin, Interactive, base_style_
             return
         iw, ih = image.size
         width, height = self.size
-        if ih > height or iw > width:
+        if (ih > height or iw > width) and (height > 1 and width > 1):
             self.__image = src_image.as_size((width - 1, height - 1))
         # if text := self.text:
         #     style = self.style
@@ -162,51 +171,6 @@ class Button(CustomEventResultsMixin, DisableableMixin, Interactive, base_style_
 
     # region Packing
 
-    def _pack_size(self) -> XY:
-        # Width is measured in pixels, but height is measured in characters
-        # TODO: Width may not be correct yet
-        try:
-            width, height = self.size
-        except TypeError:
-            width, height = 0, 0
-        if width and height:
-            return width, height
-
-        text, image = self.text, self.image
-        if not text and not image:
-            return width, height
-
-        style = self.style
-        if text and image:
-            lines = text.splitlines()
-            if not width:
-                # width = int(ceil(image.width / style.char_width())) + len(text)
-                text_width = max(len(line) for line in lines) * style.char_width('button')
-                width = text_width + image.width
-            if not height:
-                text_height = len(lines) * style.char_height('button')
-                # This needs testing - I would have thought it would make more sense to use max(img, txt)
-                height = int(ceil(image.height / text_height))
-                # height = style.char_height() + image.height
-        elif text:
-            lines = text.splitlines()
-            if not width:
-                width = max(len(line) for line in lines) + 1
-                # width = len(text) + 1
-                # width = style.char_width() * len(text)
-            if not height:
-                height = len(lines)
-                # height = style.char_height()
-        else:
-            if not width:
-                # width = int(ceil(image.width / style.char_width()))
-                width = image.width
-            if not height:
-                # height = 1
-                height = image.height
-
-        return width, height
-
     @property
     def style_config(self) -> dict[str, Any]:
         style, state = self.style, self.style_state
@@ -224,7 +188,7 @@ class Button(CustomEventResultsMixin, DisableableMixin, Interactive, base_style_
     def _init_widget(self, tk_container: TkContainer):
         # self.string_var = StringVar()
         # self.string_var.set(self._value)
-        width, height = self._pack_size()
+        width, height = PackSizeCalculator(self.text, self.image, self.size, self.style).get_pack_size()
         kwargs = {
             'width': width,
             'height': height,
@@ -239,7 +203,7 @@ class Button(CustomEventResultsMixin, DisableableMixin, Interactive, base_style_
             kwargs['text'] = self.text
         if image := self.image:
             kwargs['image'] = image = PhotoImage(image)
-            kwargs['compound'] = tkc.CENTER
+            kwargs['compound'] = self.compound.value
             kwargs['highlightthickness'] = 0
         elif not self.pad or 0 in self.pad:
             kwargs['highlightthickness'] = 0
@@ -248,6 +212,7 @@ class Button(CustomEventResultsMixin, DisableableMixin, Interactive, base_style_
         if self.disabled:
             kwargs['state'] = self._disabled_state
 
+        # log.debug(f'Packing Button with {kwargs=}')
         self.widget = button = _Button(tk_container, **kwargs)
         if image:
             button.image = image
@@ -287,6 +252,75 @@ class Button(CustomEventResultsMixin, DisableableMixin, Interactive, base_style_
             log.warning(f'No action configured for button={self}')
 
     # endregion
+
+
+class PackSizeCalculator:
+    __slots__ = ('text', 'image', 'size', 'style')
+
+    def __init__(self, text: str | None, image: PILImage | None, size: XY, style: Style):
+        self.text = text
+        self.image = image
+        self.size = size
+        self.style = style
+
+    def get_pack_size(self) -> XY:
+        # When only text is present, width is measured in pixels, but height is measured in characters
+        # When a mix is present, height is measured in pixels
+        try:
+            width, height = self.size
+        except TypeError:
+            width, height = 0, 0
+
+        if width and height:
+            return width, height
+        elif self.text:
+            if self.image:
+                return self._combo_pack_size(width, height)
+            return self._text_pack_size(width, height)
+        elif self.image:
+            return self._image_pack_size(width, height)
+        else:
+            return width, height
+
+    def _combo_pack_size(self, width: int | None, height: int | None) -> XY:
+        lines = self.text.splitlines()
+        if not width:
+            # width = int(ceil(image.width / style.char_width())) + len(text)
+            text_width = max(len(line) for line in lines) * self.style.char_width('button')
+            width = text_width + self.image.width
+
+        if not height:
+            text_height = len(lines) * self.style.char_height('button')
+            height = max(text_height, self.image.height)
+            # height = int(ceil(self.image.height / text_height))  # On Windows, apparently this was needed instead?
+            # log.debug(f'Combo button {text_height=}, image height={self.image.height} => {height=}')
+            # height = style.char_height() + image.height
+
+        return width, height
+
+    def _text_pack_size(self, width: int | None, height: int | None) -> XY:
+        lines = self.text.splitlines()
+        if not width:
+            width = max(len(line) for line in lines) + 1
+            # width = len(text) + 1
+            # width = style.char_width() * len(text)
+
+        if not height:
+            height = len(lines)
+            # height = style.char_height()
+
+        return width, height
+
+    def _image_pack_size(self, width: int | None, height: int | None) -> XY:
+        if not width:
+            # width = int(ceil(image.width / style.char_width()))
+            width = self.image.width
+
+        if not height:
+            # height = 1
+            height = self.image.height
+
+        return width, height
 
 
 def _normalize_shortcut(shortcut: str) -> str:
