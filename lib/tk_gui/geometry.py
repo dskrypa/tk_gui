@@ -63,12 +63,10 @@ class Sized(ABC):
         return x, y
 
     def new_aspect_ratio_width(self, y: int) -> int:
-        aspect = self.aspect_ratio
-        return _round_aspect(y * aspect, key=lambda n: abs(aspect - n / y))
+        return new_aspect_ratio_width(y, self.aspect_ratio)
 
     def new_aspect_ratio_height(self, x: int) -> int:
-        aspect = self.aspect_ratio
-        return _round_aspect(x / aspect, key=lambda n: 0 if n == 0 else abs(aspect - x / n))
+        return new_aspect_ratio_height(x, self.aspect_ratio)
 
     # endregion
 
@@ -151,6 +149,10 @@ class Box(Sized):
     @classmethod
     def from_size_and_pos(cls, width: int, height: int, x: X = 0, y: Y = 0) -> Box:
         return cls(x, y, x + width, y + height)
+
+    @classmethod
+    def from_sized(cls, sized: HasSize) -> Box:
+        return cls.from_size_and_pos(*sized.size)
 
     def __repr__(self) -> str:
         x, y, width, height = self.left, self.top, self.width, self.height
@@ -315,7 +317,48 @@ class Box(Sized):
 
     # endregion
 
+    # region Cropping
+
+    def centered_crop_to_ratio(self, x: int | float, y: int | float) -> Box:
+        if self.left != 0 or self.top != 0:
+            raise ValueError('Crop to ratio is currently only supported for boxes without a top/left offset')
+        try:
+            return self._centered_crop_to_ratio(x, y)
+        except ZeroDivisionError as e:
+            raise ValueError(f'Unable to crop {self} to aspect ratio {x}:{y}') from e
+
+    def _centered_crop_to_ratio(self, x: int | float, y: int | float) -> Box:
+        width, height = self.size
+        ratio = x / y
+        if ratio == self.aspect_ratio:
+            return self
+        elif ratio > 1 or (ratio == 1 and self.aspect_ratio < 1):
+            # Target state is a horizontal box, so trim the height
+            new_height = new_aspect_ratio_height(width, ratio)
+            top = floor((height - new_height) / 2)
+            if top < 0:
+                raise ValueError(f'Unable to crop {self} to aspect ratio {x}:{y} while maintaining the current width')
+            return Box(0, top, width, top + new_height)
+        else:
+            # Target state is a vertical box, so trim the width
+            new_width = new_aspect_ratio_width(height, ratio)
+            left = floor((width - new_width) / 2)
+            if left < 0:
+                raise ValueError(f'Unable to crop {self} to aspect ratio {x}:{y} while maintaining the current height')
+            return Box(left, 0, left + new_width, height)
+
+    # endregion
+
+
 
 def _round_aspect(number: float, key: Callable[[float], float]) -> int:
     rounded = min(floor(number), ceil(number), key=key)
     return rounded if rounded > 1 else 1
+
+
+def new_aspect_ratio_width(height: int, aspect_ratio: float) -> int:
+    return _round_aspect(height * aspect_ratio, key=lambda n: abs(aspect_ratio - n / height))
+
+
+def new_aspect_ratio_height(width: int, aspect_ratio: float) -> int:
+    return _round_aspect(width / aspect_ratio, key=lambda n: 0 if n == 0 else abs(aspect_ratio - width / n))
