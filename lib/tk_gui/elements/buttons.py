@@ -195,6 +195,7 @@ class Button(CustomEventResultsMixin, DisableableMixin, Interactive, base_style_
             'anchor': self.anchor_info.value,
             'justify': self.justify.value,
             'takefocus': int(self.allow_focus),
+            'compound': self.compound.value,
             **self.style_config,
         }
         if not self.separate:
@@ -203,7 +204,6 @@ class Button(CustomEventResultsMixin, DisableableMixin, Interactive, base_style_
             kwargs['text'] = self.text
         if image := self.image:
             kwargs['image'] = image = PhotoImage(image)
-            kwargs['compound'] = self.compound.value
             kwargs['highlightthickness'] = 0
         elif not self.pad or 0 in self.pad:
             kwargs['highlightthickness'] = 0

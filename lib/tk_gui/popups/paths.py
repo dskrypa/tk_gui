@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any
 from tk_gui.enums import TreeSelectMode
 from tk_gui.event_handling import ENTER_KEYSYMS, event_handler, button_handler
 from tk_gui.images.icons import Icons
-from ..elements import Button, EventButton as EButton, Input, Text, PathTree, VerticalSeparator
+from ..elements import Button, EventButton as EButton, Input, Text, PathTree, VerticalSeparator, Frame
 from ..elements.trees.nodes import PathNode
 from .base import Popup
 from .common import popup_error
@@ -45,7 +45,7 @@ class PathPopup(Popup):
             raise ValueError('At least one of allow_files or allow_dirs must be enabled/True')
         super().__init__(title=title, bind_esc=bind_esc, **kwargs)
         # TODO: Add support for file_types filter (default: All Files / All Types)
-        # TODO: Add Places left panel (Home, desktop, documents, etc), with custom places/bookmarks param
+        # TODO: Add custom places/bookmarks param to include in places
         self.initial_dir = Path(initial_dir).resolve() if initial_dir else Path.home().resolve()
         self.allow_multiple = multiple
         self.allow_files = allow_files
@@ -103,14 +103,12 @@ class PathPopup(Popup):
     # endregion
 
     def get_pre_window_layout(self) -> Layout:
-        yield from self._get_pre_window_layout()
-        # TODO: Include location / full path text field in all path popups to accept a path to navigate to?
-        # TODO: File types filter: funnel-fill; funnel
-        # These buttons end up in the opposite order since both have side=right
-        yield [self._submit_button, EButton(self._cancel_text, key='cancel', side='right')]
+        places_frame = Frame(self._build_places_layout(), anchor='ne')
+        picker_frame = Frame(self._build_picker_layout())
+        yield [places_frame, picker_frame]
 
-    def _build_places_frame(self):
-        # Home: house-door-fill; house-door; house-fill; house
+    def _build_places_layout(self) -> Layout:
+        # Home: house-door-fill; house-door; house-fill; house; \U0001f3e0
         # Desktop: window-desktop; archive-fill; archive; calendar3-fill (flip 180); laptop-fill; laptop;
         # Documents: file-earmark; files;
         # Downloads: download; chevron-bar-down
@@ -119,10 +117,24 @@ class PathPopup(Popup):
         # Videos: film
         # (disk): hdd-network; hdd-network-fill; hdd; hdd-fill; hdd-stack-fill; hdd-stack; hdd-rack-fill; hdd-rack
         # Bookmarks: bookmark; bookmark-fill; bookmark-star-fill; bookmark-star
-        pass
+        kwargs = {'size': (14, 1), 'anchor_info': 'w'}
+        yield [Text('Places', font=('Helvetica', 12, 'bold'))]
+        yield [EButton('\U0001f3e0 Home', key='place:home', **kwargs)]
+        yield [EButton('\U0001f5d4 Desktop', key='place:desktop', **kwargs)]
+        yield [EButton('\U0001f5b9 Documents', key='place:documents', **kwargs)]
+        yield [EButton('\U0001f5f3 Downloads', key='place:downloads', **kwargs)]
+        yield [EButton('\U0001f3b5 Music', key='place:music', **kwargs)]
+        yield [EButton('\U0001f4f7 Pictures', key='place:pictures', **kwargs)]
+        yield [EButton('\U0001f39e Videos', key='place:videos', **kwargs)]  # alt: 1f3a5
 
-    def _get_pre_window_layout(self) -> Layout:
-        # TODO: Places left panel will result in most of the other elements here needing to be in a frame
+    def _build_picker_layout(self) -> Layout:
+        yield from self._build_base_picker_layout()
+        # TODO: File types filter: funnel-fill; funnel
+        # These buttons end up in the opposite order since both have side=right
+        yield [self._submit_button, EButton(self._cancel_text, key='cancel', side='right')]
+
+    def _build_base_picker_layout(self) -> Layout:
+        # TODO: Include location / full path text field in all path popups to accept a path to navigate to?
         yield [*self._nav_buttons.values(), VerticalSeparator(), self._path_field]
         yield [self._path_tree]
 
@@ -155,6 +167,20 @@ class PathPopup(Popup):
     @button_handler('refresh')
     def _handle_refresh(self, event=None, key=None):
         self._path_tree.root_dir = self._path_tree.root_dir
+
+    # endregion
+
+    # region Place Button Handlers
+
+    @button_handler('place:home', 'place:desktop', 'place:documents', 'place:downloads', 'place:music')
+    @button_handler('place:pictures', 'place:videos')
+    def _go_to_place(self, event=None, key: str = None):
+        if not key:
+            return
+        elif key == 'place:home':
+            self._path_tree.root_dir = Path.home()
+        else:
+            self._path_tree.root_dir = Path.home().joinpath(key.split(':', 1)[1].title())
 
     # endregion
 
@@ -377,8 +403,8 @@ class SaveAs(PathPopup):
     def _path_tree_kwargs(self) -> dict[str, Any]:
         return {'selection_changed_cb': self._handle_selection_changed, 'include_children': False}
 
-    def _get_pre_window_layout(self) -> Layout:
-        yield from super()._get_pre_window_layout()
+    def _build_base_picker_layout(self) -> Layout:
+        yield from super()._build_base_picker_layout()
         yield [Text('Name:'), self._name_input]
 
     def _handle_name_input_changed(self, *args):
