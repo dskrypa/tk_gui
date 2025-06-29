@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any
 from tk_gui.enums import TreeSelectMode
 from tk_gui.event_handling import ENTER_KEYSYMS, event_handler, button_handler
 from tk_gui.images.icons import Icons
-from ..elements import Button, Input, Text, PathTree, ButtonAction
+from ..elements import Button, Input, Text, PathTree, ButtonAction, VerticalSeparator
 from ..elements.trees.nodes import PathNode
 from .base import Popup
 from .common import popup_error
@@ -43,6 +43,8 @@ class PathPopup(Popup):
         if not allow_files and not allow_dirs:
             raise ValueError('At least one of allow_files or allow_dirs must be enabled/True')
         super().__init__(title=title, bind_esc=bind_esc, **kwargs)
+        # TODO: Add support for file_types filter (default: All Files / All Types)
+        # TODO: Add Places left panel (Home, desktop, documents, etc), with custom places/bookmarks param
         self.initial_dir = Path(initial_dir) if initial_dir else Path.home()
         self.allow_multiple = multiple
         self.allow_files = allow_files
@@ -50,6 +52,9 @@ class PathPopup(Popup):
         self._tree_rows = rows
         self._submit_text = submit_text
         self._submitted = False
+        self._history: list[Path] = [self.initial_dir]
+        self._history_index: int = 0
+        self._preserve_history: bool = False
 
     # region Elements
 
@@ -83,11 +88,24 @@ class PathPopup(Popup):
     # endregion
 
     def get_pre_window_layout(self) -> Layout:
-        icon = Icons(15).draw_with_transparent_bg('caret-left-fill')
-        yield [Button('', icon, cb=self._handle_back), self._path_field]
-        yield [self._path_tree]
+        yield from self._get_pre_window_layout()
         # TODO: Include location / full path text field in all path popups to accept a path to navigate to?
+        # TODO: File types filter
+        # TODO: Cancel button?
         yield [self._submit_button]
+
+    def _get_pre_window_layout(self) -> Layout:
+        # TODO: Places left panel will result in most of the other elements here needing to be in a frame
+        # TODO: Add refresh button
+        draw_icon = Icons(15).draw_with_transparent_bg
+        yield [
+            Button('', draw_icon('caret-left-fill'), cb=self._handle_back),
+            Button('', draw_icon('caret-right-fill'), cb=self._handle_forward),
+            Button('', draw_icon('caret-up-fill'), cb=self._handle_up),
+            VerticalSeparator(),
+            self._path_field,
+        ]
+        yield [self._path_tree]
 
     # region Event Handling
 
@@ -97,10 +115,46 @@ class PathPopup(Popup):
 
     @event_handler('<Alt-Left>', '<Mod1-Left>')
     def _handle_back(self, event=None):
+        index = self._history_index - 1
+        if index >= 0:
+            # log.debug(f'History now has {len(self._history)} entries; going back to {index=}')
+            self._history_index = index
+            self._preserve_history = True
+            self._path_tree.root_dir = self._history[index]
+
+    @event_handler('<Alt-Right>', '<Mod1-Right>')
+    def _handle_forward(self, event=None):
+        index = self._history_index + 1
+        try:
+            path = self._history[index]
+        except IndexError:
+            pass
+        else:
+            # log.debug(f'History now has {len(self._history)} entries; going forward to {index=}')
+            self._history_index = index
+            self._preserve_history = True
+            self._path_tree.root_dir = path
+
+    @event_handler('<Alt-Up>', '<Mod1-Up>')
+    def _handle_up(self, event=None):
         self._path_tree.root_dir = self._path_tree.root_dir.parent
 
     def _handle_root_changed(self, path: Path):
         self._path_field.update(path.as_posix(), auto_resize=True)
+        # History navigation (back/forward) events should not modify history, but other root changes should
+        preserve_history = self._preserve_history
+        self._preserve_history = False
+        if preserve_history:
+            return
+
+        # TODO: Disable forward/back buttons when there's nothing in history to go forward/back to
+        index = self._history_index + 1
+        # log.debug(f'Truncating history from {len(self._history)} to {index} entries')
+        history = self._history[:index]
+        history.append(path)
+        self._history = history
+        self._history_index = len(history) - 1
+        # log.debug(f'History now has {len(history)} entries with index={self._history_index}')
 
     @button_handler('submit')
     def _handle_submit(self, event, key=None):
@@ -233,7 +287,6 @@ class SaveAs(PathPopup):
             title=title,
             **kwargs,
         )
-        # TODO: Add support for file_types filter
         self.initial_name = initial_name or ''
         if default_ext:
             self.default_ext = default_ext if default_ext.startswith('.') else f'.{default_ext}'
@@ -250,9 +303,7 @@ class SaveAs(PathPopup):
         return {'selection_changed_cb': self._handle_selection_changed, 'include_children': False}
 
     def get_pre_window_layout(self) -> Layout:
-        icon = Icons(15).draw_with_transparent_bg('caret-left-fill')
-        yield [Button('', icon, cb=self._handle_back), self._path_field]
-        yield [self._path_tree]
+        yield from self._get_pre_window_layout()
         yield [Text('Name:'), self._name_input, self._submit_button]
 
     def _handle_name_input_changed(self, *args):
