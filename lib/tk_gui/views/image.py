@@ -8,7 +8,7 @@ import logging
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Union, TypeVar, ParamSpec, Iterator
+from typing import TYPE_CHECKING, Any, Union, TypeVar, ParamSpec, Iterator
 
 from PIL.Image import registered_extensions
 
@@ -400,7 +400,7 @@ class ImageView(View):
 
     @cached_property
     def _height_offset(self) -> int:
-        style = self.window.style
+        style = self.style
         # footer_req_height = self.info_bar.widget.winfo_reqheight()  # Usually 22
         footer_bd = style.input.border_width.disabled or 1
         footer_req_height = style.char_height() + (2 * footer_bd) + 4
@@ -413,7 +413,7 @@ class ImageView(View):
 
     @cached_property
     def _width_offset(self) -> int:
-        style = self.window.style
+        style = self.style
         # scroll_y_width = self.gui_image.widget.scroll_bar_y.winfo_reqwidth()  # usually 12->15 / 14->17
         scroll = style.get_map('scroll', aw='arrow_width', bw='bar_width', bd='border_width')
         scroll_width = max(scroll.get('aw', 12), scroll.get('bw', 12))
@@ -458,8 +458,8 @@ class ImageView(View):
     # region Layout
 
     @cached_property(block=False)
-    def _style(self):
-        return self.window.style.sub_style(bg='#000000', border_width=0)
+    def _img_style(self):
+        return self.style.sub_style(bg='#000000', border_width=0)
 
     def get_post_window_layout(self) -> Layout:
         if not self.standalone:
@@ -473,7 +473,7 @@ class ImageView(View):
 
     @cached_property
     def gui_image(self) -> ScrollableImage:
-        kwargs = {'pad': (0, 0), 'style': self._style}
+        kwargs: dict[str, Any] = {'pad': (0, 0), 'style': self._img_style}
         if self._add_save_as_menu:
             class ImageMenu(Menu):
                 MenuItem('Save As...', callback=self.handle_save_as)
