@@ -99,8 +99,19 @@ class Icons:
         font, size = self._font_and_size(size)
         return draw_icon(size, self._normalize(icon), color_to_rgb(color), color_to_rgb(bg), font)
 
-    def draw_with_transparent_bg(self, icon: Icon, size: XY = None, color: Color = BLACK, bg: Color = None) -> PILImage:
-        return self.draw(icon, size, color, pick_transparent_bg(color, bg))
+    def draw_with_transparent_bg(
+        self,
+        icon: Icon,
+        size: XY = None,
+        color: Color = BLACK,
+        bg: Color = None,
+        *,
+        rotate_angle: int = None,
+        pad: Padding = None,
+    ) -> PILImage:
+        bg = pick_transparent_bg(color, bg)
+        image = self.draw(icon, size, color, bg)
+        return _rotate_and_pad(image, bg, rotate_angle, pad)
 
     def draw_many(
         self, icons: Iterable[Icon], size: XY = None, color: Color = BLACK, bg: Color = WHITE
@@ -149,16 +160,20 @@ class Icons:
         # possible to the expected size after it has been cropped.
         target_size = Box(*image.getbbox()).scale_size(self._font_and_size(size)[1])
         image = self.draw(icon, target_size, color, bg)
-        image = image.crop(image.getbbox())
-        if rotate_angle:
-            image = image.rotate(rotate_angle)
-        if pad:
-            padded_image: PILImage = new_image('RGBA', pad.size_for(image), bg)  # noqa
-            log.debug(f'Padding image with size={image.size} -> {padded_image.size} using {pad=}')
-            padded_image.paste(image, (pad.left, pad.top))
-            return padded_image
-        else:
-            return image
+        return _rotate_and_pad(image.crop(image.getbbox()), bg, rotate_angle, pad)
+
+
+def _rotate_and_pad(image: PILImage, bg: RGBA, rotate_angle: int = None, pad: Padding = None) -> PILImage:
+    if rotate_angle:
+        image = image.rotate(rotate_angle)
+
+    if pad:
+        padded_image: PILImage = new_image('RGBA', pad.size_for(image), bg)  # noqa
+        log.debug(f'Padding image with size={image.size} -> {padded_image.size} using {pad=}')
+        padded_image.paste(image, (pad.left, pad.top))
+        return padded_image
+    else:
+        return image
 
 
 def pick_transparent_bg(fg: Color, bg: Color = None) -> RGBA:

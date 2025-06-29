@@ -637,9 +637,12 @@ class Window(BindMixin, RowContainer):
     def make_modal(self):
         parent = self.parent
         try:  # Apparently this does not work on macs...
-            self.root.transient(parent.root if parent else None)  # This will have no effect if parent is not set
-            if not self._init_config.can_minimize and DISPLAY_SERVER == DisplayServer.X11:
-                self._set_type_attr('utility')  # This must happen after marking the Window as transient
+            if parent:
+                # Skip these steps if there is no parent (usually only during testing) to prevent the window from
+                # being difficult to select after alt-tab
+                self.root.transient(parent.root)  # This will have no effect if parent is not set
+                if not self._init_config.can_minimize and DISPLAY_SERVER == DisplayServer.X11:
+                    self._set_type_attr('utility')  # This must happen after marking the Window as transient
 
             self.root.grab_set()
             self.root.focus_force()

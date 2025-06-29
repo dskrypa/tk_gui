@@ -86,7 +86,7 @@ class RootPathNode(TreeNode[Path]):
             path = Path.cwd()
         elif not path.is_dir():
             path = path.parent
-        super().__init__(None, path)
+        super().__init__(None, path.resolve())
 
     @classmethod
     def with_dir_contents(cls, path: Path, pt_config: PathTreeConfig) -> RootPathNode:

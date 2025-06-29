@@ -7,14 +7,13 @@ Tkinter GUI popups: Path-related prompts
 from __future__ import annotations
 
 import logging
-from functools import cached_property, partial
+from functools import cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from tk_gui.enums import TreeSelectMode
 from tk_gui.event_handling import ENTER_KEYSYMS, event_handler, button_handler
 from tk_gui.images.icons import Icons
-from tk_gui.styles.colors import WHITE, BLACK
 from ..elements import Button, EventButton as EButton, Input, Text, PathTree, VerticalSeparator
 from ..elements.trees.nodes import PathNode
 from .base import Popup
@@ -47,7 +46,7 @@ class PathPopup(Popup):
         super().__init__(title=title, bind_esc=bind_esc, **kwargs)
         # TODO: Add support for file_types filter (default: All Files / All Types)
         # TODO: Add Places left panel (Home, desktop, documents, etc), with custom places/bookmarks param
-        self.initial_dir = Path(initial_dir) if initial_dir else Path.home()
+        self.initial_dir = Path(initial_dir).resolve() if initial_dir else Path.home().resolve()
         self.allow_multiple = multiple
         self.allow_files = allow_files
         self.allow_dirs = allow_dirs
@@ -57,9 +56,7 @@ class PathPopup(Popup):
         self._submit_text = submit_text
         self._cancel_text = cancel_text
         self._submitted = False
-        self._history: list[Path] = [self.initial_dir]
-        self._history_index: int = 0
-        self._preserve_history: bool = False
+        self._history = PathHistory(self.initial_dir)
 
     @cached_property
     def _icons(self) -> Icons:
@@ -94,6 +91,15 @@ class PathPopup(Popup):
     def _submit_button(self) -> Button:
         return EButton(self._submit_text, key='submit', side='right')
 
+    @cached_property
+    def _nav_buttons(self) -> dict[str, Button]:
+        return {
+            'back': EButton('\u2b9c', key='back', disabled=True),
+            'forward': EButton('\u2b9e', key='forward', disabled=True),
+            'up': EButton('\u2b9d', key='up', disabled=len(self.initial_dir.resolve().parts) == 1),
+            'refresh': EButton('\u2b6e', key='refresh', font=('Helvetica', 10, 'bold')),
+        }
+
     # endregion
 
     def get_pre_window_layout(self) -> Layout:
@@ -117,16 +123,7 @@ class PathPopup(Popup):
 
     def _get_pre_window_layout(self) -> Layout:
         # TODO: Places left panel will result in most of the other elements here needing to be in a frame
-        fg = WHITE if self.style.is_dark_mode else BLACK
-        draw_icon = partial(self._icons.draw_with_transparent_bg, size=(20, 20), color=fg)
-        yield [
-            EButton('', draw_icon('chevron-left'), key='back'),
-            EButton('', draw_icon('chevron-right'), key='forward'),
-            EButton('', draw_icon('chevron-up'), key='up'),
-            EButton('', draw_icon('arrow-repeat'), key='refresh'),
-            VerticalSeparator(),
-            self._path_field,
-        ]
+        yield [*self._nav_buttons.values(), VerticalSeparator(), self._path_field]
         yield [self._path_tree]
 
     # region Event Handling
@@ -135,28 +132,18 @@ class PathPopup(Popup):
     # def _handle_any(self, event):
     #     log.info(f'Event: {event}')
 
+    # region History / Parent Navigation Handlers
+
     @event_handler('<Alt-Left>', '<Mod1-Left>')
     @button_handler('back')
     def _handle_back(self, event=None, key=None):
-        index = self._history_index - 1
-        if index >= 0:
-            # log.debug(f'History now has {len(self._history)} entries; going back to {index=}')
-            self._history_index = index
-            self._preserve_history = True
-            self._path_tree.root_dir = self._history[index]
+        if path := self._history.go_back():
+            self._path_tree.root_dir = path
 
     @event_handler('<Alt-Right>', '<Mod1-Right>')
     @button_handler('forward')
     def _handle_forward(self, event=None, key=None):
-        index = self._history_index + 1
-        try:
-            path = self._history[index]
-        except IndexError:
-            pass
-        else:
-            # log.debug(f'History now has {len(self._history)} entries; going forward to {index=}')
-            self._history_index = index
-            self._preserve_history = True
+        if path := self._history.go_forward():
             self._path_tree.root_dir = path
 
     @event_handler('<Alt-Up>', '<Mod1-Up>')
@@ -167,25 +154,16 @@ class PathPopup(Popup):
     @event_handler('<F5>')
     @button_handler('refresh')
     def _handle_refresh(self, event=None, key=None):
-        self._preserve_history = True
         self._path_tree.root_dir = self._path_tree.root_dir
+
+    # endregion
 
     def _handle_root_changed(self, path: Path):
         self._path_field.update(path.as_posix(), auto_resize=True)
-        # History navigation (back/forward) events should not modify history, but other root changes should
-        preserve_history = self._preserve_history
-        self._preserve_history = False
-        if preserve_history:
-            return
-
-        # TODO: Disable forward/back buttons when there's nothing in history to go forward/back to
-        index = self._history_index + 1
-        # log.debug(f'Truncating history from {len(self._history)} to {index} entries')
-        history = self._history[:index]
-        history.append(path)
-        self._history = history
-        self._history_index = len(history) - 1
-        # log.debug(f'History now has {len(history)} entries with index={self._history_index}')
+        self._history.append(path)
+        self._nav_buttons['back'].toggle_enabled(not self._history.can_go_back())
+        self._nav_buttons['forward'].toggle_enabled(not self._history.can_go_forward())
+        self._nav_buttons['up'].toggle_enabled(len(path.resolve().parts) == 1)
 
     @button_handler('submit')
     def _handle_submit(self, event, key=None):
@@ -224,6 +202,64 @@ class PathPopup(Popup):
 
     def get_results(self) -> list[Path]:
         return self._path_tree.get_values(self._submitted, root_fallback=True)
+
+
+class PathHistory:
+    def __init__(self, initial_dir: Path):
+        self.history = [initial_dir]
+        self.index = 0
+        self.ignore_next_change = False
+
+    def append(self, path: Path):
+        if self._should_ignore():
+            return
+
+        index = self.index + 1
+        # log.debug(f'Truncating history from {len(self._history)} to {index} entries')
+        history = self.history[:index]
+        history.append(path)
+        self.history = history
+        self.index = len(history) - 1
+        # log.debug(f'History now has {len(history)} entries with index={self._history_index}')
+
+    def _should_ignore(self) -> bool:
+        # History navigation (back/forward) events should not modify history, but other root changes should
+        ignore = self.ignore_next_change
+        self.ignore_next_change = False
+        return ignore
+
+    def go_back(self) -> Path | None:
+        index = self.index - 1
+        if index >= 0:
+            # log.debug(f'History now has {len(self.history)} entries; going back to {index=}')
+            self.index = index
+            self.ignore_next_change = True
+            return self.history[index]
+        else:
+            return None
+
+    def go_forward(self) -> Path | None:
+        index = self.index + 1
+        try:
+            path = self.history[index]
+        except IndexError:
+            return None
+        else:
+            # log.debug(f'History now has {len(self.history)} entries; going forward to {index=}')
+            self.index = index
+            self.ignore_next_change = True
+            return path
+
+    def can_go_back(self) -> bool:
+        return (self.index - 1) >= 0
+
+    def can_go_forward(self) -> bool:
+        try:
+            self.history[self.index + 1]
+        except IndexError:
+            return False
+        else:
+            return True
 
 
 class PickDirectory(PathPopup):
@@ -336,7 +372,6 @@ class SaveAs(PathPopup):
 
     @cached_property
     def _submit_button(self) -> Button:
-        # return EButton(self._submit_text, self._icons.draw_alpha_cropped('floppy'), key='submit', side='right')
         return EButton(self._submit_text, key='submit', side='right')
 
     def _path_tree_kwargs(self) -> dict[str, Any]:
