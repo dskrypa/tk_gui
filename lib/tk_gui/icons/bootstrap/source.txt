@@ -1,2 +1,3 @@
 https://icons.getbootstrap.com/
-1.5.0
+https://github.com/twbs/icons/
+1.13.1

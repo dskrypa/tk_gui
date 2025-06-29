@@ -44,7 +44,7 @@ class Icons:
 
     def __init__(self, size: int = 10):
         if self._font is None:
-            self.__class__._font = truetype(ICON_DIR.joinpath('bootstrap-icons.woff').as_posix())  # noqa
+            self.__class__._font = truetype(ICON_DIR.joinpath('bootstrap-icons.woff2').as_posix())  # noqa
         self.font: FreeTypeFont = self._font.font_variant(size=size)
 
     @property
@@ -57,7 +57,7 @@ class Icons:
             import json
 
             with ICON_DIR.joinpath('bootstrap-icons.json').open('r', encoding='utf-8') as f:
-                self.__class__._names = json.load(f)
+                self.__class__._names = {k: v for k, v in sorted(json.load(f).items())}
 
         return self._names
 
