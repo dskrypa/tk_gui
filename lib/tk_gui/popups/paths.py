@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any
 from tk_gui.enums import TreeSelectMode
 from tk_gui.event_handling import ENTER_KEYSYMS, event_handler, button_handler
 from tk_gui.images.icons import Icons
-from ..elements import Button, Input, Text, PathTree, ButtonAction, VerticalSeparator
+from ..elements import Button, EventButton as EButton, Input, Text, PathTree, VerticalSeparator
 from ..elements.trees.nodes import PathNode
 from .base import Popup
 from .common import popup_error
@@ -37,6 +37,7 @@ class PathPopup(Popup):
         title: str = None,
         rows: int = 25,
         submit_text: str = 'Submit',
+        cancel_text: str = '\U0001f6ab Cancel',  # No entry sign
         bind_esc: bool = True,
         **kwargs,
     ):
@@ -51,10 +52,15 @@ class PathPopup(Popup):
         self.allow_dirs = allow_dirs
         self._tree_rows = rows
         self._submit_text = submit_text
+        self._cancel_text = cancel_text
         self._submitted = False
         self._history: list[Path] = [self.initial_dir]
         self._history_index: int = 0
         self._preserve_history: bool = False
+
+    @cached_property
+    def _icons(self) -> Icons:
+        return Icons(15)
 
     # region Elements
 
@@ -82,26 +88,46 @@ class PathPopup(Popup):
         return {}
 
     @cached_property
+    def _cancel_button(self) -> Button:
+        # Note: Unicode codepoints are used for the default text because mixing an icon with text produces bad
+        # alignment in buttons...
+        # icon = self._icons.draw_alpha_cropped('ban', rotate_angle=180, pad=Padding(bottom=4))
+        # return EButton(self._cancel_text, icon, key='cancel', side='right')
+        return EButton(self._cancel_text, key='cancel', side='right')
+
+    @cached_property
     def _submit_button(self) -> Button:
-        return Button(self._submit_text, key='submit', side='right', action=ButtonAction.BIND_EVENT)
+        return EButton(self._submit_text, key='submit', side='right')
 
     # endregion
 
     def get_pre_window_layout(self) -> Layout:
         yield from self._get_pre_window_layout()
         # TODO: Include location / full path text field in all path popups to accept a path to navigate to?
-        # TODO: File types filter
-        # TODO: Cancel button?
-        yield [self._submit_button]
+        # TODO: File types filter: funnel-fill; funnel
+        # These buttons end up in the opposite order since both have side=right
+        yield [self._submit_button, self._cancel_button]
+
+    def _build_places_frame(self):
+        # Home: house-door-fill; house-door; house-fill; house
+        # Desktop: window-desktop; archive-fill; archive; calendar3-fill (flip 180); laptop-fill; laptop;
+        # Documents: file-earmark; files;
+        # Downloads: download; chevron-bar-down
+        # Music: music-note-beamed; music-note
+        # Pictures: card-image; image; image-fill; images;
+        # Videos: film
+        # (disk): hdd-network; hdd-network-fill; hdd; hdd-fill; hdd-stack-fill; hdd-stack; hdd-rack-fill; hdd-rack
+        # Bookmarks: bookmark; bookmark-fill; bookmark-star-fill; bookmark-star
+        pass
 
     def _get_pre_window_layout(self) -> Layout:
         # TODO: Places left panel will result in most of the other elements here needing to be in a frame
-        # TODO: Add refresh button
-        draw_icon = Icons(15).draw_with_transparent_bg
+        draw_icon = self._icons.draw_with_transparent_bg
         yield [
-            Button('', draw_icon('caret-left-fill'), cb=self._handle_back),
-            Button('', draw_icon('caret-right-fill'), cb=self._handle_forward),
-            Button('', draw_icon('caret-up-fill'), cb=self._handle_up),
+            Button('', draw_icon('caret-left-fill'), cb=self._handle_back),         # arrow-left; chevron-left
+            Button('', draw_icon('caret-right-fill'), cb=self._handle_forward),     # arrow-right; chevron-right
+            Button('', draw_icon('caret-up-fill'), cb=self._handle_up),             # arrow-up; chevron-up
+            Button('', draw_icon('arrow-repeat'), cb=self._handle_refresh),
             VerticalSeparator(),
             self._path_field,
         ]
@@ -138,6 +164,11 @@ class PathPopup(Popup):
     @event_handler('<Alt-Up>', '<Mod1-Up>')
     def _handle_up(self, event=None):
         self._path_tree.root_dir = self._path_tree.root_dir.parent
+
+    @event_handler('<F5>')
+    def _handle_refresh(self, event=None):
+        self._preserve_history = True
+        self._path_tree.root_dir = self._path_tree.root_dir
 
     def _handle_root_changed(self, path: Path):
         self._path_field.update(path.as_posix(), auto_resize=True)
@@ -184,6 +215,10 @@ class PathPopup(Popup):
         else:
             self._submitted = True
             self.window.interrupt(event, self._path_tree)
+
+    @button_handler('cancel')
+    def _handle_cancel(self, event, key=None):
+        self.window.interrupt(event, self._path_tree)
 
     # endregion
 
@@ -274,7 +309,7 @@ class SaveAs(PathPopup):
         initial_name: str | None = None,
         default_ext: str | None = None,
         *,
-        submit_text: str = 'Save',
+        submit_text: str = '\U0001f4be Save',  # Floppy disk icon
         title: str = 'Save As',
         **kwargs,
     ):
@@ -296,15 +331,22 @@ class SaveAs(PathPopup):
     def _name_input(self) -> Input:
         binds = {key: self._handle_submit for key in ENTER_KEYSYMS}
         return Input(
-            self.initial_name, key='filename', size=(40, 1), change_cb=self._handle_name_input_changed, binds=binds
+            self.initial_name, key='filename', size=(60, 1), change_cb=self._handle_name_input_changed, binds=binds
         )
+
+    @cached_property
+    def _submit_button(self) -> Button:
+        # Note: Unicode codepoints are used for the default text because mixing an icon with text produces bad
+        # alignment in buttons...
+        # return EButton(self._submit_text, self._icons.draw_alpha_cropped('floppy'), key='submit', side='right')
+        return EButton(self._submit_text, key='submit', side='right')
 
     def _path_tree_kwargs(self) -> dict[str, Any]:
         return {'selection_changed_cb': self._handle_selection_changed, 'include_children': False}
 
-    def get_pre_window_layout(self) -> Layout:
-        yield from self._get_pre_window_layout()
-        yield [Text('Name:'), self._name_input, self._submit_button]
+    def _get_pre_window_layout(self) -> Layout:
+        yield from super()._get_pre_window_layout()
+        yield [Text('Name:'), self._name_input]
 
     def _handle_name_input_changed(self, *args):
         # log.debug(f'_handle_name_input_changed: {args}')

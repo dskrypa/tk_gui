@@ -175,7 +175,7 @@ class ScrollableText(ScrollableWidget, Frame, inner_cls=Text):
 
     def __init__(self, parent: BaseWidget = None, scroll_y: Bool = False, scroll_x: Bool = False, *args, **kwargs):
         super().__init__(parent, scroll_y, scroll_x, *args, **kwargs)
-        self.inner_widget.configure(wrap=tkc.NONE if scroll_x else tkc.WORD)
+        self.inner_widget.configure(wrap=tkc.NONE if scroll_x else tkc.WORD)  # noqa
 
 
 class ScrollableListbox(ScrollableWidget, Frame, inner_cls=Listbox):
@@ -197,6 +197,7 @@ class ComplexScrollable(ScrollableBase, ABC):
         _x_binds = ('<Shift-4>', '<Shift-5>')
 
     canvas: Canvas
+    resize_offset: int
     _last_box: Box = Box(0, 0, 0, 0)
     _last_size: XY = ()
     _x_config: AxisConfig
@@ -429,6 +430,8 @@ class ScrollableContainer(ComplexScrollable, ABC):
         **kwargs,
     ):
         super().__init__(parent, **kwargs)
+        # TODO: Add support for tracking which widgets have been displayed, and lazy-load/pack them as scrolling
+        #  occurs / they become visible
         self.init_inner(inner_cls, **(inner_kwargs or {}))
         if not auto_resize:
             self.auto_resize = auto_resize
