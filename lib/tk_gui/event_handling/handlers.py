@@ -7,6 +7,7 @@ from __future__ import annotations
 import logging
 from abc import ABCMeta
 from contextvars import ContextVar
+from fnmatch import fnmatch
 from functools import partial
 from typing import TYPE_CHECKING, Any, Callable, Generic, Iterator, Type, TypeVar
 
@@ -191,13 +192,21 @@ class HandlesEvents(metaclass=HandlesEventsMeta):
         button_cls: Type[Button] = CustomEventResultsMixin._fqn_cls_map['tk_gui.elements.buttons.Button']
         button: Button = button_cls.get_result(event)
         key = button.key
-        try:
-            handlers = self._button_handler_map[key]  # noqa
-        except KeyError:
-            log.debug(f'No button handlers found for {key=}: {self._button_handler_map=}')
-            return
+        if handlers := self._find_handlers(key):
+            window = button.window
+            for handler in handlers:
+                result = handler(event, key)
+                window._handle_callback_action(result, event, button)
 
-        window = button.window
-        for handler in handlers:
-            result = handler(event, key)
-            window._handle_callback_action(result, event, button)
+    def _find_handlers(self, key):
+        try:
+            return self._button_handler_map[key]  # noqa
+        except KeyError:
+            pass
+
+        for handler_key, handlers in self._button_handler_map.items():
+            if fnmatch(key, handler_key):
+                return handlers
+
+        log.debug(f'No button handlers found for {key=}: {self._button_handler_map=}')
+        return None

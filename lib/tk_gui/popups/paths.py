@@ -7,14 +7,16 @@ Tkinter GUI popups: Path-related prompts
 from __future__ import annotations
 
 import logging
-from functools import cached_property
+from functools import cached_property, partial
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from tk_gui.enums import TreeSelectMode
 from tk_gui.event_handling import ENTER_KEYSYMS, event_handler, button_handler
 from tk_gui.images.icons import Icons
-from ..elements import Button, EventButton as EButton, Input, Text, PathTree, VerticalSeparator, Frame
+from tk_gui.styles.colors import BLACK, WHITE
+from ..elements import Button, EventButton as EButton, Input, Text, PathTree, Frame, Spacer
+from ..elements.bars import VerticalSeparator
 from ..elements.trees.nodes import PathNode
 from .base import Popup
 from .common import popup_error
@@ -38,6 +40,8 @@ class PathPopup(Popup):
         rows: int = 25,
         submit_text: str = 'Submit',
         cancel_text: str = '\U0001f6ab Cancel',  # No entry sign
+        bookmarks: dict[str, Path | None] = None,
+        bookmarks_header: str = 'Bookmarks',
         bind_esc: bool = True,
         **kwargs,
     ):
@@ -45,7 +49,6 @@ class PathPopup(Popup):
             raise ValueError('At least one of allow_files or allow_dirs must be enabled/True')
         super().__init__(title=title, bind_esc=bind_esc, **kwargs)
         # TODO: Add support for file_types filter (default: All Files / All Types)
-        # TODO: Add custom places/bookmarks param to include in places
         self.initial_dir = Path(initial_dir).resolve() if initial_dir else Path.home().resolve()
         self.allow_multiple = multiple
         self.allow_files = allow_files
@@ -55,6 +58,8 @@ class PathPopup(Popup):
         # alignment in buttons...
         self._submit_text = submit_text
         self._cancel_text = cancel_text
+        self._bookmarks_header = bookmarks_header
+        self._bookmarks = bookmarks or {}
         self._submitted = False
         self._history = PathHistory(self.initial_dir)
 
@@ -108,24 +113,37 @@ class PathPopup(Popup):
         yield [places_frame, picker_frame]
 
     def _build_places_layout(self) -> Layout:
-        # Home: house-door-fill; house-door; house-fill; house; \U0001f3e0
-        # Desktop: window-desktop; archive-fill; archive; calendar3-fill (flip 180); laptop-fill; laptop;
-        # Documents: file-earmark; files;
-        # Downloads: download; chevron-bar-down
-        # Music: music-note-beamed; music-note
-        # Pictures: card-image; image; image-fill; images;
-        # Videos: film
         # (disk): hdd-network; hdd-network-fill; hdd; hdd-fill; hdd-stack-fill; hdd-stack; hdd-rack-fill; hdd-rack
         # Bookmarks: bookmark; bookmark-fill; bookmark-star-fill; bookmark-star
-        kwargs = {'size': (14, 1), 'anchor_info': 'w'}
         yield [Text('Places', font=('Helvetica', 12, 'bold'))]
-        yield [EButton('\U0001f3e0 Home', key='place:home', **kwargs)]
-        yield [EButton('\U0001f5d4 Desktop', key='place:desktop', **kwargs)]
-        yield [EButton('\U0001f5b9 Documents', key='place:documents', **kwargs)]
-        yield [EButton('\U0001f5f3 Downloads', key='place:downloads', **kwargs)]
-        yield [EButton('\U0001f3b5 Music', key='place:music', **kwargs)]
-        yield [EButton('\U0001f4f7 Pictures', key='place:pictures', **kwargs)]
-        yield [EButton('\U0001f39e Videos', key='place:videos', **kwargs)]  # alt: 1f3a5
+
+        # kwargs = {'size': (14, 1), 'anchor_info': 'w'}
+        # yield [EButton('\U0001f3e0 Home', key='place:home', **kwargs)]
+        # yield [EButton('\U0001f5d4 Desktop', key='place:desktop', **kwargs)]
+        # yield [EButton('\U0001f5b9 Documents', key='place:documents', **kwargs)]
+        # yield [EButton('\U0001f5f3 Downloads', key='place:downloads', **kwargs)]
+        # yield [EButton('\U0001f3b5 Music', key='place:music', **kwargs)]
+        # yield [EButton('\U0001f4f7 Pictures', key='place:pictures', **kwargs)]
+        # yield [EButton('\U0001f39e Videos', key='place:videos', **kwargs)]  # alt: 1f3a5
+
+        # w results in icon centered, text too high; sw results in icon slightly too low, but text properly centered
+        kwargs = {'size': (120, 16), 'anchor_info': 'sw'}
+        draw_icon = partial(self._icons.draw_with_transparent_bg, color=WHITE if self.style.is_dark_mode else BLACK)
+        yield [EButton('Home', draw_icon('house-door'), key='place:home', **kwargs)]
+        yield [EButton('Desktop', draw_icon('window-desktop'), key='place:desktop', **kwargs)]
+        yield [EButton('Documents', draw_icon('files'), key='place:documents', **kwargs)]
+        yield [EButton('Downloads', draw_icon('download'), key='place:downloads', **kwargs)]
+        yield [EButton('Music', draw_icon('music-note-beamed'), key='place:music', **kwargs)]
+        yield [EButton('Pictures', draw_icon('images'), key='place:pictures', **kwargs)]
+        yield [EButton('Videos', draw_icon('film'), key='place:videos', **kwargs)]
+
+        if self._bookmarks:
+            yield [Spacer((120, 8))]
+            yield [Text(self._bookmarks_header, font=('Helvetica', 12, 'bold'))]
+            icon = draw_icon('bookmark-star')
+            for name, path in self._bookmarks.items():
+                if path:
+                    yield [EButton(name, icon, key=f'place:custom:{name}', **kwargs)]
 
     def _build_picker_layout(self) -> Layout:
         yield from self._build_base_picker_layout()
@@ -172,13 +190,14 @@ class PathPopup(Popup):
 
     # region Place Button Handlers
 
-    @button_handler('place:home', 'place:desktop', 'place:documents', 'place:downloads', 'place:music')
-    @button_handler('place:pictures', 'place:videos')
+    @button_handler('place:*')
     def _go_to_place(self, event=None, key: str = None):
         if not key:
             return
         elif key == 'place:home':
             self._path_tree.root_dir = Path.home()
+        elif key.startswith('place:custom:'):
+            self._path_tree.root_dir = self._bookmarks[key.split(':', 2)[2]]
         else:
             self._path_tree.root_dir = Path.home().joinpath(key.split(':', 1)[1].title())
 
