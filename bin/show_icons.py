@@ -8,6 +8,8 @@ from tk_gui.elements import Text, VerticalSeparator, Image
 from tk_gui.images import IconSourceImage, Icons
 from tk_gui.window import Window
 
+log = logging.getLogger(__name__)
+
 
 class IconViewer(Command):
     action = Action(help='The action to take')
@@ -32,7 +34,12 @@ class IconViewer(Command):
     def show(self):
         icons = Icons(30)
         layout, row = [], []
-        for i, (icon, name) in enumerate(icons.draw_many(self._get_icon_names(icons))):
+        names = self._get_icon_names(icons)
+        if not names:
+            log.warning('No icon names matched the specified filter(s)')
+            return
+
+        for i, (icon, name) in enumerate(icons.draw_many(names)):
             if row and i % self.count_per_row == 0:
                 layout.append(row[:-1])
                 row = []

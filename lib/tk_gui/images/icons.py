@@ -7,6 +7,7 @@ bootstrap-icons font.
 
 from __future__ import annotations
 
+import logging
 from base64 import b64encode
 from importlib.resources import files
 from io import BytesIO
@@ -15,7 +16,7 @@ from typing import TYPE_CHECKING, Optional, Union, TypeVar, Iterator, Iterable
 from PIL.Image import Image as PILImage, new as new_image, core as pil_image_core
 from PIL.ImageFont import FreeTypeFont, truetype
 
-from tk_gui.geometry import Box
+from tk_gui.geometry import Box, Padding
 from .color import color_to_rgb, find_unused_color
 
 if TYPE_CHECKING:
@@ -24,6 +25,7 @@ if TYPE_CHECKING:
     from tk_gui.typing import XY, Color, RGB, RGBA, ImageType  # noqa
 
 __all__ = ['Icons', 'PlaceholderCache', 'placeholder_icon_cache', 'icon_path']
+log = logging.getLogger(__name__)
 
 ICONS_DIR = files('tk_gui.icons')
 ICON_DIR = ICONS_DIR.joinpath('bootstrap')
@@ -113,7 +115,16 @@ class Icons:
         self.draw(*args, **kwargs).save(bio, 'PNG')
         return b64encode(bio.getvalue())
 
-    def draw_alpha_cropped(self, icon: Icon, size: XY = None, color: Color = BLACK, bg: Color = None) -> PILImage:
+    def draw_alpha_cropped(
+        self,
+        icon: Icon,
+        size: XY = None,
+        color: Color = BLACK,
+        bg: Color = None,
+        *,
+        rotate_angle: int = None,
+        pad: Padding = None,
+    ) -> PILImage:
         """
         Draws the specified icon with an automatically selected background color that will be rendered transparent, and
         crops the image so that the visible icon will reach the edges of the canvas.
@@ -124,6 +135,8 @@ class Icons:
         :param bg: The background color to use.  For the background to be 100% transparent, the alpha value should be 0,
           e.g., ``#ffffff00`` or ``(255, 255, 255, 0)``.  If not specified, a value will automatically be chosen that
           is different than the specified foreground color.
+        :param rotate_angle: Degrees to rotate, if any.  Applied before padding, if specified.
+        :param pad: A Padding object providing top/left/bottom/right pad values to apply to the final image
         :return: The specified icon as a PIL Image object.  It will need to be wrapped in a :class:`.images.Image`
           element to be included in a layout.
         """
@@ -136,8 +149,16 @@ class Icons:
         # possible to the expected size after it has been cropped.
         target_size = Box(*image.getbbox()).scale_size(self._font_and_size(size)[1])
         image = self.draw(icon, target_size, color, bg)
-        bbox = image.getbbox()
-        return image.crop(bbox)
+        image = image.crop(image.getbbox())
+        if rotate_angle:
+            image = image.rotate(rotate_angle)
+        if pad:
+            padded_image: PILImage = new_image('RGBA', pad.size_for(image), bg)  # noqa
+            log.debug(f'Padding image with size={image.size} -> {padded_image.size} using {pad=}')
+            padded_image.paste(image, (pad.left, pad.top))
+            return padded_image
+        else:
+            return image
 
 
 def pick_transparent_bg(fg: Color, bg: Color = None) -> RGBA:

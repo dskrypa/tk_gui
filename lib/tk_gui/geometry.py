@@ -362,3 +362,15 @@ def new_aspect_ratio_width(height: int, aspect_ratio: float) -> int:
 
 def new_aspect_ratio_height(width: int, aspect_ratio: float) -> int:
     return _round_aspect(width / aspect_ratio, key=lambda n: 0 if n == 0 else abs(aspect_ratio - width / n))
+
+
+@dataclass(slots=True)
+class Padding:
+    left: X = 0
+    top: Y = 0
+    right: X = 0
+    bottom: Y = 0
+
+    def size_for(self, sized: HasSize) -> XY:
+        width, height = sized.size
+        return width + self.left + self.right, height + self.top + self.bottom
