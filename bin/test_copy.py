@@ -5,8 +5,7 @@ import logging
 from cli_command_parser import Command, Counter, Positional, main
 from cli_command_parser.inputs import Path as IPath
 
-from tk_gui.__version__ import __author_email__, __version__, __author__, __url__  # noqa
-from tk_gui.popups.files import CopyFilesPopup
+from tk_gui.popups.copy_files import CopyFilesPopup
 
 
 class GuiCopyFilesPopupTest(Command):
