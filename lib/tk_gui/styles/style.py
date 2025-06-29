@@ -94,6 +94,14 @@ class Style(ClearableCachedPropertyMixin):
             ancestors.add(style)
         return ancestors
 
+    @cached_property
+    def is_dark_mode(self) -> bool:
+        return any(s.name == '_dark_base' for s in self._family)
+
+    @cached_property
+    def is_light_mode(self) -> bool:
+        return not self.is_dark_mode
+
     def __getitem__(self, layer_name: str) -> StyleLayer:
         if layer_name in self._layers:
             return getattr(self, layer_name)

@@ -14,10 +14,12 @@ from tk_gui.caching import cached_property
 from tk_gui.config import GuiConfigProperty
 from tk_gui.event_handling import HandlesEvents, BindMap
 from tk_gui.monitors import Monitor, monitor_manager
+from tk_gui.styles.style import Style
 from tk_gui.utils import timer
 from tk_gui.window import Window
 
 if TYPE_CHECKING:
+    from tk_gui.styles.typing import StyleSpec
     from tk_gui.typing import Layout, Key, PathLike
 
 __all__ = ['ViewWindowInitializer']
@@ -30,6 +32,7 @@ class ViewWindowInitializer(HandlesEvents, ABC):
     parent: Window | None = None
     title: str | None = None
     is_popup: bool = False
+    _style: StyleSpec = None
 
     config = GuiConfigProperty()
     config_name: str = None
@@ -66,6 +69,7 @@ class ViewWindowInitializer(HandlesEvents, ABC):
         config_path: PathLike = None,
         config_defaults: dict[str, Any] = None,
         is_popup: bool = None,
+        style: StyleSpec = None,
         **kwargs,
     ):
         if parent is _NotSet:
@@ -84,6 +88,8 @@ class ViewWindowInitializer(HandlesEvents, ABC):
             self.config_defaults = config_defaults
         if is_popup is not None:
             self.is_popup = is_popup
+        if style is not None:
+            self._style = style
         self.window_kwargs = kwargs
 
     def __repr__(self) -> str:
@@ -95,6 +101,11 @@ class ViewWindowInitializer(HandlesEvents, ABC):
     @cached_property
     def bind_map(self) -> BindMap:
         return self._get_bind_map()
+
+    @cached_property
+    def style(self) -> Style:
+        # This matches the logic in Window.__init__ + RowContainer.__init__
+        return Style.get_style(self._style or self.config.style)
 
     @property
     def window_kwargs(self) -> dict[str, Any]:
@@ -138,6 +149,7 @@ class ViewWindowInitializer(HandlesEvents, ABC):
             config=self.config,
             is_popup=self.is_popup,
             show=False,
+            style=self._style,
             **kwargs,
         )
         if self._parent_window:

@@ -7,13 +7,14 @@ Tkinter GUI popups: Path-related prompts
 from __future__ import annotations
 
 import logging
-from functools import cached_property
+from functools import cached_property, partial
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from tk_gui.enums import TreeSelectMode
 from tk_gui.event_handling import ENTER_KEYSYMS, event_handler, button_handler
 from tk_gui.images.icons import Icons
+from tk_gui.styles.colors import WHITE, BLACK
 from ..elements import Button, EventButton as EButton, Input, Text, PathTree, VerticalSeparator
 from ..elements.trees.nodes import PathNode
 from .base import Popup
@@ -51,6 +52,8 @@ class PathPopup(Popup):
         self.allow_files = allow_files
         self.allow_dirs = allow_dirs
         self._tree_rows = rows
+        # Note: Unicode codepoints are used for the default text values because mixing an icon with text produces bad
+        # alignment in buttons...
         self._submit_text = submit_text
         self._cancel_text = cancel_text
         self._submitted = False
@@ -66,7 +69,7 @@ class PathPopup(Popup):
 
     @cached_property
     def _path_field(self) -> Text:
-        return Text(self.initial_dir)
+        return Text(self.initial_dir, anchor='sw')
 
     @cached_property
     def _path_tree(self) -> PathTree:
@@ -88,14 +91,6 @@ class PathPopup(Popup):
         return {}
 
     @cached_property
-    def _cancel_button(self) -> Button:
-        # Note: Unicode codepoints are used for the default text because mixing an icon with text produces bad
-        # alignment in buttons...
-        # icon = self._icons.draw_alpha_cropped('ban', rotate_angle=180, pad=Padding(bottom=4))
-        # return EButton(self._cancel_text, icon, key='cancel', side='right')
-        return EButton(self._cancel_text, key='cancel', side='right')
-
-    @cached_property
     def _submit_button(self) -> Button:
         return EButton(self._submit_text, key='submit', side='right')
 
@@ -106,7 +101,7 @@ class PathPopup(Popup):
         # TODO: Include location / full path text field in all path popups to accept a path to navigate to?
         # TODO: File types filter: funnel-fill; funnel
         # These buttons end up in the opposite order since both have side=right
-        yield [self._submit_button, self._cancel_button]
+        yield [self._submit_button, EButton(self._cancel_text, key='cancel', side='right')]
 
     def _build_places_frame(self):
         # Home: house-door-fill; house-door; house-fill; house
@@ -122,12 +117,13 @@ class PathPopup(Popup):
 
     def _get_pre_window_layout(self) -> Layout:
         # TODO: Places left panel will result in most of the other elements here needing to be in a frame
-        draw_icon = self._icons.draw_with_transparent_bg
+        fg = WHITE if self.style.is_dark_mode else BLACK
+        draw_icon = partial(self._icons.draw_with_transparent_bg, size=(20, 20), color=fg)
         yield [
-            Button('', draw_icon('caret-left-fill'), cb=self._handle_back),         # arrow-left; chevron-left
-            Button('', draw_icon('caret-right-fill'), cb=self._handle_forward),     # arrow-right; chevron-right
-            Button('', draw_icon('caret-up-fill'), cb=self._handle_up),             # arrow-up; chevron-up
-            Button('', draw_icon('arrow-repeat'), cb=self._handle_refresh),
+            EButton('', draw_icon('chevron-left'), key='back'),
+            EButton('', draw_icon('chevron-right'), key='forward'),
+            EButton('', draw_icon('chevron-up'), key='up'),
+            EButton('', draw_icon('arrow-repeat'), key='refresh'),
             VerticalSeparator(),
             self._path_field,
         ]
@@ -140,7 +136,8 @@ class PathPopup(Popup):
     #     log.info(f'Event: {event}')
 
     @event_handler('<Alt-Left>', '<Mod1-Left>')
-    def _handle_back(self, event=None):
+    @button_handler('back')
+    def _handle_back(self, event=None, key=None):
         index = self._history_index - 1
         if index >= 0:
             # log.debug(f'History now has {len(self._history)} entries; going back to {index=}')
@@ -149,7 +146,8 @@ class PathPopup(Popup):
             self._path_tree.root_dir = self._history[index]
 
     @event_handler('<Alt-Right>', '<Mod1-Right>')
-    def _handle_forward(self, event=None):
+    @button_handler('forward')
+    def _handle_forward(self, event=None, key=None):
         index = self._history_index + 1
         try:
             path = self._history[index]
@@ -162,11 +160,13 @@ class PathPopup(Popup):
             self._path_tree.root_dir = path
 
     @event_handler('<Alt-Up>', '<Mod1-Up>')
-    def _handle_up(self, event=None):
+    @button_handler('up')
+    def _handle_up(self, event=None, key=None):
         self._path_tree.root_dir = self._path_tree.root_dir.parent
 
     @event_handler('<F5>')
-    def _handle_refresh(self, event=None):
+    @button_handler('refresh')
+    def _handle_refresh(self, event=None, key=None):
         self._preserve_history = True
         self._path_tree.root_dir = self._path_tree.root_dir
 
@@ -336,8 +336,6 @@ class SaveAs(PathPopup):
 
     @cached_property
     def _submit_button(self) -> Button:
-        # Note: Unicode codepoints are used for the default text because mixing an icon with text produces bad
-        # alignment in buttons...
         # return EButton(self._submit_text, self._icons.draw_alpha_cropped('floppy'), key='submit', side='right')
         return EButton(self._submit_text, key='submit', side='right')
 
