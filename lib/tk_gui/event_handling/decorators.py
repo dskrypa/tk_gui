@@ -28,6 +28,8 @@ class DelayedEventHandler:
     triggered multiple times within that time span, the timer is reset, and the method is re-registered to be actually
     called ``delay_ms`` milliseconds from then.
     """
+    # TODO: `jump`? https://www.tcl-lang.org/man/tcl8.6.14/TkCmd/options.htm#M-jump
+
     __slots__ = ('name', 'cb_id_attr', 'widget_attr', 'delay_ms', 'func', 'window_root')
 
     def __init__(self, func: BindMethod, widget_attr: str = None, delay_ms: int = 200, window_root: bool = False):

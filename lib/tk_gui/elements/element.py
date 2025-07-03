@@ -52,7 +52,14 @@ class ElementBase(ClearableCachedPropertyMixin, ABC):
     allow_focus: bool = False
     ignore_grab: bool = False
     anchor: Anchor = Inheritable('anchor_elements', type=Anchor)
+
     pad: XY = Inheritable('element_padding')
+    # Most widgets only use this option for padding text: if they are displaying a bitmap or image, then they usually ignore padding options.
+    # https://www.tcl-lang.org/man/tcl8.6.14/TkCmd/options.htm#M-padx
+    # TODO: Disambiguate widget padx/pady from pack padx/pady
+    #  https://www.tcl-lang.org/man/tcl8.6.14/TkCmd/options.htm#M-padx
+    #  https://www.tcl-lang.org/man/tcl8.6.14/TkCmd/pack.htm#M17
+
     side: Side = Inheritable('element_side', type=Side)
     style: Style = Inheritable(type=Style.get_style)
 

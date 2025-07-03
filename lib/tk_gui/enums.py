@@ -93,10 +93,12 @@ class CallbackAction(MissingMixin, Enum):
 
 
 class Side(MissingMixin, Enum, aliases={'l': 'LEFT', 'r': 'RIGHT', 't': 'TOP', 'b': 'BOTTOM'}):
+    """Used when packing widgets.  Specifies which side of the container the content will be packed against."""
+
     NONE = None
     LEFT = tkc.LEFT
     RIGHT = tkc.RIGHT
-    TOP = tkc.TOP
+    TOP = tkc.TOP           # Default
     BOTTOM = tkc.BOTTOM
 
     def as_sticky(self) -> str:
@@ -106,16 +108,26 @@ class Side(MissingMixin, Enum, aliases={'l': 'LEFT', 'r': 'RIGHT', 't': 'TOP', '
 
 
 class Justify(MissingMixin, Enum, aliases={'c': 'CENTER', 'l': 'LEFT', 'r': 'RIGHT'}):
-    NONE = None
-    LEFT = tkc.LEFT
-    CENTER = tkc.CENTER
-    RIGHT = tkc.RIGHT
+    """
+    When there are multiple lines of text displayed in a widget, this option determines how the lines line up with
+    each other.
+    """
+
+    NONE = None             # Unspecified
+    LEFT = tkc.LEFT         # All text lines' left edges are aligned together
+    CENTER = tkc.CENTER     # All text lines' centers are aligned
+    RIGHT = tkc.RIGHT       # All text lines' right edges are aligned together
 
     def as_anchor(self):
         return JUSTIFY_TO_ANCHOR.get(self.value)
 
 
 class Anchor(MissingMixin, Enum, aliases=ANCHOR_ALIASES):
+    """Specifies how the information in a widget (e.g. text or a bitmap) is to be displayed in the widget."""
+    # TODO: Disambiguate widget anchor setting from pack anchor setting
+    #  https://www.tcl-lang.org/man/tcl8.6.14/TkCmd/options.htm#M-anchor
+    #  https://www.tcl-lang.org/man/tcl8.6.14/TkCmd/pack.htm#M8
+
     NONE = None
     TOP_LEFT = tkc.NW
     TOP_CENTER = tkc.N
@@ -188,12 +200,17 @@ class Anchor(MissingMixin, Enum, aliases=ANCHOR_ALIASES):
 
 
 class Compound(MissingMixin, Enum, aliases={'l': 'LEFT', 'r': 'RIGHT', 't': 'TOP', 'b': 'BOTTOM'}):
-    NONE = None
-    LEFT = tkc.LEFT
-    RIGHT = tkc.RIGHT
-    TOP = tkc.TOP
-    BOTTOM = tkc.BOTTOM
-    CENTER = tkc.CENTER
+    """
+    Specifies if the widget should display text and bitmaps/images at the same time, and if so, where the bitmap/image
+    should be placed relative to the text.
+    """
+
+    NONE = None             # Display image instead of text
+    LEFT = tkc.LEFT         # Display image to the left of text
+    RIGHT = tkc.RIGHT       # Display image to the right of text
+    TOP = tkc.TOP           # Display image above text
+    BOTTOM = tkc.BOTTOM     # Display image below text
+    CENTER = tkc.CENTER     # Display image on top of text
 
 
 # endregion

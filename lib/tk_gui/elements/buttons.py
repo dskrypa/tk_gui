@@ -9,7 +9,6 @@ from __future__ import annotations
 import logging
 import tkinter.constants as tkc
 from enum import Enum
-from math import ceil
 from time import monotonic
 from tkinter import Event, Button as _Button
 from typing import TYPE_CHECKING, Any
@@ -73,7 +72,7 @@ class Button(CustomEventResultsMixin, DisableableMixin, Interactive, base_style_
         binds: BindMapping = None,
         bind_enter: Bool = False,
         cb: BindCallback = None,
-        separate: Bool = False,
+        separate: Bool = False,  # Handle button press/release separately
         focus: Bool = None,
         **kwargs,
     ):
@@ -200,6 +199,8 @@ class Button(CustomEventResultsMixin, DisableableMixin, Interactive, base_style_
         }
         if not self.separate:
             kwargs['command'] = self.handle_activated
+        # TODO: Maybe ttk.Button (either by default or with a custom ttk style) would be better at handling vertical
+        #  alignment of image+text together?  https://www.tcl-lang.org/man/tcl8.6.14/TkCmd/ttk_button.htm
         if self.text:
             kwargs['text'] = self.text
         if image := self.image:
