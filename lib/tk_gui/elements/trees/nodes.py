@@ -148,7 +148,7 @@ class PathNode(TreeNode[Path]):
         if self._expanded or not self.is_dir:
             return False
 
-        log.debug(f'Expanding {self}')
+        # log.debug(f'Expanding {self}')
         self._expanded = True
         for child in self.children.values():
             if child.is_dir:
@@ -157,7 +157,7 @@ class PathNode(TreeNode[Path]):
         return True
 
     def promote_to_root(self) -> Self:
-        log.debug(f'Promoting to root: {self}')
+        # log.debug(f'Promoting to root: {self}')
         self.parent = None
         self.iid = ''
         self.expand()

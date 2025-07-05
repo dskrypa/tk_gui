@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Callable, Iterable, Sequence, TypeVar, Generic
 
 from tk_gui.enums import Anchor, TreeSelectMode, TreeShowMode
 from tk_gui.widgets.scroll import ScrollableTreeview
-from tk_gui.event_handling.utils import ENTER_KEYSYMS
+from tk_gui.event_handling import ENTER_KEYSYMS, event_handler
 from .base import TreeViewBase, Column
 from .nodes import TreeNode, RootPathNode, PathNode
 from .utils import PathTreeConfig
@@ -22,8 +22,7 @@ from .utils import PathTreeConfig
 if TYPE_CHECKING:
     from tkinter import Event
     from PIL.ImageTk import PhotoImage
-    from tk_gui.event_handling.containers import BindMapping
-    from tk_gui.typing import TkContainer, TreeSelectModes, TreeShowModes
+    from tk_gui.typing import BindMapping, TkContainer, TreeSelectModes, TreeShowModes
 
 __all__ = ['Tree', 'PathTree']
 log = logging.getLogger(__name__)
@@ -105,6 +104,7 @@ class BaseTree(TreeViewBase, Generic[N], base_style_layer='tree'):
     def _set_focus_on_iid(self, iid: str):
         self.tree_view.selection_set(iid)
         self.tree_view.focus(iid)
+        self.tree_view.see(iid)
 
     # endregion
 
@@ -267,43 +267,34 @@ class BaseTree(TreeViewBase, Generic[N], base_style_layer='tree'):
     # region Event Handling
 
     def _prepare_binds(self, binds: BindMapping | None, enter_submits: bool = False):
-        handlers = {
-            '<<TreeviewOpen>>': self._handle_node_opened,
-            '<<TreeviewClose>>': self._handle_node_closed,
-            '<KeyPress-Shift_L>': self._handle_shift,
-            '<KeyRelease-Shift_L>': self._handle_shift,
-            '<KeyPress-Shift_R>': self._handle_shift,
-            '<KeyRelease-Shift_R>': self._handle_shift,
-        }
         if enter_submits:
             self._enter_submits = enter_submits
-            for key in ENTER_KEYSYMS:
-                handlers[key] = self._handle_return
-
-        if not binds:
-            return handlers
+            handlers = {key: self._handle_return for key in ENTER_KEYSYMS}
+            return (binds | handlers) if binds else handlers  # noqa
         else:
-            return binds | handlers  # noqa
+            return binds
 
+    @event_handler('<<TreeviewOpen>>')
     def _handle_node_opened(self, event: Event):
         iid = self.tree_view.focus()
-        # node = self._iid_node_map.get(iid)
-        # log.debug(f'_handle_node_opened: {event}, {iid=}, {node=}', extra={'color': 10})
+        # log.debug(f'_handle_node_opened: {event}, {iid=}, node={self._iid_node_map.get(iid)}', extra={'color': 10})
         if not self._submitted:  # Prevent enter used to submit from toggling open status
             self._iid_open_map[iid] = True
 
+    @event_handler('<<TreeviewClose>>')
     def _handle_node_closed(self, event: Event):
         iid = self.tree_view.focus()
-        # node = self._iid_node_map.get(iid)
-        # log.debug(f'_handle_node_closed: {event}, {iid=}, {node=}', extra={'color': 11})
+        # log.debug(f'_handle_node_closed: {event}, {iid=}, node={self._iid_node_map.get(iid)}', extra={'color': 11})
         if not self._submitted:  # Prevent enter used to submit from toggling open status
             self._iid_open_map[iid] = False
 
+    @event_handler('<KeyPress-Shift_L>', '<KeyRelease-Shift_L>', '<KeyPress-Shift_R>', '<KeyRelease-Shift_R>')
     def _handle_shift(self, event: Event):
         # This event won't be triggered until the first time the tree view event receives focus
         # log.debug(f'_handle_shift: {event}, {event.__dict__}')
         # Shift_L = 65505, Shift_R = 65506; type = EventType.KeyPress (2) or EventType.KeyRelease (3)
         self.__shift_is_active[event.keysym_num - 65505] = event.type == EventType.KeyPress
+        # TODO: Expand/contract multi-selection when holding shift and pressing up/down
 
     def _handle_return(self, event: Event):
         # log.debug(f'_handle_return: {event}', extra={'color': 9})
@@ -337,6 +328,7 @@ class Tree(BaseTree[N]):
 class PathTree(BaseTree[PathNode]):
     _root: RootPathNode | PathNode
     _pt_config: PathTreeConfig
+    _key_node_map: dict[Path, PathNode]
 
     def __init__(
         self,
@@ -345,6 +337,7 @@ class PathTree(BaseTree[PathNode]):
         *,
         files: bool = True,
         dirs: bool = True,
+        save_as: bool = False,
         root_changed_cb: Callable[[Path], ...] = None,
         selection_changed_cb: Callable[[list[PathNode]], ...] = None,
         **kwargs,
@@ -359,6 +352,7 @@ class PathTree(BaseTree[PathNode]):
         self._selection_changed_cb = selection_changed_cb
         self._files = files
         self._dirs = dirs
+        self._save_as = save_as
 
     @property
     def value(self) -> list[Path]:
@@ -380,10 +374,10 @@ class PathTree(BaseTree[PathNode]):
         if not path_or_name:
             if iids := self.tree_view.selection():
                 self.tree_view.selection_remove(*iids)
-        elif nodes := self._find_nodes(path_or_name):
+        elif nodes := self._find_nodes_by_names(path_or_name):
             self.tree_view.selection_set(*(node.iid for node in nodes))
 
-    def _find_nodes(self, path_or_name: str | Path | Collection[str | Path]):
+    def _find_nodes_by_names(self, path_or_name: str | Path | Collection[str | Path]):
         if isinstance(path_or_name, (str, Path)):
             path_or_name = (path_or_name,)
 
@@ -429,6 +423,8 @@ class PathTree(BaseTree[PathNode]):
         # calling this method
         self._root = node
         self._insert_nodes(self._root.children.values())
+        if iid := next(iter(self._iid_node_map), None):
+            self._set_focus_on_iid(iid)
         if self._root_changed_cb is not None:
             self._root_changed_cb(self._root.key)
 
@@ -440,15 +436,6 @@ class PathTree(BaseTree[PathNode]):
 
     # region Event Handling
 
-    def _prepare_binds(self, binds: BindMapping | None, enter_submits: bool = False):
-        binds = super()._prepare_binds(binds, enter_submits)
-        handlers = {
-            '<<TreeviewSelect>>': self._handle_node_selected,
-            '<Double-1>': self._handle_double_click,
-            '<space>': self._handle_chdir,
-        }
-        return binds | handlers
-
     def _get_selected_node(self, action: str) -> PathNode | None:
         nodes = self._get_selected_nodes()
         if len(nodes) == 1:
@@ -459,7 +446,6 @@ class PathTree(BaseTree[PathNode]):
 
     def _selection_is_submissible(self) -> bool:
         # Note: single/multiple is handled via select_mode
-        # TODO: Improve this and/or return handling so SaveAs can use enter to chdir
         if self._pt_config.files and self._pt_config.dirs:
             return True
         elif self._pt_config.files:
@@ -467,6 +453,7 @@ class PathTree(BaseTree[PathNode]):
         else:
             return all(node.is_dir for node in self._get_selected_nodes())
 
+    @event_handler('<<TreeviewSelect>>')
     def _handle_node_selected(self, event: Event):
         """
         This event is triggered by many conditions:
@@ -483,6 +470,7 @@ class PathTree(BaseTree[PathNode]):
             if self._selection_changed_cb is not None:
                 self._selection_changed_cb(nodes)
 
+    @event_handler('<Double-1>')
     def _handle_double_click(self, event: Event):
         if node := self._get_selected_node('double-click'):
             if node.is_dir:
@@ -491,10 +479,36 @@ class PathTree(BaseTree[PathNode]):
                 self._submitted = True
                 self.trigger_interrupt(event)
 
+    @event_handler('<space>')
     def _handle_chdir(self, event: Event):
         """Triggered by space"""
         if node := self._get_selected_node(f'chdir via {event}'):
             if node.is_dir:
                 self._promote_to_root(node)
+
+    def _handle_return(self, event: Event):
+        # log.debug(f'_handle_return: {event}', extra={'color': 9})
+        if self._save_as and (node := self._get_selected_node('enter')) and node.is_dir and node.key != self.root_dir:
+            self._promote_to_root(node)
+        else:
+            super()._handle_return(event)
+
+    @event_handler('<Key>')
+    def _handle_any_key(self, event: Event):
+        # TODO: Handle multi-char prefixes - need to store keys discovered so far + capture timing; ~0.4s window for
+        #  grouping key presses seems acceptable, but it should be configurable
+        # log.debug(f'Handling key press {event=}')
+        key = event.char
+        if not key or not key.isprintable():
+            return
+
+        keys = (key.lower(), key.upper())
+        for path, node in self._key_node_map.items():
+            if path.name.startswith(keys) and (not node.parent_iid or self._iid_open_map.get(node.parent_iid, False)):
+                # log.debug(f'Setting selection for {key=} to {node}')
+                self._set_focus_on_iid(node.iid)
+                break
+        # else:
+        #     log.debug(f'No matching path found for {key=} from {event=}')
 
     # endregion

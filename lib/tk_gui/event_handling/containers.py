@@ -118,11 +118,11 @@ class BindMap(MutableMapping['Bindable', list['BindTarget']]):
                 for key, val in binds.items():
                     self._set(key, val, add)
 
-    def update(self, binds: BindMapping | BindMap = None, **kwargs: AnyBindTarget):
+    def update(self, binds: BindMapping | BindMap | None = None, **kwargs: AnyBindTarget):
         """Update this BindMap with the given new targets, replacing any existing target callbacks."""
         self._update(binds, kwargs, False)
 
-    def update_add(self, binds: BindMapping | BindMap = None, **kwargs: AnyBindTarget):
+    def update_add(self, binds: BindMapping | BindMap | None = None, **kwargs: AnyBindTarget):
         """Update this BindMap with the given new targets, extending any existing target callbacks."""
         self._update(binds, kwargs, True)
 

@@ -14,14 +14,14 @@ from typing import TYPE_CHECKING, Any, Callable, Generic, Iterator, Type, TypeVa
 from tk_gui.caching import cached_property
 from tk_gui.enums import BindEvent
 from .containers import BindMap
-from .mixins import CustomEventResultsMixin
+from .mixins import BindMixin, CustomEventResultsMixin
 
 if TYPE_CHECKING:
     from tkinter import Event
     from tk_gui.elements.buttons import Button
-    from tk_gui.typing import BindCallback, ButtonEventCB
+    from tk_gui.typing import BindCallback, BindMapping, ButtonEventCB
 
-__all__ = ['event_handler', 'button_handler', 'HandlesEvents']
+__all__ = ['event_handler', 'button_handler', 'HandlesEvents', 'HandlesBindEvents']
 log = logging.getLogger(__name__)
 
 _stack = ContextVar('tk_gui.event_handling.stack', default=[])
@@ -212,3 +212,20 @@ class HandlesEvents(metaclass=HandlesEventsMeta):
 
         log.debug(f'No button handlers found for {key=}: {self._button_handler_map=}')
         return None
+
+
+class HandlesBindEvents(BindMixin, HandlesEvents):
+    @property
+    def binds(self) -> BindMap:
+        if (binds := self._binds) is None:
+            self._binds = binds = self.event_handler_binds() if self._event_handlers_ else BindMap()
+        return binds
+
+    @binds.setter
+    def binds(self, value: BindMapping | BindMap | None):
+        if self._event_handlers_:
+            self._binds = binds = self.event_handler_binds()
+            if value:
+                binds.update_add(value)
+        else:
+            self._binds = value if isinstance(value, BindMap) else BindMap(value)

@@ -30,7 +30,7 @@ class GuiPopupTest(Command):
             log_fmt = '%(asctime)s %(levelname)s %(name)s %(lineno)d %(message)s' if self.verbose > 1 else '%(message)s'
             logging.basicConfig(level=logging.DEBUG if self.verbose else logging.INFO, format=log_fmt)
         else:
-            init_logging(self.verbose, log_path=None, names=None, entry_fmt=ENTRY_FMT_DETAILED)
+            init_logging(self.verbose, log_path=None, names=None, entry_fmt=ENTRY_FMT_DETAILED, millis=True)
 
         log.debug(f'Popup Test using tcl version: {tcl_version()}')
 

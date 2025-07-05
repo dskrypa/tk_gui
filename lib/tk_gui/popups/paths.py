@@ -107,6 +107,8 @@ class PathPopup(Popup):
 
     # endregion
 
+    # region Build Layout
+
     def get_pre_window_layout(self) -> Layout:
         places_frame = Frame(self._build_places_layout(), anchor='ne')
         picker_frame = Frame(self._build_picker_layout())
@@ -156,11 +158,9 @@ class PathPopup(Popup):
         yield [*self._nav_buttons.values(), VerticalSeparator(), self._path_field]
         yield [self._path_tree]
 
-    # region Event Handling
+    # endregion
 
-    # @event_handler('<Key>')
-    # def _handle_any(self, event):
-    #     log.info(f'Event: {event}')
+    # region Event Handling
 
     # region History / Parent Navigation Handlers
 
@@ -181,7 +181,7 @@ class PathPopup(Popup):
     def _handle_up(self, event=None, key=None):
         self._path_tree.root_dir = self._path_tree.root_dir.parent
 
-    @event_handler('<F5>')
+    @event_handler('<F5>', '<Control-r>')
     @button_handler('refresh')
     def _handle_refresh(self, event=None, key=None):
         self._path_tree.root_dir = self._path_tree.root_dir
@@ -420,7 +420,7 @@ class SaveAs(PathPopup):
         return EButton(self._submit_text, key='submit', side='right')
 
     def _path_tree_kwargs(self) -> dict[str, Any]:
-        return {'selection_changed_cb': self._handle_selection_changed, 'include_children': False}
+        return {'selection_changed_cb': self._handle_selection_changed, 'include_children': False, 'save_as': True}
 
     def _build_base_picker_layout(self) -> Layout:
         yield from super()._build_base_picker_layout()

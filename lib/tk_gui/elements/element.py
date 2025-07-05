@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any, Callable, overload
 
 from tk_gui.caching import ClearableCachedPropertyMixin, cached_property
 from tk_gui.enums import StyleState, Anchor, Justify, Side, BindTargets
-from tk_gui.event_handling import BindMixin
+from tk_gui.event_handling import HandlesBindEvents
 from tk_gui.pseudo_elements.tooltips import ToolTip
 from tk_gui.styles import Style, StyleLayer
 from tk_gui.utils import Inheritable, call_with_popped, extract_style
@@ -233,7 +233,7 @@ class ElementBase(ClearableCachedPropertyMixin, ABC):
     # endregion
 
 
-class Element(BindMixin, ElementBase, ABC):
+class Element(HandlesBindEvents, ElementBase, ABC):
     _key: Key | None = None
     _tooltip: ToolTip | None = None
     _pack_settings: dict[str, Any] = None
