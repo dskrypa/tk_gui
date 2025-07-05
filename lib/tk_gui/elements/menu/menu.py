@@ -10,10 +10,10 @@ import logging
 from abc import ABC, abstractmethod
 from functools import partial
 from tkinter import Event, BaseWidget, Menu as TkMenu
-from typing import TYPE_CHECKING, Optional, Union, Type, Any, Sequence, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, Sequence, Type, TypeVar
 
 from tk_gui.event_handling import CustomEventResultsMixin
-from ..element import ElementBase
+from ..element import ElementBase, Element
 from ..exceptions import CallbackError, CallbackAlreadyRegistered, NoCallbackRegistered
 from .._utils import normalize_underline
 from .utils import MenuMode, MenuModeCallback, Mode, ContainerMixin, MenuMeta
@@ -21,7 +21,7 @@ from .utils import get_current_menu_group, wrap_menu_cb, find_member, copy_menu_
 
 if TYPE_CHECKING:
     from tk_gui.popups.base import PopupMixin
-    from tk_gui.pseudo_elements import Row
+    from tk_gui.pseudo_elements.row import Row, RowBase
     from tk_gui.typing import Bool, XY, EventCallback, ProvidesEventCallback, Top, HasFrame
 
 __all__ = ['MenuEntry', 'MenuItem', 'MenuGroup', 'Menu', 'CustomMenuItem', 'MenuProperty']
@@ -49,7 +49,7 @@ class MenuEntry(ABC):
     def __init__(
         self,
         label: str = None,
-        underline: Union[str, int] = None,
+        underline: str | int = None,
         enabled: Mode = MenuMode.ALWAYS,
         show: Mode = MenuMode.ALWAYS,
         keyword: str = None,
@@ -91,14 +91,14 @@ class MenuEntry(ABC):
         return copy_menu_obj(self, None)
 
     @property
-    def root_menu(self) -> Optional[Menu]:
+    def root_menu(self) -> Menu | None:
         parent = self.parent
         if parent is None or isinstance(parent, Menu):
             return parent
         return parent.parent
 
     @property
-    def underline(self) -> Optional[int]:
+    def underline(self) -> int | None:
         # TODO: Register underlined char to activate when combined with [Alt] & ensure no conflicts exist
         return normalize_underline(self._underline, self.label)
 
@@ -142,7 +142,7 @@ class MenuItem(MenuEntry):
         label: str,
         callback: EventCallback | ProvidesEventCallback | Type[PopupMixin] = None,
         *,
-        underline: Union[str, int] = None,
+        underline: str | int = None,
         enabled: Mode = MenuMode.ALWAYS,
         show: Mode = None,
         keyword: str = None,
@@ -266,7 +266,7 @@ class MenuGroup(ContainerMixin, MenuEntry):
     __slots__ = ('members', 'hide_if_disabled')
 
     def __init__(
-        self, label: Optional[str], underline: Union[str, int] = None, hide_if_disabled: Bool = True, **kwargs
+        self, label: str | None, underline: str | int = None, hide_if_disabled: Bool = True, **kwargs
     ):
         """
         :param label: The label to be displayed for this menu entry.
@@ -277,7 +277,7 @@ class MenuGroup(ContainerMixin, MenuEntry):
         """
         # TODO: Add a way to define a menu more like a Window's layout?
         super().__init__(label, underline, **kwargs)
-        self.members: list[Union[MenuEntry, MenuItem, MenuGroup]] = []
+        self.members: list[MenuMember] = []
         self.hide_if_disabled = hide_if_disabled
 
     def __repr__(self) -> str:
@@ -325,13 +325,17 @@ class MenuGroup(ContainerMixin, MenuEntry):
         return True
 
 
+MenuMember = MenuEntry | MenuItem | MenuGroup
+
+
 class Menu(CustomEventResultsMixin, ContainerMixin, ElementBase, metaclass=MenuMeta, base_style_layer='menu'):
     """A menu bar or right-click menu"""
 
     widget: TkMenu
-    members: Sequence[Union[MenuEntry, MenuItem, MenuGroup]]
+    parent: RowBase | HasFrame | Element | None
+    members: Sequence[MenuMember]
 
-    def __init__(self, members: Sequence[Union[MenuEntry, MenuItem, MenuGroup]] = None, cb_inst=None, **kwargs):
+    def __init__(self, members: Sequence[MenuMember] = None, cb_inst=None, **kwargs):
         """
         :param members: A sequence of menu entries that should be used as members in this menu.  Not required if this
           menu is defined as a class with groups / items defined as class members.
@@ -427,5 +431,5 @@ class MenuProperty(Generic[M]):
             return self
         return self.menu_cls(cb_inst=instance)
 
-    def __getitem__(self, index_or_label: int | str) -> Union[MenuEntry, MenuItem, MenuGroup]:
+    def __getitem__(self, index_or_label: int | str) -> MenuMember:
         return find_member(self.menu_cls.members, index_or_label)
