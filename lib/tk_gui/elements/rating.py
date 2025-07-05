@@ -7,8 +7,7 @@ Tkinter GUI Rating Element
 from __future__ import annotations
 
 import logging
-from tkinter import Event
-from typing import TYPE_CHECKING, Optional, Iterator, Callable, Literal, Union
+from typing import TYPE_CHECKING, Callable, Iterator, Literal
 
 from PIL.Image import Image as PILImage, new as new_image
 
@@ -19,6 +18,8 @@ from .images import Image
 from .text import Text, Input
 
 if TYPE_CHECKING:
+    from tkinter import Event
+
     from ..typing import Bool, XY
     from .element import Element
 
@@ -53,7 +54,7 @@ class Rating(InteractiveRowFrame):
         self._button_down = False
         self._change_cb = change_cb
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f'<{self.__class__.__name__}({self.rating}, key={self._key!r}, {self._show_value=}, {self.disabled=})>'
 
     # @property
@@ -78,8 +79,8 @@ class Rating(InteractiveRowFrame):
     @property
     def color(self) -> Color:
         if (color := self._color) != 'mix':
-            return color
-        return 'gold' if self.rating else 'black'  # noqa
+            return color  # noqa
+        return 'gold' if self.rating else 'black'
 
     @cached_property
     def _star_images(self) -> dict[Color, dict[FillAmount, PILImage]]:
@@ -92,7 +93,7 @@ class Rating(InteractiveRowFrame):
             color: {name: icons.draw(icon, color=rgb, bg='#ffffff00') for name, icon in names.items()}
             for color, rgb in colors.items()
         }
-        return images
+        return images  # noqa
 
     def _iter_star_images(self) -> Iterator[PILImage]:
         images = self._star_images[self.color]
@@ -116,7 +117,7 @@ class Rating(InteractiveRowFrame):
     # endregion
 
     @cached_property
-    def rating_input(self) -> Optional[Input]:
+    def rating_input(self) -> Input | None:
         if not self._show_value:
             return None
         return Input(self._rating, disabled=self.disabled, size=(5, 1), tooltip=self.tooltip_text)
@@ -228,7 +229,7 @@ class Rating(InteractiveRowFrame):
 
 
 def star_fill_counts(
-    rating: Union[int, float], out_of: int = 10, num_stars: int = 5, half=None
+    rating: int | float, out_of: int = 10, num_stars: int = 5, half=None
 ) -> tuple[int, int, int]:
     if out_of < 1:
         raise ValueError('out_of must be > 0')
@@ -243,7 +244,7 @@ def star_fill_counts(
     return filled, half, empty
 
 
-def stars_to_256(rating: Union[int, float], out_of: int = 5) -> Optional[int]:
+def stars_to_256(rating: int | float, out_of: int = 5) -> int | None:
     """
     This implementation uses the same values specified in the following link, except for 1 star, which uses 15
     instead of 1: https://en.wikipedia.org/wiki/ID3#ID3v2_rating_tag_issue
