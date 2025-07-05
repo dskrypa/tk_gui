@@ -18,7 +18,7 @@ from ..config import GuiConfig, WindowConfigProperty
 from ..elements.menu import Menu
 from ..enums import BindTargets, Anchor, Justify, Side, BindEvent, CallbackAction, DisplayServer
 from ..environment import DISPLAY_SERVER, ON_LINUX, ON_WINDOWS
-from ..event_handling import BindMixin, BindMapping, BindMap, BindManager
+from ..event_handling import BindMixin, BindMap, BindManager
 from ..event_handling.decorators import delayed_event_handler, _tk_event_handler
 from ..event_handling.utils import ENTER_KEYSYMS, MotionTracker, Interrupt
 from ..exceptions import DuplicateKeyError
@@ -35,8 +35,8 @@ if TYPE_CHECKING:
     from PIL.Image import Image as PILImage
     from ..elements.element import Element, ElementBase
     from ..styles.typing import StyleSpec
-    from ..typing import XY, BindCallback, EventCallback, Key, BindTarget, Bindable, Layout, Bool, HasValue
-    from ..typing import TkContainer, GrabAnywhere, Top, PathLike
+    from ..typing import XY, BindCallback, BindMapping, EventCallback, Key, BindTarget, Bindable, Layout, Bool
+    from ..typing import HasValue, TkContainer, GrabAnywhere, Top, PathLike
 
 __all__ = ['Window']
 log = logging.getLogger(__name__)

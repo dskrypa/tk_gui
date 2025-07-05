@@ -62,7 +62,7 @@ class ViewWindowInitializer(HandlesEvents, ABC):
 
     def __init__(
         self,
-        parent: Union[ViewWindowInitializer, Window] = _NotSet,
+        parent: ViewWindowInitializer | Window = _NotSet,
         *,
         title: str = None,
         config_name: str = None,

@@ -5,26 +5,24 @@ Containers for events to bind to callbacks, and to store resulting function IDs 
 from __future__ import annotations
 
 from collections.abc import MutableMapping, ItemsView, KeysView, ValuesView, Iterable
-from typing import TYPE_CHECKING, Any, Mapping, Collection, Iterator, Union
+from typing import TYPE_CHECKING, Any, Collection, Iterator, Mapping
 
-from tk_gui.typing import BindCallback, Bindable, BindTarget, Bool
 from tk_gui.widgets.utils import unbind
 
 if TYPE_CHECKING:
     from tkinter import BaseWidget
+    from tk_gui.typing import AnyBindTarget, BindCallback, Bindable, BindMapping, BindTarget, Bool
 
 __all__ = ['BindMap', 'BindManager']
 
 _NotSet = object()
-_BindVal = Union[BindTarget, Collection[BindTarget]]
-BindMapping = Mapping[Bindable, _BindVal]
 
 
-class BindMap(MutableMapping[Bindable, list[BindTarget]]):
+class BindMap(MutableMapping['Bindable', list['BindTarget']]):
     __slots__ = ('_data',)
     _data: dict[Bindable, list[BindTarget]]
 
-    def __init__(self, binds: BindMapping | BindMap = None, **kwargs: _BindVal):
+    def __init__(self, binds: BindMapping | BindMap = None, **kwargs: AnyBindTarget):
         self._data = {}
         self._update(binds, kwargs, True)
 
@@ -93,7 +91,7 @@ class BindMap(MutableMapping[Bindable, list[BindTarget]]):
             for callback in callbacks:
                 yield key, callback
 
-    def _set(self, key: Bindable, value: _BindVal, add: Bool = True):
+    def _set(self, key: Bindable, value: AnyBindTarget, add: Bool = True):
         match value:
             case str():
                 self.add(key, value, add)
@@ -108,7 +106,7 @@ class BindMap(MutableMapping[Bindable, list[BindTarget]]):
         else:
             self._data[key] = [target]
 
-    def extend(self, key: Bindable, targets: Collection[BindTarget], add: Bool = True):
+    def extend(self, key: Bindable, targets: Iterable[BindTarget], add: Bool = True):
         if add:
             self._data.setdefault(key, []).extend(targets)
         else:
@@ -120,11 +118,11 @@ class BindMap(MutableMapping[Bindable, list[BindTarget]]):
                 for key, val in binds.items():
                     self._set(key, val, add)
 
-    def update(self, binds: BindMapping | BindMap = None, **kwargs: _BindVal):
+    def update(self, binds: BindMapping | BindMap = None, **kwargs: AnyBindTarget):
         """Update this BindMap with the given new targets, replacing any existing target callbacks."""
         self._update(binds, kwargs, False)
 
-    def update_add(self, binds: BindMapping | BindMap = None, **kwargs: _BindVal):
+    def update_add(self, binds: BindMapping | BindMap = None, **kwargs: AnyBindTarget):
         """Update this BindMap with the given new targets, extending any existing target callbacks."""
         self._update(binds, kwargs, True)
 

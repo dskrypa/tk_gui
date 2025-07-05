@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import tkinter.constants as tkc
 from abc import abstractmethod
-from typing import TYPE_CHECKING, Protocol, TypeVar, Any, Union, Callable, Iterable, Optional, runtime_checkable
-from typing import Hashable, Literal
+from typing import TYPE_CHECKING, Any, Callable, Collection, Hashable, Iterable, Protocol, TypeVar, runtime_checkable
+from typing import Literal, Mapping, Union
 
 if TYPE_CHECKING:
     from pathlib import Path  # noqa
@@ -40,6 +40,8 @@ ButtonEventCB = Callable[['Event', 'Key'], Union['CallbackAction', None]]
 TraceCallback = Callable[[str, str, str], Any]
 Bindable = Union['BindEvent', str]
 BindTarget = Union[BindCallback, EventCallback, ButtonEventCB, 'BindTargets', str, None]
+AnyBindTarget = BindTarget | Collection[BindTarget]
+BindMapping = Mapping[Bindable, AnyBindTarget]
 
 AnyEle = Union['ElementBase', 'Element']
 E = TypeVar('E', bound=AnyEle)
@@ -47,11 +49,11 @@ ElementRow = Iterable[E]
 Key = Hashable
 
 PathLike = Union['Path', str]
-OptStr = Optional[str]
+OptStr = str | None
 IterStrs = Iterable[str]
-OptInt = Optional[int]
-OptFloat = Optional[float]
-Bool = Union[bool, Any]
+OptInt = int | None
+OptFloat = float | None
+Bool = bool | Any
 XY = tuple[int, int]
 OptXY = tuple[OptInt, OptInt]
 OptXYF = tuple[OptFloat, OptFloat]

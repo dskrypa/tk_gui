@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any, Callable, overload
 
 from tk_gui.caching import ClearableCachedPropertyMixin, cached_property
 from tk_gui.enums import StyleState, Anchor, Justify, Side, BindTargets
-from tk_gui.event_handling import BindMixin, BindMapping
+from tk_gui.event_handling import BindMixin
 from tk_gui.pseudo_elements.tooltips import ToolTip
 from tk_gui.styles import Style, StyleLayer
 from tk_gui.utils import Inheritable, call_with_popped, extract_style
@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from tkinter import Widget, Event, BaseWidget
     from tk_gui.pseudo_elements.row import RowBase
     from tk_gui.styles.typing import StyleSpec, Layer
-    from tk_gui.typing import XY, Bool, BindCallback, Key, TkFill, BindTarget, HasFrame, TkContainer
+    from tk_gui.typing import XY, Bool, BindCallback, BindMapping, Key, TkFill, BindTarget, HasFrame, TkContainer
     from tk_gui.window import Window
     from .menu import Menu
 
@@ -60,7 +60,7 @@ class ElementBase(ClearableCachedPropertyMixin, ABC):
     #  https://www.tcl-lang.org/man/tcl8.6.14/TkCmd/options.htm#M-padx
     #  https://www.tcl-lang.org/man/tcl8.6.14/TkCmd/pack.htm#M17
 
-    side: Side = Inheritable('element_side', type=Side)
+    side: Side = Inheritable('element_side', type=Side)  # Used during packing - side of container to pack against
     style: Style = Inheritable(type=Style.get_style)
 
     def __init_subclass__(cls, base_style_layer: Layer = None, **kwargs):
@@ -296,9 +296,8 @@ class Element(BindMixin, ElementBase, ABC):
             self.binds.add('<ButtonRelease-3>', self.handle_right_click, add=True)
 
     def __repr__(self) -> str:
-        size, visible = self.size, self._visible
         key_str = f'key={self._key!r}' if self._key else ''
-        return f'<{self.__class__.__name__}[id={self.id}, {key_str}{size=}, {visible=}]>'
+        return f'<{self.__class__.__name__}[id={self.id}, {key_str}size={self.size!r}, visible={self._visible!r}]>'
 
     @property
     def key(self) -> Key:
@@ -335,7 +334,7 @@ class Element(BindMixin, ElementBase, ABC):
         if focus:
             self.parent.window.maybe_set_focus(self)
 
-    def _pack_widget(self, widget: Widget, expand: bool, fill: TkFill, kwargs: dict[str, Any]):
+    def _pack_widget(self, widget: Widget, expand: bool | None, fill: TkFill, kwargs: dict[str, Any]):
         if expand is None:
             expand = self.expand
         if fill is None:

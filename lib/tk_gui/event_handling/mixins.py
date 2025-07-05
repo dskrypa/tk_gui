@@ -11,10 +11,10 @@ from typing import TYPE_CHECKING, Any
 
 from tk_gui.enums import BindTargets
 from tk_gui.widgets.utils import unbind
-from .containers import BindMap, BindMapping
+from .containers import BindMap
 
 if TYPE_CHECKING:
-    from tk_gui.typing import Bindable, BindTarget, Bool
+    from tk_gui.typing import Bindable, BindMapping, BindTarget, Bool
 
 __all__ = ['BindMixin', 'CustomEventResultsMixin']
 log = logging.getLogger(__name__)
@@ -51,7 +51,7 @@ class BindMixin:
             return
         # log.debug(f'Binding event={event_pat!r} on widget={self._bind_widget!r} to {cb=} for {self}')
         try:
-            func_id = self._bind_widget.bind(event_pat, cb, add=add)
+            self._bind_widget.bind(event_pat, cb, add=add)  # returns a function id that can be used to unbind it
         except (TclError, RuntimeError) as e:
             log.error(f'Unable to bind event={event_pat!r}: {e}')
             # self._bind_widget.unbind_all(event_pat)

@@ -179,6 +179,8 @@ class HandlesEvents(metaclass=HandlesEventsMeta):
         return cls.__class__.event_handler_binds(cls, self)
 
     def button_handler_binds(self) -> BindMap:
+        # This method is not called outside this module because when button handlers are defined,
+        # `HandlesEventsMeta.__new__` adds a single event handler targeting `_handle_button_clicked_` in this class
         cls: HandlesEventsMeta = self.__class__
         return cls.__class__.button_handler_binds(cls, self)
 
@@ -192,13 +194,13 @@ class HandlesEvents(metaclass=HandlesEventsMeta):
         button_cls: Type[Button] = CustomEventResultsMixin._fqn_cls_map['tk_gui.elements.buttons.Button']
         button: Button = button_cls.get_result(event)
         key = button.key
-        if handlers := self._find_handlers(key):
+        if handlers := self._find_button_handlers(key):
             window = button.window
             for handler in handlers:
                 result = handler(event, key)
                 window._handle_callback_action(result, event, button)
 
-    def _find_handlers(self, key):
+    def _find_button_handlers(self, key):
         try:
             return self._button_handler_map[key]  # noqa
         except KeyError:

@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Any
 from PIL.ImageTk import PhotoImage
 
 from tk_gui.enums import Justify, Anchor, Compound
-from tk_gui.event_handling import ENTER_KEYSYMS, BindMap, BindMapping, CustomEventResultsMixin
+from tk_gui.event_handling import ENTER_KEYSYMS, BindMap, CustomEventResultsMixin
 from tk_gui.images.wrapper import SourceImage, ResizedImage
 from tk_gui.utils import Inheritable
 from .element import Interactive
@@ -25,7 +25,7 @@ from .mixins import DisableableMixin
 if TYPE_CHECKING:
     from PIL.Image import Image as PILImage
     from ..styles.style import Style
-    from ..typing import XY, BindCallback, Bool, ImageType, Key, TkContainer, OptStr, IterStrs
+    from ..typing import XY, BindCallback, BindMapping, Bool, ImageType, Key, TkContainer, OptStr, IterStrs
 
 __all__ = ['Button', 'OK', 'Cancel', 'Yes', 'No', 'Submit', 'EventButton']
 log = logging.getLogger(__name__)
