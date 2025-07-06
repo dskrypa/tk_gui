@@ -11,11 +11,12 @@ import logging
 from base64 import b64encode
 from importlib.resources import files
 from io import BytesIO
-from typing import TYPE_CHECKING, Optional, Union, TypeVar, Iterator, Iterable
+from typing import TYPE_CHECKING, TypeVar, Iterator, Iterable
 
 from PIL.Image import Image as PILImage, new as new_image, core as pil_image_core
 from PIL.ImageFont import FreeTypeFont, truetype
 
+from tk_gui.environment import ON_LINUX
 from tk_gui.geometry import Box, Padding
 from .color import color_to_rgb, find_unused_color
 
@@ -32,7 +33,7 @@ ICON_DIR = ICONS_DIR.joinpath('bootstrap')
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 
-Icon = Union[str, int]
+Icon = str | int
 IMG = TypeVar('IMG', bound='ImageType')
 
 _core_draw = pil_image_core.draw
@@ -40,14 +41,24 @@ _core_fill = pil_image_core.fill
 
 
 class Icons:
-    __slots__ = ('font',)
-    _font: Optional[FreeTypeFont] = None
-    _names: Optional[dict[str, int]] = None
+    __slots__ = ('font', '_text_font')
+    font: FreeTypeFont
+    _font: FreeTypeFont | None = None
+    _text_font: FreeTypeFont | None
+    _names: dict[str, int] | None = None
 
-    def __init__(self, size: int = 10):
+    def __init__(self, size: int = 10, text_font: str | None = None):
         if self._font is None:
             self.__class__._font = truetype(ICON_DIR.joinpath('bootstrap-icons.woff2').as_posix())  # noqa
-        self.font: FreeTypeFont = self._font.font_variant(size=size)
+        self.font = self._font.font_variant(size=size)
+        if ON_LINUX and text_font is None:
+            try:
+                self._text_font = truetype('DejaVuSans.ttf', size)
+            except OSError as e:
+                log.warning(f'Unable to load default font: {e}')
+                self._text_font = None
+        else:
+            self._text_font = truetype(text_font, size) if text_font else None
 
     @property
     def char_names(self) -> dict[str, int]:
@@ -97,7 +108,7 @@ class Icons:
           element to be included in a layout.
         """
         font, size = self._font_and_size(size)
-        return draw_icon(size, self._normalize(icon), color_to_rgb(color), color_to_rgb(bg), font)
+        return draw_icon(size, self._normalize(icon), font, color_to_rgb(color), color_to_rgb(bg))
 
     def draw_with_transparent_bg(
         self,
@@ -119,7 +130,7 @@ class Icons:
         font, size = self._font_and_size(size)
         bg, fg = color_to_rgb(bg), color_to_rgb(color)
         for icon in icons:
-            yield draw_icon(size, self._normalize(icon), fg, bg, font), icon
+            yield draw_icon(size, self._normalize(icon), font, fg, bg), icon
 
     def draw_base64(self, *args, **kwargs) -> bytes:
         bio = BytesIO()
@@ -159,8 +170,35 @@ class Icons:
         # expected size to calculate the larger target width/height necessary to produce an image that is as close as
         # possible to the expected size after it has been cropped.
         target_size = Box(*image.getbbox()).scale_size(self._font_and_size(size)[1])
+        # Note about bbox here: `Icons(30).font.getbbox(icons._normalize('house-door'))` => (0, 2, 30, 30)
+        #  but `Icons(30).draw_with_transparent_bg('house-door').getbbox()` => (3, 2, 28, 28)
         image = self.draw(icon, target_size, color, bg)
         return _rotate_and_pad(image.crop(image.getbbox()), bg, rotate_angle, pad)
+
+    def draw_with_text(
+        self,
+        icon: Icon,
+        text: str,
+        fg: Color = BLACK,
+        bg: Color = None,
+        *,
+        transparent_bg: bool = False,
+        it_pad_x: int = 0,  # padding between the image and text along the x-axis
+    ) -> PILImage:
+        # TODO: Add support for padding around the content; separate icon/text sizes
+        fg = color_to_rgb(fg)
+        if transparent_bg:
+            bg = pick_transparent_bg(fg, bg)
+        else:
+            bg = WHITE if bg is None else color_to_rgb(bg)
+
+        icon = self._normalize(icon)
+        iw, ih = self.font.getbbox(icon)[2:]
+        tw, th = self._text_font.getbbox(text)[2:]
+        image: PILImage = new_image('RGBA', (iw + tw + it_pad_x, max(ih, th)), bg)
+        _draw_icon(image, icon, self.font, fg)
+        _draw_icon(image, text, self._text_font, fg, x_offset=iw + it_pad_x)
+        return image
 
 
 def _rotate_and_pad(image: PILImage, bg: RGBA, rotate_angle: int = None, pad: Padding = None) -> PILImage:
@@ -194,7 +232,13 @@ def pick_transparent_bg(fg: Color, bg: Color = None) -> RGBA:
     return bg
 
 
-def draw_icon(size: XY, text: str, fg: RGB | RGBA, bg: RGB | RGBA, font: FreeTypeFont) -> PILImage:
+def draw_icon(
+    size: XY,
+    text: str,
+    font: FreeTypeFont,
+    fg: RGB | RGBA,
+    bg: RGB | RGBA,
+) -> PILImage:
     """
     Optimized version of the following::
 
@@ -204,20 +248,31 @@ def draw_icon(size: XY, text: str, fg: RGB | RGBA, bg: RGB | RGBA, font: FreeTyp
         return image
     """
     # TODO: Automatically detect changes to the functions that this is replacing?
-    image: PILImage = new_image('RGBA', size, bg)
-    draw = _core_draw(image.im, 0)  # This would happen in ImageDraw.__init__, but it does many other unnecessary steps
-    # mode=L is used for the remaining steps, matching the `fontmode` that would be set in __init__,
-    # since `new_image` was called with mode=RGBA
+    return _draw_icon(new_image('RGBA', size, bg), text, font, fg)
 
-    # The remaining steps replace the call to `ImageDraw.text`
+
+def _draw_icon(
+    image: PILImage,
+    text: str,
+    font: FreeTypeFont,
+    fg: RGB | RGBA = (0, 0, 0),
+    x_offset: int = 0,
+) -> PILImage:
+    # ImageDraw.__init__(...):
+    draw = _core_draw(image.im, 0)  # This would happen in ImageDraw.__init__, but it does many other unnecessary steps
+    # self.fontmode = '1' if mode in '1PIF' else 'L' => (font)mode=L used for remaining steps, since RGBA was used above
+
+    # ImageDraw.text(...):
     ink = draw.draw_ink(fg)         # replaces a call to the ImageDraw._getink helper that normalizes to this
-    # The remaining steps replace the `draw_text` function defined inside `ImageDraw.text`
-    # They also replace the call to `FreeTypeFont.getmask2` inside `draw_text`, which defines a `fill` function
-    f_size, offset = font.font.getsize(text, 'L')  # noqa  # replaces a step performed in font.render
-    mask: ImagingCore = _core_fill('L', f_size, 0)  # replaces the `fill` func defined inside `FreeTypeFont.getmask2`
-    font.font.render(
+
+    # ImageDraw.text(...).draw_text: (nested function)
+    # mode = self.fontmode (L); xy = (0, 0) => coord = start = (0, 0)
+    # mask, offset = font.getmask2(...) is used by the original method because `FreeTypeFont.getmask2` exists
+
+    # ImageFont.FreeTypeFont.getmask2(...):
+    mask, offset = font.font.render(       # This step was performed in `PIL.ImageFont.FreeTypeFont.getmask2`
         text,               # text
-        lambda *a: mask,    # noqa  # fill (expects callable that accepts mode(str) + size(2-tuple))
+        _render_fill,       # fill
         'L',                # mode
         None,               # direction
         None,               # features
@@ -226,10 +281,25 @@ def draw_icon(size: XY, text: str, fg: RGB | RGBA, bg: RGB | RGBA, font: FreeTyp
         False,              # stroke_filled (added in 11.2.x)
         None,               # anchor
         ink,                # ink
-        (0, 0),             # Changed from expecting x/y separately in 11.2.x
+        (0, 0),             # start (changed from expecting x/y separately in 11.2.x)
     )
-    draw.draw_bitmap(offset, mask, ink)  # replaces the last line of `draw_text`
+
+    # Back in ImageDraw.text(...).draw_text:
+    coord = (x_offset, offset[1]) if x_offset else offset
+    # The original used `coord = (start[0] + offset[0], start[1] + offset[1])`, but that produces very poor results
+    # for start points != (0, 0)
+    # This will probably only work for drawing a single row of images - refactoring will be necessary to draw a grid
+    # log.info(f'Drawing rendered mask for {text=} with {image.size=}, {x_offset=}, {offset=}, {coord=}, {mask.size=}')
+    draw.draw_bitmap(coord, mask, ink)
     return image
+
+
+def _render_fill(width: int, height: int) -> ImagingCore:
+    # Replaces the `fill` function defined/nested in `PIL.ImageFont.FreeTypeFont.getmask2(...)`
+    # Original uses `'RGBA' if mode == 'RGBA' else 'L'` where mode == ImageDraw.fontmode == 'L' when image mode = RGBA
+    # The width/height passed to this func can also be obtained via `f_size, offset = font.font.getsize(text, 'L')`
+    # The returned value is treated as a mask, and is passed through in `self.font.render(...)`'s return value
+    return _core_fill('L', (width, height))
 
 
 class PlaceholderCache:
@@ -250,7 +320,7 @@ class PlaceholderCache:
             self._cache[size] = image = Icons(size).draw_alpha_cropped(self._icon)
             return image
 
-    def image_or_placeholder(self, image: Optional[IMG], size: XY | float | int) -> IMG | PILImage:
+    def image_or_placeholder(self, image: IMG | None, size: XY | float | int) -> IMG | PILImage:
         """
         :param image: An image or falsey value if a placeholder should be rendered instead
         :param size: The size of the placeholder image that should be rendered for use in place of the missing image

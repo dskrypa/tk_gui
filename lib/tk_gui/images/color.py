@@ -8,19 +8,19 @@ from __future__ import annotations
 
 from colorsys import rgb_to_hls
 from random import randrange
-from typing import TYPE_CHECKING, Union, Optional, Collection
+from typing import TYPE_CHECKING, Collection
 
 from PIL.ImageColor import getrgb
 
 if TYPE_CHECKING:
-    from tk_gui.typing import RGB, HSL, RGBA, Color
+    from tk_gui.typing import RGB, RGBA, Color
 
 __all__ = [
     'color_to_rgb', 'get_hue', 'get_lightness', 'get_saturation', 'pick_fg', 'find_unused_color', 'color_to_rgb_str'
 ]
 
 
-def color_to_rgb(color: Color) -> Union[RGB, RGBA]:
+def color_to_rgb(color: Color) -> RGB | RGBA:
     if isinstance(color, tuple):
         return color
     try:
@@ -38,7 +38,7 @@ def color_to_rgb_str(color: Color) -> str:
     return f'#{r:2x}{g:2x}{b:2x}'
 
 
-def pick_fg(bg: Optional[Color]) -> Optional[str]:
+def pick_fg(bg: Color | None) -> str | None:
     if not bg:
         return None
     try:

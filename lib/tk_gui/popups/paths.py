@@ -65,6 +65,7 @@ class PathPopup(Popup):
 
     @cached_property
     def _icons(self) -> Icons:
+        # return Icons(20)
         return Icons(15)
 
     # region Elements
@@ -130,6 +131,21 @@ class PathPopup(Popup):
 
         # w results in icon centered, text too high; sw results in icon slightly too low, but text properly centered
         kwargs = {'size': (120, 16), 'anchor_info': 'sw'}
+
+        # draw = partial(
+        #     self._icons.draw_with_text,
+        #     fg=WHITE if self.style.is_dark_mode else BLACK,
+        #     transparent_bg=True,
+        #     it_pad_x=10,
+        # )
+        # yield [EButton('', draw('house-door', 'Home'), key='place:home', **kwargs)]
+        # yield [EButton('', draw('window-desktop', 'Desktop'), key='place:desktop', **kwargs)]
+        # yield [EButton('', draw('files', 'Documents'), key='place:documents', **kwargs)]
+        # yield [EButton('', draw('download', 'Downloads'), key='place:downloads', **kwargs)]
+        # yield [EButton('', draw('music-note-beamed', 'Music'), key='place:music', **kwargs)]
+        # yield [EButton('', draw('images', 'Pictures'), key='place:pictures', **kwargs)]
+        # yield [EButton('', draw('film', 'Videos'), key='place:videos', **kwargs)]
+
         draw_icon = partial(self._icons.draw_with_transparent_bg, color=WHITE if self.style.is_dark_mode else BLACK)
         yield [EButton('Home', draw_icon('house-door'), key='place:home', **kwargs)]
         yield [EButton('Desktop', draw_icon('window-desktop'), key='place:desktop', **kwargs)]
