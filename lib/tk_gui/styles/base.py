@@ -1,7 +1,8 @@
 from .colors import BLACK, GREY_L_1, CYAN_0, YLW_L_0, GLD_M_1
 from .style import Style
 
-DEFAULT_FONT = ('Helvetica', 10)
+DEFAULT_FONT_NAME = 'DejaVu Sans'
+DEFAULT_FONT = (DEFAULT_FONT_NAME, 10)
 
 # States: (default, disabled, invalid, active, highlight (may be interpreted as 'selected' for some uses))
 _common = {

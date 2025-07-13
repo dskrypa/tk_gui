@@ -45,7 +45,8 @@ where = ['lib']
 namespaces = false
 
 [tool.setuptools.package-data]
-'tk_gui.icons' = ['bootstrap/*', 'spinners/*', 'exclamation-triangle-yellow.png', 'search.png']
+'tk_gui.data.icons' = ['spinners/*', 'exclamation-triangle-yellow.png', 'search.png']
+'tk_gui.data.fonts' = ['bootstrap/*', 'dejavu/*']
 
 
 [tool.ruff]

@@ -16,7 +16,6 @@ from typing import TYPE_CHECKING, TypeVar, Iterator, Iterable
 from PIL.Image import Image as PILImage, new as new_image, core as pil_image_core
 from PIL.ImageFont import FreeTypeFont, truetype
 
-from tk_gui.environment import ON_LINUX
 from tk_gui.geometry import Box, Padding
 from .color import color_to_rgb, find_unused_color
 
@@ -28,8 +27,9 @@ if TYPE_CHECKING:
 __all__ = ['Icons', 'PlaceholderCache', 'placeholder_icon_cache', 'icon_path']
 log = logging.getLogger(__name__)
 
-ICONS_DIR = files('tk_gui.icons')
-ICON_DIR = ICONS_DIR.joinpath('bootstrap')
+FONTS_DIR = files('tk_gui.data.fonts')
+ICONS_DIR = files('tk_gui.data.icons')
+
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 
@@ -41,24 +41,20 @@ _core_fill = pil_image_core.fill
 
 
 class Icons:
-    __slots__ = ('font', '_text_font')
+    __slots__ = ('font', 'text_font')
     font: FreeTypeFont
+    text_font: FreeTypeFont
     _font: FreeTypeFont | None = None
-    _text_font: FreeTypeFont | None
+    _text_font: FreeTypeFont | None = None
     _names: dict[str, int] | None = None
 
     def __init__(self, size: int = 10, text_font: str | None = None):
         if self._font is None:
-            self.__class__._font = truetype(ICON_DIR.joinpath('bootstrap-icons.woff2').as_posix())  # noqa
+            self.__class__._font = truetype(FONTS_DIR.joinpath('bootstrap/bootstrap-icons.woff2'))  # noqa
+            self.__class__._text_font = truetype(FONTS_DIR.joinpath('dejavu/DejaVuSans.ttf'))  # noqa
+
         self.font = self._font.font_variant(size=size)
-        if ON_LINUX and text_font is None:
-            try:
-                self._text_font = truetype('DejaVuSans.ttf', size)
-            except OSError as e:
-                log.warning(f'Unable to load default font: {e}')
-                self._text_font = None
-        else:
-            self._text_font = truetype(text_font, size) if text_font else None
+        self.text_font = self._text_font.font_variant(size=size)
 
     @property
     def char_names(self) -> dict[str, int]:
@@ -69,7 +65,7 @@ class Icons:
         if self._names is None:
             import json
 
-            with ICON_DIR.joinpath('bootstrap-icons.json').open('r', encoding='utf-8') as f:
+            with FONTS_DIR.joinpath('bootstrap/bootstrap-icons.json').open('r', encoding='utf-8') as f:
                 self.__class__._names = {k: v for k, v in sorted(json.load(f).items())}
 
         return self._names
@@ -194,10 +190,14 @@ class Icons:
 
         icon = self._normalize(icon)
         iw, ih = self.font.getbbox(icon)[2:]
-        tw, th = self._text_font.getbbox(text)[2:]
+        tw, th = self.text_font.getbbox(text)[2:]
+
         image: PILImage = new_image('RGBA', (iw + tw + it_pad_x, max(ih, th)), bg)
+        # While this approach that uses coordinates with `draw.draw_bitmap(...)` is likely more efficient, it may be
+        # easier to use Image.paste with bboxes that are easier to control... or more of the steps in `_draw_icon` may
+        # need to be moved here to more easily control the `coord` values
         _draw_icon(image, icon, self.font, fg)
-        _draw_icon(image, text, self._text_font, fg, x_offset=iw + it_pad_x)
+        _draw_icon(image, text, self.text_font, fg, x_offset=iw + it_pad_x)
         return image
 
 

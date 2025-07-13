@@ -19,7 +19,7 @@ from .layers import StyleLayer, StyleProperty, StyleLayerProperty
 if TYPE_CHECKING:
     from tk_gui.typing import XY
     from .states import StateValues
-    from .typing import StyleStateVal, Layer, StyleOptions, StyleSpec, FinalValue
+    from .typing import StyleStateVal, Layer, StyleOptions, StyleSpec, FinalValue, FontMetric
 
 __all__ = ['Style']
 # log = logging.getLogger(__name__)
@@ -243,6 +243,38 @@ class Style(ClearableCachedPropertyMixin):
 
     # region Font Methods
 
+    def font_metric(self, metric: FontMetric, layer: Layer = 'base', state: StyleStateVal = StyleState.DEFAULT) -> int:
+        """
+        Font metric properties are for the whole font itself and not for individual characters drawn in that font.  In
+        the following definitions, the “baseline” of a font is the horizontal line where the bottom of most letters
+        line up; certain letters, such as lower-case “g”, stick below the baseline.
+
+        Metric names / descriptions:
+
+        :ascent: The amount in pixels that the tallest letter sticks up above the baseline of the font, plus any extra
+          blank space added by the designer of the font.
+        :descent: The largest amount in pixels that any letter sticks down below the baseline of the font, plus any
+          extra blank space added by the designer of the font.
+        :linespace: Returns how far apart vertically in pixels two lines of text using the same font should be placed
+          so that none of the characters in one line overlap any of the characters in the other line.  This is
+          generally the sum of the ascent above the baseline line plus the descent below the baseline.
+        :fixed: True if this is a fixed-width / monospace font; Fase if this is a proportionally-spaced font, where
+          individual characters have different widths.  The widths of control characters, tab characters, and other
+          non-printing characters are not included when calculating this value.
+
+        :param metric: One of `ascent`, `descent`, `linespace`, or `fixed`.
+        :param layer: The style layer containing the font that should be used .
+        :param state: The state of the specified style layer containing the font that should be used.
+        """
+        tk_font: TkFont = getattr(self, layer).tk_font[state]
+        return tk_font.metrics(metric)  # noqa
+
+    def font_metrics(
+        self, layer: Layer = 'base', state: StyleStateVal = StyleState.DEFAULT
+    ) -> dict[FontMetric, int | bool]:
+        tk_font: TkFont = getattr(self, layer).tk_font[state]
+        return tk_font.metrics()  # noqa
+
     def char_height(self, layer: Layer = 'base', state: StyleStateVal = StyleState.DEFAULT) -> int:
         tk_font: TkFont = getattr(self, layer).tk_font[state]
         return tk_font.metrics('linespace')
@@ -253,9 +285,15 @@ class Style(ClearableCachedPropertyMixin):
 
     def measure(self, text: str, layer: Layer = 'base', state: StyleStateVal = StyleState.DEFAULT) -> int:
         """
-        Char widths for the default font::
+        Char widths for the default font (on Windows 10)::
 
             {3: 'I', 6: 'J', 7: 'LTXZ', 8: 'F', 9: 'ABCDEHKNPRSUVY', 10: 'GOQ', 11: 'M', 13: 'W'}
+
+        From the `Tk docs <https://www.tcl-lang.org/man/tcl8.6.14/TkCmd/font.htm>`__::
+
+            The return value is the total width in pixels of text, not including the extra pixels used by highly
+            exaggerated characters such as cursive “f”. If the string contains newlines or tabs, those characters are
+            not expanded or treated specially when measuring the string.
 
         :param text: The text for which the width should be measured.
         :param layer: The style layer containing the font that should be used .

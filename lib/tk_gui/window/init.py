@@ -10,6 +10,7 @@ from ..caching import cached_property
 from ..enums import DisplayServer
 from ..environment import ON_LINUX, DISPLAY_SERVER
 from ..monitors import Monitor, monitor_manager
+from ..styles.fonts import FontLoader
 from ..utils import timer
 from ..widgets.scroll import ScrollableToplevel
 from ..widgets.utils import get_req_size
@@ -54,7 +55,12 @@ class WindowInitializer:
 
     @cached_property
     def monitor(self) -> Monitor | None:
-        x, y = self.position or self.window.position
+        if self.position:  # A specific position was saved or specified - use it
+            x, y = self.position
+        else:  # Otherwise, create the new window on the same screen as the mouse cursor's current location
+            x, y = ensure_tk_is_initialized().root.winfo_pointerxy()
+
+        # log.debug(f'Finding monitor for {x=}, {y=}; {self.position=}, {self.window.position=}')
         if not (monitor := monitor_manager.get_monitor(x, y)):
             log.debug(f'Could not find monitor for pos={x, y}')
         return monitor
@@ -206,6 +212,7 @@ class HiddenRoot:
     tk_load_profile: bool = False
 
     def __init__(self):
+        FontLoader().load()  # This is a one-time step per process, and this class should only be initialized once
         tk_cls = Tk if self.tk_load_profile else NoProfileTk
         # log.debug('Initializing hidden root')
         self.root = root = tk_cls()
@@ -251,9 +258,10 @@ class HiddenRoot:
             self.close()
 
     @classmethod
-    def ensure_tk_is_initialized(cls):
+    def ensure_tk_is_initialized(cls) -> HiddenRoot:
         if cls.__active_hidden_root is None:
             cls.__active_hidden_root = cls()
+        return cls.__active_hidden_root
 
     @classmethod
     def maybe_schedule_close(cls):

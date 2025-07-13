@@ -36,6 +36,7 @@ OptIntVals = Union[OptInt, Mapping[StyleStateVal, OptInt], _OptIntTuple]
 Font = Union[str, tuple[str, int], tuple[str, int, str, ...], None]
 _FontValsTuple = Union[tuple[Font], tuple[(Font,) * 2], tuple[(Font,) * 3], tuple[(Font,) * 4], tuple[(Font,) * 5]]
 FontValues = Union[Font, Mapping[StyleStateVal, Font], _FontValsTuple]
+FontMetric = Literal['ascent', 'descent', 'linespace', 'fixed']
 
 StyleValue = Union[OptStr, OptInt, Font]
 FinalValue = Union[StyleValue, TkFont]

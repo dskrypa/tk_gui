@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any
 from tk_gui.enums import TreeSelectMode
 from tk_gui.event_handling import ENTER_KEYSYMS, event_handler, button_handler
 from tk_gui.images.icons import Icons
+from tk_gui.styles.base import DEFAULT_FONT_NAME
 from tk_gui.styles.colors import BLACK, WHITE
 from ..elements import Button, EventButton as EButton, Input, Text, PathTree, Frame, Spacer
 from ..elements.bars import VerticalSeparator
@@ -103,7 +104,7 @@ class PathPopup(Popup):
             'back': EButton('\u2b9c', key='back', disabled=True),
             'forward': EButton('\u2b9e', key='forward', disabled=True),
             'up': EButton('\u2b9d', key='up', disabled=len(self.initial_dir.resolve().parts) == 1),
-            'refresh': EButton('\u2b6e', key='refresh', font=('Helvetica', 10, 'bold')),
+            'refresh': EButton('\u2b6e', key='refresh', font=(DEFAULT_FONT_NAME, 10, 'bold')),
         }
 
     # endregion
@@ -118,7 +119,7 @@ class PathPopup(Popup):
     def _build_places_layout(self) -> Layout:
         # (disk): hdd-network; hdd-network-fill; hdd; hdd-fill; hdd-stack-fill; hdd-stack; hdd-rack-fill; hdd-rack
         # Bookmarks: bookmark; bookmark-fill; bookmark-star-fill; bookmark-star
-        yield [Text('Places', font=('Helvetica', 12, 'bold'))]
+        yield [Text('Places', font=(DEFAULT_FONT_NAME, 12, 'bold'))]
 
         # kwargs = {'size': (14, 1), 'anchor_info': 'w'}
         # yield [EButton('\U0001f3e0 Home', key='place:home', **kwargs)]
@@ -138,6 +139,7 @@ class PathPopup(Popup):
         #     transparent_bg=True,
         #     it_pad_x=10,
         # )
+        # # TODO: The overall image needs more padding around it
         # yield [EButton('', draw('house-door', 'Home'), key='place:home', **kwargs)]
         # yield [EButton('', draw('window-desktop', 'Desktop'), key='place:desktop', **kwargs)]
         # yield [EButton('', draw('files', 'Documents'), key='place:documents', **kwargs)]
@@ -157,7 +159,7 @@ class PathPopup(Popup):
 
         if self._bookmarks:
             yield [Spacer((120, 8))]
-            yield [Text(self._bookmarks_header, font=('Helvetica', 12, 'bold'))]
+            yield [Text(self._bookmarks_header, font=(DEFAULT_FONT_NAME, 12, 'bold'))]
             icon = draw_icon('bookmark-star')
             for name, path in self._bookmarks.items():
                 if path:
