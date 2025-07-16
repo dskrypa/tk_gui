@@ -41,20 +41,20 @@ _core_fill = pil_image_core.fill
 
 
 class Icons:
-    __slots__ = ('font', 'text_font')
-    font: FreeTypeFont
+    __slots__ = ('icon_font', 'text_font')
+    icon_font: FreeTypeFont
     text_font: FreeTypeFont
-    _font: FreeTypeFont | None = None
+    _icon_font: FreeTypeFont | None = None
     _text_font: FreeTypeFont | None = None
     _names: dict[str, int] | None = None
 
-    def __init__(self, size: int = 10, text_font: str | None = None):
-        if self._font is None:
-            self.__class__._font = truetype(FONTS_DIR.joinpath('bootstrap/bootstrap-icons.woff2'))  # noqa
+    def __init__(self, icon_size: int = 10, text_size: int | None = None):
+        if self._icon_font is None:
+            self.__class__._icon_font = truetype(FONTS_DIR.joinpath('bootstrap/bootstrap-icons.woff2'))  # noqa
             self.__class__._text_font = truetype(FONTS_DIR.joinpath('dejavu/DejaVuSans.ttf'))  # noqa
 
-        self.font = self._font.font_variant(size=size)
-        self.text_font = self._text_font.font_variant(size=size)
+        self.icon_font = self._icon_font.font_variant(size=icon_size)
+        self.text_font = self._text_font.font_variant(size=text_size or icon_size)
 
     @property
     def char_names(self) -> dict[str, int]:
@@ -70,8 +70,10 @@ class Icons:
 
         return self._names
 
-    def change_size(self, size: int):
-        self.font = self.font.font_variant(size=size)
+    def change_size(self, icon_size: int, text_size: int | None = None, *, both: bool = True):
+        self.icon_font = self.icon_font.font_variant(size=icon_size)
+        if both:
+            self.text_font = self.text_font.font_variant(size=text_size or icon_size)
 
     def __getitem__(self, char_name: str) -> str:
         return chr(self.char_names[char_name])
@@ -85,7 +87,7 @@ class Icons:
             return icon  # assume it is a single-character string that matches an already-normalized char
 
     def _font_and_size(self, size: XY = None) -> tuple[FreeTypeFont, XY]:
-        font = self.font
+        font = self.icon_font
         font_size = font.size
         if size and (new_size := max(size)) != font_size:
             font = font.font_variant(size=new_size)
@@ -166,7 +168,7 @@ class Icons:
         # expected size to calculate the larger target width/height necessary to produce an image that is as close as
         # possible to the expected size after it has been cropped.
         target_size = Box(*image.getbbox()).scale_size(self._font_and_size(size)[1])
-        # Note about bbox here: `Icons(30).font.getbbox(icons._normalize('house-door'))` => (0, 2, 30, 30)
+        # Note about bbox here: `Icons(30).icon_font.getbbox(icons._normalize('house-door'))` => (0, 2, 30, 30)
         #  but `Icons(30).draw_with_transparent_bg('house-door').getbbox()` => (3, 2, 28, 28)
         image = self.draw(icon, target_size, color, bg)
         return _rotate_and_pad(image.crop(image.getbbox()), bg, rotate_angle, pad)
@@ -179,7 +181,7 @@ class Icons:
         bg: Color = None,
         *,
         transparent_bg: bool = False,
-        it_pad_x: int = 0,  # padding between the image and text along the x-axis
+        i_pad_x: int = 0,  # padding around the image along the x-axis
     ) -> PILImage:
         # TODO: Add support for padding around the content; separate icon/text sizes
         fg = color_to_rgb(fg)
@@ -189,15 +191,28 @@ class Icons:
             bg = WHITE if bg is None else color_to_rgb(bg)
 
         icon = self._normalize(icon)
-        iw, ih = self.font.getbbox(icon)[2:]
+        iw, ih = self.icon_font.getbbox(icon)[2:]
         tw, th = self.text_font.getbbox(text)[2:]
 
-        image: PILImage = new_image('RGBA', (iw + tw + it_pad_x, max(ih, th)), bg)
+        # TODO: Icon font ascent > text font ascent (typically/always?) at the same font size.  To vertically center
+        #  perfectly, the start position for text xor icon drawings needs to be adjusted.  Again, this will likely be
+        #  significantly easier with Image.paste than with the current implementation.
+
+        # i_asc, i_dsc = self.icon_font.getmetrics()
+        # t_asc, t_dsc = self.text_font.getmetrics()
+        # log.debug(
+        #     f'Drawing {icon=} + {text=} with icon size={iw}x{ih}, {i_asc=}, {i_dsc=};'
+        #     f' text size={tw}x{th}, {t_asc=}, {t_dsc=}'
+        # )
+
+        full_pad_x = i_pad_x * 2
+        image: PILImage = new_image('RGBA', (iw + tw + full_pad_x, max(ih, th)), bg)
+        # log.debug(f'Created blank image with size={image.size}')
         # While this approach that uses coordinates with `draw.draw_bitmap(...)` is likely more efficient, it may be
         # easier to use Image.paste with bboxes that are easier to control... or more of the steps in `_draw_icon` may
         # need to be moved here to more easily control the `coord` values
-        _draw_icon(image, icon, self.font, fg)
-        _draw_icon(image, text, self.text_font, fg, x_offset=iw + it_pad_x)
+        _draw_icon(image, icon, self.icon_font, fg, x_offset=i_pad_x)
+        _draw_icon(image, text, self.text_font, fg, x_offset=iw + full_pad_x)
         return image
 
 

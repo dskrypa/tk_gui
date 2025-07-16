@@ -303,7 +303,7 @@ class IconSourceImage(SourceImage):
         self._bg = bg
         self._popup_size = popup_size
         if image is None:
-            size = int(icons.font.size)
+            size = int(icons.icon_font.size)
             image = icons.draw(icon, (size, size), color=color, bg=bg)
         super().__init__(image)
 
