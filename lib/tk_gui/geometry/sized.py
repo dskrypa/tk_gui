@@ -58,10 +58,20 @@ class Resizable(Sized, ABC):
     def new_aspect_ratio_size(self, width: float, height: float) -> Size:
         """Copied logic from :meth:`PIL.Image.Image.thumbnail`"""
         x, y = floor(width), floor(height)
+        # A "vertical" rectangle has width < height; ar < 1
+        # A "horizontal" rectangle has width > height; ar > 1
         try:
             if x / y >= self.aspect_ratio:
+                # This rectangle is vertical and the specified dimensions would be for a horizontal rectangle or a
+                # vertical rectangle with a relatively shorter height than this one.  To fit within that size, the
+                # provided height is used, but a new width is calculated such that this rectangle's aspect ratio is
+                # maintained.  The new width will be less than the provided width.
                 x = self.aspect_ratio.new_width(y)
             else:
+                # This rectangle is horizontal and the specified dimensions would be for a vertical rectangle or a
+                # horizontal rectangle with a relatively shorter width than this one.  To fit within that size, the
+                # provided width is used, but a new height is calculated such that this rectangle's aspect ratio is
+                # maintained.  The new height will be less than the provided height.
                 y = self.aspect_ratio.new_height(x)
         except ZeroDivisionError:
             pass
@@ -71,29 +81,22 @@ class Resizable(Sized, ABC):
 
     # region Resize
 
-    # noinspection PyInconsistentReturns
-    def target_size(self, size: OptXYF, keep_ratio: bool = True) -> Size:  # noqa
-        dst_w, dst_h = size
-        if dst_w is dst_h is None:
-            return self.size
-        elif None not in size:
-            if keep_ratio:
-                return self.new_aspect_ratio_size(dst_w, dst_h)
-            return Size(floor(dst_w), floor(dst_h))
-        elif keep_ratio:
-            if dst_w is None:
+    def target_size(self, size: OptXYF, keep_ratio: bool = True) -> Size:
+        match size:
+            case (None, None):
+                return self.size
+            case (None, dst_h):
                 dst_h = floor(dst_h)
-                dst_w = self.aspect_ratio.new_width(dst_h)
-            elif dst_h is None:
+                return Size(self.aspect_ratio.new_width(dst_h) if keep_ratio else self.width, dst_h)
+            case (dst_w, None):
                 dst_w = floor(dst_w)
-                dst_h = self.aspect_ratio.new_height(dst_w)
-            return Size(dst_w, dst_h)
-        else:
-            src_w, src_h = self.size
-            if dst_w is None:
-                return Size(src_w, floor(dst_h))
-            elif dst_h is None:
-                return Size(floor(dst_w), src_h)
+                return Size(dst_w, self.aspect_ratio.new_height(dst_w) if keep_ratio else self.height)
+            case (dst_w, dst_h):
+                if keep_ratio:
+                    return self.new_aspect_ratio_size(dst_w, dst_h)
+                return Size(floor(dst_w), floor(dst_h))
+            case _:
+                raise TypeError('Unexpected size - expected a 2-tuple of int/float/None values')
 
     def fit_inside_size(self, size: XY, keep_ratio: bool = True) -> Size:
         """Determine a target size that would make this object's size fit inside a box of the given size"""

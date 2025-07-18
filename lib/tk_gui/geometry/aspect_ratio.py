@@ -10,6 +10,16 @@ _NotSet = object()
 
 
 class AspectRatio(Fraction):
+    """
+    The aspect ratio of an image, or more generally, a rectangle, is the ratio of its width to its height.  This class
+    represents a given aspect ratio as a fraction to preserve the exact original integer ratio (such as 37:20 for the
+    aspect ratio 1.85:1, which is commonly used in cinematography).
+
+    Squares have an aspect ratio of 1:1 (or 1).
+    Rectangles that are "vertical" (width < height) have an aspect ratio < 1.
+    Rectangles that are "horizontal" (width > height) have an aspect ratio > 1.
+    """
+
     __slots__ = ()
 
     # region Init
