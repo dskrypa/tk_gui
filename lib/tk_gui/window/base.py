@@ -33,9 +33,10 @@ from .utils import WindowData  # noqa
 if TYPE_CHECKING:
     from pathlib import Path
     from PIL.Image import Image as PILImage
+    from tk_gui.geometry.typing import XY
     from ..elements.element import Element, ElementBase
     from ..styles.typing import StyleSpec
-    from ..typing import XY, BindCallback, BindMapping, EventCallback, Key, BindTarget, Bindable, Layout, Bool
+    from ..typing import BindCallback, BindMapping, EventCallback, Key, BindTarget, Bindable, Layout, Bool
     from ..typing import HasValue, TkContainer, GrabAnywhere, Top, PathLike
 
 __all__ = ['Window']

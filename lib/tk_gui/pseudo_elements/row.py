@@ -16,10 +16,11 @@ from tk_gui.caching import cached_property
 from tk_gui.enums import Anchor, Justify, Side
 from tk_gui.styles import Style
 from tk_gui.utils import Inheritable
-from tk_gui.typing import Bool, XY, TkFill, E
+from tk_gui.typing import Bool, TkFill, E
 
 if TYPE_CHECKING:
     from tk_gui.elements.element import Element, ElementBase  # noqa
+    from tk_gui.geometry.typing import XY
     from tk_gui.styles.typing import StyleSpec
     from tk_gui.window import Window
     from .row_container import RowContainer

@@ -13,9 +13,9 @@ from .utils import _style_map_data, mono_width
 
 if TYPE_CHECKING:
     from tkinter import BaseWidget
+    from tk_gui.geometry.typing import XY
     from tk_gui.styles.typing import Font, Layer
     from tk_gui.pseudo_elements import Row
-    from tk_gui.typing import XY
 
 __all__ = ['TreeViewBase', 'Column']
 log = logging.getLogger(__name__)

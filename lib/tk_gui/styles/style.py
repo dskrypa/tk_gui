@@ -17,7 +17,7 @@ from tk_gui.enums import StyleState
 from .layers import StyleLayer, StyleProperty, StyleLayerProperty
 
 if TYPE_CHECKING:
-    from tk_gui.typing import XY
+    from tk_gui.geometry.typing import XY
     from .states import StateValues
     from .typing import StyleStateVal, Layer, StyleOptions, StyleSpec, FinalValue, FontMetric
 

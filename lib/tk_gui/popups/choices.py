@@ -13,7 +13,8 @@ from ..images.icons import placeholder_icon_cache
 from .base import BasicPopup
 
 if TYPE_CHECKING:
-    from ..typing import XY, ImageType, Layout
+    from tk_gui.geometry.typing import XY
+    from ..typing import ImageType, Layout
 
 __all__ = ['ChoiceMapPopup', 'ChooseItemPopup', 'ChooseImagePopup', 'choose_item']
 log = logging.getLogger(__name__)

@@ -22,9 +22,10 @@ from tk_gui.widgets.utils import find_descendants
 
 if TYPE_CHECKING:
     from tkinter import Widget, Event, BaseWidget
+    from tk_gui.geometry.typing import XY
     from tk_gui.pseudo_elements.row import RowBase
     from tk_gui.styles.typing import StyleSpec, Layer
-    from tk_gui.typing import XY, Bool, BindCallback, BindMapping, Key, TkFill, BindTarget, HasFrame, TkContainer
+    from tk_gui.typing import Bool, BindCallback, BindMapping, Key, TkFill, BindTarget, HasFrame, TkContainer
     from tk_gui.window import Window
     from .menu import Menu
 

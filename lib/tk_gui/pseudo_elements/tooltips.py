@@ -15,8 +15,8 @@ from tk_gui.styles import Style
 
 if TYPE_CHECKING:
     from tk_gui.elements.element import Element
+    from tk_gui.geometry.typing import XY
     from tk_gui.styles.typing import StyleSpec
-    from tk_gui.typing import XY
 
 __all__ = ['ToolTip']
 log = logging.getLogger(__name__)

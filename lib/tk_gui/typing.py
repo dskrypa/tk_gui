@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 
 # fmt: off
 __all__ = [
-    'Bool', 'XY', 'HasSize', 'Key', 'HasParent', 'HasValue', 'Layout', 'Axis', 'Orientation', 'PathLike', 'OptInt',
+    'Bool', 'HasSize', 'Key', 'HasParent', 'HasValue', 'Layout', 'Axis', 'Orientation', 'PathLike', 'OptInt',
     'BindCallback', 'EventCallback', 'TraceCallback', 'BindTarget', 'Bindable', 'ProvidesEventCallback',
     'TkFill', 'TkSide', 'TkJustify',
     'TkContainer', 'HasFrame', 'FrameLike',
@@ -54,10 +54,7 @@ IterStrs = Iterable[str]
 OptInt = int | None
 OptFloat = float | None
 Bool = bool | Any
-XY = tuple[int, int]
-OptXY = tuple[OptInt, OptInt]
-OptXYF = tuple[OptFloat, OptFloat]
-SelectionPos = XY | tuple[XY, XY] | tuple[None, None] | tuple[str, str]
+
 Axis = Literal['x', 'y']
 # Orientation = Literal['horizontal', 'vertical']
 Orientation = Literal[tkc.HORIZONTAL, tkc.VERTICAL]  # noqa

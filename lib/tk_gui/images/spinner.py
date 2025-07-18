@@ -18,7 +18,8 @@ from .color import color_to_rgb, find_unused_color
 from .cycle import FrameCycle
 
 if TYPE_CHECKING:
-    from ..typing import XY, PathLike
+    from tk_gui.geometry.typing import XY
+    from ..typing import PathLike
 
 __all__ = ['Spinner']
 log = logging.getLogger(__name__)

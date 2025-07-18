@@ -21,8 +21,9 @@ from tk_gui.widgets.scroll import ScrollableFrame, ScrollableLabelFrame
 from .element import Element, InteractiveMixin
 
 if TYPE_CHECKING:
+    from tk_gui.geometry.typing import XY
     from tk_gui.styles.typing import StyleSpec
-    from tk_gui.typing import Layout, Bool, XY, TkContainer, E
+    from tk_gui.typing import Layout, Bool, TkContainer, E
     from tk_gui.pseudo_elements.row import Row
 
 __all__ = [

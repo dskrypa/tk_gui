@@ -24,8 +24,9 @@ from .mixins import DisableableMixin
 
 if TYPE_CHECKING:
     from PIL.Image import Image as PILImage
+    from tk_gui.geometry.typing import XY
     from ..styles.style import Style
-    from ..typing import XY, BindCallback, BindMapping, Bool, ImageType, Key, TkContainer, OptStr, IterStrs
+    from ..typing import BindCallback, BindMapping, Bool, ImageType, Key, TkContainer, OptStr, IterStrs
 
 __all__ = ['Button', 'OK', 'Cancel', 'Yes', 'No', 'Submit', 'EventButton']
 log = logging.getLogger(__name__)
@@ -129,6 +130,7 @@ class Button(CustomEventResultsMixin, DisableableMixin, Interactive, base_style_
         iw, ih = image.size
         width, height = self.size
         if (ih > height or iw > width) and (height > 1 and width > 1):
+            # log.debug(f'Resizing button image from {image.size=} due to button size={self.size}')
             self.__image = src_image.as_size((width - 1, height - 1))
         # if text := self.text:
         #     style = self.style
@@ -188,6 +190,7 @@ class Button(CustomEventResultsMixin, DisableableMixin, Interactive, base_style_
         # self.string_var = StringVar()
         # self.string_var.set(self._value)
         width, height = PackSizeCalculator(self.text, self.image, self.size, self.style).get_pack_size()
+        # log.debug(f'Packing button with {width=} x {height=}')
         kwargs = {
             'width': width,
             'height': height,

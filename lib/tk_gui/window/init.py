@@ -16,8 +16,8 @@ from ..widgets.scroll import ScrollableToplevel
 from ..widgets.utils import get_req_size
 
 if TYPE_CHECKING:
-    from ..typing import XY, Bool
-    from ..typing import TkContainer, Top
+    from tk_gui.geometry.typing import XY
+    from ..typing import Bool, TkContainer, Top
     from ..widgets.configuration import AxisConfig
     from .base import Window
 

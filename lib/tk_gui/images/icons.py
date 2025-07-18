@@ -16,13 +16,14 @@ from typing import TYPE_CHECKING, TypeVar, Iterator, Iterable
 from PIL.Image import Image as PILImage, new as new_image, core as pil_image_core
 from PIL.ImageFont import FreeTypeFont, truetype
 
-from tk_gui.geometry import Box, Padding
+from tk_gui.geometry import BBox, Padding
 from .color import color_to_rgb, find_unused_color
 
 if TYPE_CHECKING:
     from pathlib import Path
     from PIL.Image.core import ImagingCore
-    from tk_gui.typing import XY, Color, RGB, RGBA, ImageType  # noqa
+    from tk_gui.typing import Color, RGB, RGBA, ImageType  # noqa
+    from tk_gui.geometry.typing import XY
 
 __all__ = ['Icons', 'PlaceholderCache', 'placeholder_icon_cache', 'icon_path']
 log = logging.getLogger(__name__)
@@ -167,7 +168,7 @@ class Icons:
         # The dimensions that would have been the result of cropping the image from the initial size are used with the
         # expected size to calculate the larger target width/height necessary to produce an image that is as close as
         # possible to the expected size after it has been cropped.
-        target_size = Box(*image.getbbox()).scale_size(self._font_and_size(size)[1])
+        target_size = BBox(*image.getbbox()).scale_size(self._font_and_size(size)[1])
         # Note about bbox here: `Icons(30).icon_font.getbbox(icons._normalize('house-door'))` => (0, 2, 30, 30)
         #  but `Icons(30).draw_with_transparent_bg('house-door').getbbox()` => (3, 2, 28, 28)
         image = self.draw(icon, target_size, color, bg)
@@ -200,19 +201,20 @@ class Icons:
 
         # i_asc, i_dsc = self.icon_font.getmetrics()
         # t_asc, t_dsc = self.text_font.getmetrics()
+        # # Ascent and descent overlap by 1 px, so a font with ascent=19, descent=5 will have a max height of 23, not 24
+        # # The icon font has descent=0 and ascent == size
         # log.debug(
         #     f'Drawing {icon=} + {text=} with icon size={iw}x{ih}, {i_asc=}, {i_dsc=};'
         #     f' text size={tw}x{th}, {t_asc=}, {t_dsc=}'
         # )
 
-        full_pad_x = i_pad_x * 2
-        image: PILImage = new_image('RGBA', (iw + tw + full_pad_x, max(ih, th)), bg)
+        image: PILImage = new_image('RGBA', (iw + tw + i_pad_x * 3, max(ih, th)), bg)
         # log.debug(f'Created blank image with size={image.size}')
         # While this approach that uses coordinates with `draw.draw_bitmap(...)` is likely more efficient, it may be
         # easier to use Image.paste with bboxes that are easier to control... or more of the steps in `_draw_icon` may
         # need to be moved here to more easily control the `coord` values
-        _draw_icon(image, icon, self.icon_font, fg, x_offset=i_pad_x)
-        _draw_icon(image, text, self.text_font, fg, x_offset=iw + full_pad_x)
+        _draw_icon(image, icon, self.icon_font, fg, pos=(i_pad_x, 0))
+        _draw_icon(image, text, self.text_font, fg, pos=(iw + i_pad_x * 2, 0))
         return image
 
 
@@ -271,7 +273,7 @@ def _draw_icon(
     text: str,
     font: FreeTypeFont,
     fg: RGB | RGBA = (0, 0, 0),
-    x_offset: int = 0,
+    pos: XY = (0, 0),
 ) -> PILImage:
     # ImageDraw.__init__(...):
     draw = _core_draw(image.im, 0)  # This would happen in ImageDraw.__init__, but it does many other unnecessary steps
@@ -285,6 +287,7 @@ def _draw_icon(
     # mask, offset = font.getmask2(...) is used by the original method because `FreeTypeFont.getmask2` exists
 
     # ImageFont.FreeTypeFont.getmask2(...):
+    mask: ImagingCore
     mask, offset = font.font.render(       # This step was performed in `PIL.ImageFont.FreeTypeFont.getmask2`
         text,               # text
         _render_fill,       # fill
@@ -298,13 +301,30 @@ def _draw_icon(
         ink,                # ink
         (0, 0),             # start (changed from expecting x/y separately in 11.2.x)
     )
+    # When adding an additional offset to the offset returned by `font.render`, the start position seems like it should
+    # always be (0, 0)...  It's unclear whether providing the additional offset as the start position would result in
+    # `font.render` returning an offset that could be directly used as the position to draw the mask.  The original
+    # code in `PIL.ImageDraw.ImageDraw` used `start = (math.modf(xy[0])[0], math.modf(xy[1])[0])` then
+    # `coord = [xy[0] + offset[0], xy[1] + offset[1]]`...  `math.modf(0)` returns `0`.  If using a different `xy`
+    # position, the modified start coordinates may result in the intended values... but the extra steps seem convoluted.
+
+    # The X-offset is almost always 0, but in theory it may be a positive integer if the first character in the
+    # provided text is thinner than the font's character width, such as with monospace fonts.
+
+    # The Y-offset will be 0 when the text contains a char that reaches the full ascent of the font, otherwise it will
+    # be a positive integer that ends up being the difference between the (max) ascent of the font and the max ascent
+    # of the characters in the given text.  This allows separately rendered text values to be aligned on the font's
+    # baseline.
+
+    # When mixing multiple fonts in the same image, the baselines may differ.
+    # TODO: To perfectly align them, this difference needs to be taken into account (outside of this function).
 
     # Back in ImageDraw.text(...).draw_text:
-    coord = (x_offset, offset[1]) if x_offset else offset
-    # The original used `coord = (start[0] + offset[0], start[1] + offset[1])`, but that produces very poor results
-    # for start points != (0, 0)
+    coord = (pos[0] + offset[0], pos[1] + offset[1])
+    # The original used `coord = (start[0] + offset[0], start[1] + offset[1])`, where `start` was passed to
+    # `font.render`, but that seems to produce very poor results for start points != `(0, 0)`
     # This will probably only work for drawing a single row of images - refactoring will be necessary to draw a grid
-    # log.info(f'Drawing rendered mask for {text=} with {image.size=}, {x_offset=}, {offset=}, {coord=}, {mask.size=}')
+    # log.info(f'Drawing rendered mask for {text=} @ {coord=} with {image.size=}, {pos=}, {offset=}, {mask.size=}')
     draw.draw_bitmap(coord, mask, ink)
     return image
 

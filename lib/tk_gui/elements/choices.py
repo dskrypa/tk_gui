@@ -19,7 +19,7 @@ from weakref import WeakValueDictionary
 from tk_gui.caching import cached_property
 from tk_gui.enums import ListBoxSelectMode, Anchor
 from tk_gui.environment import ON_WINDOWS
-from tk_gui.typing import Bool, T, BindTarget, BindCallback, TraceCallback, TkContainer, HasFrame, XY
+from tk_gui.typing import Bool, T, BindTarget, BindCallback, TraceCallback, TkContainer, HasFrame
 from tk_gui.utils import max_line_len, extract_kwargs
 from tk_gui.widgets.scroll import ScrollableListbox
 from ._utils import normalize_underline
@@ -30,6 +30,7 @@ from .mixins import DisableableMixin, CallbackCommandMixin, TraceCallbackMixin
 if TYPE_CHECKING:
     from tkinter import Scrollbar, Listbox as TkListbox, Frame as TkFrame
     from tkinter.ttk import Style as TtkStyle
+    from tk_gui.geometry.typing import XY
     from tk_gui.pseudo_elements import Row
     from tk_gui.window import Window
 

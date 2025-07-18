@@ -16,7 +16,8 @@ from .view import View
 
 if TYPE_CHECKING:
     from tkinter import Event
-    from ..typing import XY, Color
+    from tk_gui.geometry.typing import XY
+    from ..typing import Color
 
 __all__ = ['ClockView']
 

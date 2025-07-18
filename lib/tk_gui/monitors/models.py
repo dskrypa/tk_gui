@@ -8,10 +8,11 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional
 
 from tk_gui.caching import cached_property
-from tk_gui.geometry import Box
+from tk_gui.geometry import BBox
 
 if TYPE_CHECKING:
-    from tk_gui.typing import XY, HasSize
+    from tk_gui.geometry.typing import XY
+    from tk_gui.typing import HasSize
 
 __all__ = ['Monitor', 'Rectangle']
 
@@ -71,7 +72,7 @@ class Monitor:
         return self.work_area.center_coordinates(size)
 
 
-class Rectangle(Box):
+class Rectangle(BBox):
     @cached_property
     def is_primary(self) -> bool:
         return self.left == self.top == 0

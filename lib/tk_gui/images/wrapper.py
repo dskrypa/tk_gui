@@ -20,18 +20,19 @@ from PIL.JpegImagePlugin import RAWMODE
 from tk_gui.caching import cached_property
 from tk_gui.constants import IMAGE_MODE_TO_BPP
 from tk_gui.enums import ImageResizeMode
-from tk_gui.geometry import Box, Sized
+from tk_gui.geometry import BBox, Resizable
 from tk_gui.utils import get_user_temp_dir
 
 if TYPE_CHECKING:
-    from tk_gui.typing import XY, ImageType, PathLike, Color, ImgResizeMode
+    from tk_gui.geometry.typing import XY
+    from tk_gui.typing import ImageType, PathLike, Color, ImgResizeMode
     from .icons import Icons, Icon
 
 __all__ = ['ImageWrapper', 'SourceImage', 'ResizedImage', 'IconSourceImage']
 log = logging.getLogger(__name__)
 
 
-class ImageWrapper(Sized, ABC):
+class ImageWrapper(Resizable, ABC):
     @property
     @abstractmethod
     def pil_image(self) -> PILImage | None:
@@ -97,11 +98,11 @@ class ImageWrapper(Sized, ABC):
             return super().target_size(size, keep_ratio)
 
     @cached_property(block=False)
-    def box(self) -> Box:
-        return Box.from_pos_and_size(0, 0, *self.size)
+    def box(self) -> BBox:
+        return BBox.from_pos_and_size(0, 0, *self.size)
 
-    def get_bbox(self) -> Box:
-        return Box(*self.pil_image.getbbox())
+    def get_bbox(self) -> BBox:
+        return BBox(*self.pil_image.getbbox())
 
     # region Format
 

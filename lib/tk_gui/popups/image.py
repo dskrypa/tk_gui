@@ -24,7 +24,8 @@ from .base import Popup
 
 if TYPE_CHECKING:
     from tkinter import Event
-    from tk_gui.typing import XY, Layout, ImageType, PathLike
+    from tk_gui.geometry.typing import XY
+    from tk_gui.typing import Layout, ImageType, PathLike
 
 __all__ = ['ImagePopup', 'AnimatedPopup', 'SpinnerPopup', 'ClockPopup']
 log = logging.getLogger(__name__)

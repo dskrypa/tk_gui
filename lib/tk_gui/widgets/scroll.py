@@ -18,13 +18,14 @@ from tk_gui.caching import cached_property
 from tk_gui.enums import ScrollUnit
 from tk_gui.environment import ON_WINDOWS
 from tk_gui.event_handling.decorators import delayed_event_handler
-from tk_gui.geometry import Box
+from tk_gui.geometry import BBox
 from .configuration import AxisConfig
 from .utils import get_parent_or_none, get_root_widget
 
 if TYPE_CHECKING:
+    from tk_gui.geometry.typing import XY
     from tk_gui.styles import Style
-    from tk_gui.typing import Bool, BindCallback, Axis, XY, TkContainer
+    from tk_gui.typing import Bool, BindCallback, Axis, TkContainer
 
 __all__ = [
     'ScrollableToplevel', 'ScrollableFrame', 'ScrollableLabelFrame',
@@ -198,7 +199,7 @@ class ComplexScrollable(ScrollableBase, ABC):
 
     canvas: Canvas
     resize_offset: int
-    _last_box: Box = Box(0, 0, 0, 0)
+    _last_box: BBox = BBox(0, 0, 0, 0)
     _last_size: XY = ()
     _x_config: AxisConfig
     _y_config: AxisConfig
@@ -383,7 +384,7 @@ class ComplexScrollable(ScrollableBase, ABC):
     def update_scroll_region(self, force: bool = False, **kwargs):
         canvas = self.canvas
         bbox = canvas.bbox('all')  # top left (x, y), bottom right (x, y) I think ==>> last 2 => (width, height)
-        box = Box(*bbox)
+        box = BBox(*bbox)
         if force or self._last_box != box:
             # log.debug(f'Updating scroll region to {box=} != {self._last_box=} for {self} with {kwargs=}')
             canvas.configure(scrollregion=bbox, **kwargs)

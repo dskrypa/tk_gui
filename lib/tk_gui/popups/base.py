@@ -22,8 +22,9 @@ from tk_gui.window import Window
 if TYPE_CHECKING:
     from tkinter import Event
     from tk_gui.event_handling import BindMap
+    from tk_gui.geometry.typing import XY
     from tk_gui.styles.typing import StyleSpec
-    from tk_gui.typing import XY, Layout, Bool, ImageType
+    from tk_gui.typing import Layout, Bool, ImageType
 
 __all__ = ['Popup', 'BasicPopup', 'AnyPopup']
 log = logging.getLogger(__name__)

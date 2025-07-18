@@ -18,7 +18,7 @@ from tk_gui.elements.trees import Table, Column
 from tk_gui.elements.menu import MenuProperty, Menu, MenuGroup, MenuItem, CloseWindow
 from tk_gui.enums import MissingMixin, ImageResizeMode
 from tk_gui.event_handling import EventState, event_handler, delayed_event_handler
-from tk_gui.geometry import Box
+from tk_gui.geometry import BBox
 from tk_gui.images.wrapper import ImageWrapper, SourceImage, ResizedImage
 from tk_gui.popups.about import AboutPopup
 from tk_gui.popups.common import popup_warning
@@ -28,7 +28,8 @@ from .view import View
 
 if TYPE_CHECKING:
     from tkinter import Event
-    from tk_gui.typing import XY, Layout, ImageType, OptInt, ImgResizeMode, PathLike  # noqa
+    from tk_gui.geometry.typing import XY
+    from tk_gui.typing import Layout, ImageType, OptInt, ImgResizeMode, PathLike  # noqa
     from tk_gui.window import Window
 
 __all__ = ['ImageView']
@@ -421,8 +422,8 @@ class ImageView(View):
         return scroll_y_width
 
     @property
-    def _window_box(self) -> Box:
-        win_box = Box.from_pos_and_size(0, 0, *self.window.true_size)
+    def _window_box(self) -> BBox:
+        win_box = BBox.from_pos_and_size(0, 0, *self.window.true_size)
         return win_box.with_size_offset((-self._width_offset, -self._height_offset))
 
     # endregion
@@ -545,7 +546,7 @@ class ImageView(View):
     def handle_size_changed(self, event: Event, size: XY):
         if (last_size := self._last_size) == size:
             return
-        grew = Box.from_size_and_pos(*last_size).area < Box.from_size_and_pos(*size).area
+        grew = BBox.from_size_and_pos(*last_size).area < BBox.from_size_and_pos(*size).area
         self._last_size = size
         self._update_frame_size(size)
         if grew and self.active_image.image.size_percent < 1:

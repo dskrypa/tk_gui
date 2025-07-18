@@ -17,7 +17,7 @@ from PIL.ImageTk import PhotoImage
 from .color import color_to_rgb, find_unused_color
 
 if TYPE_CHECKING:
-    from ..typing import XY
+    from tk_gui.geometry.typing import XY
 
 __all__ = ['SevenSegmentDisplay', 'ClockCycle']
 

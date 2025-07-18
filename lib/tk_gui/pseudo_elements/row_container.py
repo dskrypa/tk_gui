@@ -10,18 +10,19 @@ import logging
 from abc import ABC, abstractmethod
 from itertools import count
 from tkinter import BaseWidget
-from typing import TYPE_CHECKING, Optional, Union, Any, Iterator, Type, Generic, Protocol, overload, runtime_checkable
+from typing import TYPE_CHECKING, Union, Any, Iterator, Type, Generic, Protocol, overload, runtime_checkable
 
 from tk_gui.caching import cached_property
 from tk_gui.enums import Anchor, Justify, Side
 from tk_gui.styles import Style
 from tk_gui.utils import call_with_popped
-from tk_gui.typing import XY, Layout, Bool, TkContainer, E, ScrollWhat, Top
+from tk_gui.typing import Layout, Bool, TkContainer, E, ScrollWhat, Top
 from tk_gui.widgets.configuration import AxisConfig, ScrollAmount
 from .row import Row, RowBase
 
 if TYPE_CHECKING:
     from tk_gui.elements.element import ElementBase
+    from tk_gui.geometry.typing import XY
     from tk_gui.styles.typing import StyleSpec
     from tk_gui.window import Window
 
@@ -46,8 +47,8 @@ class RowContainer(Generic[E], ABC):
     anchor_elements: Anchor
     text_justification: Justify
     element_side: Side
-    element_padding: Optional[XY]
-    element_size: Optional[XY]
+    element_padding: XY | None
+    element_size: XY | None
     rows: list[Row[E]]
 
     # region Init Overload

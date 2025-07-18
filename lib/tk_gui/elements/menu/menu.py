@@ -20,9 +20,10 @@ from .utils import MenuMode, MenuModeCallback, Mode, ContainerMixin, MenuMeta
 from .utils import get_current_menu_group, wrap_menu_cb, find_member, copy_menu_obj
 
 if TYPE_CHECKING:
+    from tk_gui.geometry.typing import XY
     from tk_gui.popups.base import PopupMixin
     from tk_gui.pseudo_elements.row import Row, RowBase
-    from tk_gui.typing import Bool, XY, EventCallback, ProvidesEventCallback, Top, HasFrame
+    from tk_gui.typing import Bool, EventCallback, ProvidesEventCallback, Top, HasFrame
 
 __all__ = ['MenuEntry', 'MenuItem', 'MenuGroup', 'Menu', 'CustomMenuItem', 'MenuProperty']
 log = logging.getLogger(__name__)

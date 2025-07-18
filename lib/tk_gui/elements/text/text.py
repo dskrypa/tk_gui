@@ -29,9 +29,10 @@ from .links import LinkTarget, _Link
 
 if TYPE_CHECKING:
     from tkinter.ttk import Scrollbar
+    from tk_gui.geometry.typing import XY
     from tk_gui.pseudo_elements import Row
     from tk_gui.styles.typing import Font
-    from tk_gui.typing import Bool, XY, BindTarget, TraceCallback, TkFill, HasFrame, TkContainer
+    from tk_gui.typing import Bool, BindTarget, TraceCallback, TkFill, HasFrame, TkContainer
 
 __all__ = ['Text', 'Link', 'Input', 'Multiline', 'Label', 'ValidatedInput', 'NumericInput', 'FloatInput', 'IntInput']
 log = logging.getLogger(__name__)

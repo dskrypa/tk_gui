@@ -10,13 +10,13 @@ from typing import TYPE_CHECKING, Union, Optional, Any, Iterator
 
 from PIL.ImageTk import PhotoImage as PilPhotoImage
 
-from tk_gui.geometry import Box
+from tk_gui.geometry import BBox
 from .scroll import ComplexScrollable
 from .utils import get_size_and_pos
 
 if TYPE_CHECKING:
+    from tk_gui.geometry.typing import XY
     from tk_gui.styles import Style
-    from tk_gui.typing import XY
 
 __all__ = ['ScrollableImage']
 log = logging.getLogger(__name__)
@@ -28,7 +28,7 @@ class ScrollableImage(ComplexScrollable, Frame):
     __initializing: bool = True
     inner_widget: TkImage
     _inner_id: int | None = None
-    _last_img_box = Box(0, 0, 0, 0)
+    _last_img_box = BBox(0, 0, 0, 0)
 
     # region Initialization
 
@@ -58,18 +58,18 @@ class ScrollableImage(ComplexScrollable, Frame):
 
     def get_boxes(self):
         return {
-            'frame': Box.from_size_and_pos(*get_size_and_pos(self)),
-            'canvas': Box.from_size_and_pos(*get_size_and_pos(self.canvas)),
-            'bar_x': Box.from_size_and_pos(*get_size_and_pos(self.scroll_bar_x)),
-            'bar_y': Box.from_size_and_pos(*get_size_and_pos(self.scroll_bar_y)),
+            'frame': BBox.from_size_and_pos(*get_size_and_pos(self)),
+            'canvas': BBox.from_size_and_pos(*get_size_and_pos(self.canvas)),
+            'bar_x': BBox.from_size_and_pos(*get_size_and_pos(self.scroll_bar_x)),
+            'bar_y': BBox.from_size_and_pos(*get_size_and_pos(self.scroll_bar_y)),
             'image': self._last_img_box,
         }
 
-    def _center_image_box(self, size: XY) -> Box:
+    def _center_image_box(self, size: XY) -> BBox:
         if self.__initializing:
-            return Box.from_pos_and_size(0, 0, *size)
+            return BBox.from_pos_and_size(0, 0, *size)
 
-        canvas_box = Box.from_size_and_pos(*get_size_and_pos(self.canvas))
+        canvas_box = BBox.from_size_and_pos(*get_size_and_pos(self.canvas))
         # log.debug(f'Centering image within {canvas_box=}')
         return canvas_box.center(size)
 

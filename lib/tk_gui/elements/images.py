@@ -26,9 +26,10 @@ from tk_gui.widgets.images import ScrollableImage as ScrollableImageWidget
 from .element import Element
 
 if TYPE_CHECKING:
+    from tk_gui.geometry.typing import XY
     from tk_gui.pseudo_elements import Row
     from tk_gui.styles.typing import StyleSpec
-    from tk_gui.typing import XY, BindTarget, ImageType, Bool, TkContainer, HasFrame
+    from tk_gui.typing import BindTarget, ImageType, Bool, TkContainer, HasFrame
 
 __all__ = ['Image', 'Animation', 'SpinnerImage', 'ClockImage']
 log = logging.getLogger(__name__)

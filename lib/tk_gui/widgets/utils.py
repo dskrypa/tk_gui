@@ -14,8 +14,13 @@ from tk_gui.utils import mapping_repr
 
 if TYPE_CHECKING:
     from tk_gui.elements import Element
-    from tk_gui.typing import Bool, SelectionPos, Top, XY
+    from tk_gui.geometry.typing import XY
+    from tk_gui.typing import Bool, Top
     from tk_gui.window import Window
+
+    SelectionPos = XY | tuple[XY, XY] | tuple[None, None] | tuple[str, str]
+    ShowKey = Literal['config', 'event_attrs', 'event', 'element', 'pack_info', 'get_result', 'ttk_info']
+    ShowMap = dict[ShowKey, bool | Any]
 
 __all__ = [
     'get_parent_or_none', 'get_root_widget', 'get_widget_ancestor', 'find_descendants',
@@ -25,9 +30,6 @@ __all__ = [
     'NoWidgetFound',
 ]
 log = logging.getLogger(__name__)
-
-ShowKey = Literal['config', 'event_attrs', 'event', 'element', 'pack_info', 'get_result', 'ttk_info']
-ShowMap = dict[ShowKey, 'Bool']
 
 
 # region Widget Ancestors & Descendants

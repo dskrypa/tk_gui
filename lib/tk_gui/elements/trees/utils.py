@@ -13,8 +13,8 @@ from tk_gui.styles.colors import RED_MD_0
 if TYPE_CHECKING:
     from pathlib import Path
     from PIL.Image import Image as PILImage
+    from tk_gui.geometry.typing import XY
     from tk_gui.styles.style import Style
-    from tk_gui.typing import XY
 
 
 def _style_map_data(style: TtkStyle, name: str, query_opt: str, selected_color: str = None):

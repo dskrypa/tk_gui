@@ -18,8 +18,9 @@ from .exceptions import SingleParsingError
 
 if TYPE_CHECKING:
     from tkinter import Event
+    from tk_gui.geometry.typing import XY
     from tk_gui.popups.base import AnyPopup
-    from tk_gui.typing import TraceCallback, AnyEle, XY
+    from tk_gui.typing import TraceCallback, AnyEle
 
 __all__ = [
     'Opt', 'Option', 'BoolOption',

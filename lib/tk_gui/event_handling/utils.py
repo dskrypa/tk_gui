@@ -44,7 +44,8 @@ from tk_gui.widgets.utils import unbind, log_event_widget_data, get_widget_ances
 
 if TYPE_CHECKING:
     from tk_gui.elements.element import ElementBase, Element
-    from tk_gui.typing import Color, SupportsBind, Bool, XY
+    from tk_gui.geometry.typing import XY
+    from tk_gui.typing import Color, SupportsBind, Bool
 
 __all__ = ['ENTER_KEYSYMS', 'EventState', 'ClickHighlighter', 'Interrupt', 'MotionTracker']
 log = logging.getLogger(__name__)

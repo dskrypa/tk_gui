@@ -18,8 +18,9 @@ from .text import Text
 
 if TYPE_CHECKING:
     from tk_gui.enums import Side
+    from tk_gui.geometry.typing import XY
     from tk_gui.pseudo_elements import Row
-    from tk_gui.typing import XY, TkContainer, E, TkSide, TkFill, Bool
+    from tk_gui.typing import TkContainer, E, TkSide, TkFill, Bool
 
 __all__ = ['SizeGrip', 'Spacer', 'InfoBar']
 

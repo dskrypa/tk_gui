@@ -20,7 +20,8 @@ from .text import Text, Input
 if TYPE_CHECKING:
     from tkinter import Event
 
-    from ..typing import Bool, XY
+    from tk_gui.geometry.typing import XY
+    from ..typing import Bool
     from .element import Element
 
 __all__ = ['Rating']

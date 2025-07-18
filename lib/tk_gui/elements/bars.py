@@ -21,8 +21,9 @@ from .element import ElementBase, Element, Interactive
 from .mixins import DisableableMixin, CallbackCommandMixin
 
 if TYPE_CHECKING:
+    from tk_gui.geometry.typing import OptXY
     from ..pseudo_elements import Row
-    from ..typing import Bool, Orientation, T, BindTarget, TkContainer, OptXY
+    from ..typing import Bool, Orientation, T, BindTarget, TkContainer
 
 __all__ = ['Separator', 'HorizontalSeparator', 'VerticalSeparator', 'ProgressBar', 'Slider']
 log = logging.getLogger(__name__)
