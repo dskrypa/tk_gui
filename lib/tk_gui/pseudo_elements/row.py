@@ -10,23 +10,27 @@ import logging
 import tkinter.constants as tkc
 from abc import ABC, abstractmethod
 from tkinter import Frame, LabelFrame, BaseWidget
-from typing import TYPE_CHECKING, Optional, Union, Iterable, Sequence, Generic
+from typing import TYPE_CHECKING, Generic, Iterable, Sequence, TypeVar
 
 from tk_gui.caching import cached_property
 from tk_gui.enums import Anchor, Justify, Side
 from tk_gui.styles import Style
 from tk_gui.utils import Inheritable
-from tk_gui.typing import Bool, TkFill, E
 
 if TYPE_CHECKING:
-    from tk_gui.elements.element import Element, ElementBase  # noqa
+    from tk_gui.elements.element import Element, ElementBase
     from tk_gui.geometry.typing import XY
     from tk_gui.styles.typing import StyleSpec
+    from tk_gui.typing import Bool, TkFill
     from tk_gui.window import Window
     from .row_container import RowContainer
 
+    AnyEle = ElementBase | Element
+
 __all__ = ['Row']
 log = logging.getLogger(__name__)
+
+E = TypeVar('E', bound='AnyEle')
 
 _NotSet = object()
 _CENTER_ANCHORS = {tkc.CENTER, None}
@@ -35,7 +39,7 @@ _VERTICAL_CENTER_ANCHORS = {tkc.CENTER, tkc.W, tkc.E, None}
 
 
 class RowBase(Generic[E], ABC):
-    parent: Optional[Union[RowBase, RowContainer]]
+    parent: RowBase | RowContainer | None
     anchor_elements: Anchor = Inheritable(type=Anchor, attr_name='parent_rc')
     text_justification: Justify = Inheritable(type=Justify, attr_name='parent_rc')
     element_side: Side = Inheritable(type=Side, attr_name='parent_rc')
@@ -44,7 +48,7 @@ class RowBase(Generic[E], ABC):
     style: Style = Inheritable(attr_name='parent_rc')
     auto_size_text: bool = Inheritable(attr_name='parent_rc')
 
-    # region Abstract Properties
+    # region Abstract Properties / Methods
 
     @property
     @abstractmethod
@@ -53,7 +57,7 @@ class RowBase(Generic[E], ABC):
 
     @property
     @abstractmethod
-    def frame(self) -> Union[Frame, LabelFrame]:
+    def frame(self) -> Frame | LabelFrame:
         raise NotImplementedError
 
     @property
@@ -70,6 +74,10 @@ class RowBase(Generic[E], ABC):
         """
         raise NotImplementedError
 
+    @abstractmethod
+    def pack(self, parent_rc: RowContainer, debug: Bool = False):
+        raise NotImplementedError
+
     # endregion
 
     @cached_property
@@ -77,7 +85,7 @@ class RowBase(Generic[E], ABC):
         return [self.frame, *(w for element in self.elements for w in element.widgets)]  # noqa
 
     @cached_property
-    def widget_id_element_map(self) -> dict[str, Union[RowBase, E]]:
+    def widget_id_element_map(self) -> dict[str, RowBase | E]:
         """Used to populate this row's parent's :attr:`RowContainer.widget_id_element_map`."""
         widget_ele_map = {self.frame._w: self}  # noqa
         setdefault = widget_ele_map.setdefault
@@ -155,7 +163,7 @@ class Row(RowBase[E]):
         parent: RowContainer,
         elements: Iterable[E],
         *,
-        anchor: Union[str, Anchor] = _NotSet,
+        anchor: str | Anchor = _NotSet,
         expand: bool = None,
         fill: TkFill = None,
         style: StyleSpec = None,

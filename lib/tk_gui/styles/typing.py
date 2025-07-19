@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 from tkinter.font import Font as TkFont
-from typing import Union, Optional, Literal, Mapping, Any
+from typing import Any, Literal, Mapping, Union
 
 from tk_gui.enums import StyleState
-from tk_gui.typing import OptInt, OptStr
 
 Layer = Literal[
     'base', 'insert', 'scroll', 'arrows', 'radio', 'checkbox', 'frame', 'combo', 'progress', 'image', 'tooltip', 'text',
@@ -21,7 +20,10 @@ StyleAttr = Literal[
 StyleOptions = Mapping[str, Any]
 StyleSpec = Union[str, 'Style', StyleOptions, tuple[str, StyleOptions], None]
 StyleStateVal = Union[StyleState, StateName, Literal[0, 1, 2]]
-Relief = Optional[Literal['raised', 'sunken', 'flat', 'ridge', 'groove', 'solid']]
+Relief = Literal['raised', 'sunken', 'flat', 'ridge', 'groove', 'solid'] | None
+
+OptInt = int | None
+OptStr = str | None
 
 _OptStrTuple = Union[
     tuple[OptStr], tuple[(OptStr,) * 2], tuple[(OptStr,) * 3], tuple[(OptStr,) * 4], tuple[(OptStr,) * 5]

@@ -10,32 +10,34 @@ import logging
 from abc import ABC, abstractmethod
 from itertools import count
 from tkinter import BaseWidget
-from typing import TYPE_CHECKING, Union, Any, Iterator, Type, Generic, Protocol, overload, runtime_checkable
+from typing import TYPE_CHECKING, Any, Generic, Iterator, Type, TypeVar, overload
 
 from tk_gui.caching import cached_property
 from tk_gui.enums import Anchor, Justify, Side
 from tk_gui.styles import Style
 from tk_gui.utils import call_with_popped
-from tk_gui.typing import Layout, Bool, TkContainer, E, ScrollWhat, Top
 from tk_gui.widgets.configuration import AxisConfig, ScrollAmount
 from .row import Row, RowBase
 
 if TYPE_CHECKING:
-    from tk_gui.elements.element import ElementBase
+    from tk_gui.elements.element import ElementBase, Element
     from tk_gui.geometry.typing import XY
     from tk_gui.styles.typing import StyleSpec
+    from tk_gui.typing import Layout, Bool, TkContainer, ScrollWhat, Top
     from tk_gui.window import Window
+
+    AnyEle = ElementBase | Element
 
 __all__ = ['RowContainer', 'CONTAINER_PARAMS']
 log = logging.getLogger(__name__)
+
+E = TypeVar('E', bound='AnyEle')
 
 CONTAINER_PARAMS = frozenset({
     'anchor_elements', 'text_justification', 'element_side', 'element_padding', 'element_size',
     'fill_y', 'fill_x', 'scroll_y', 'scroll_x', 'scroll_y_div', 'scroll_x_div',
     'scroll_y_amount', 'scroll_x_amount', 'scroll_y_what', 'scroll_x_what',
 })
-
-ElementLike = Union[RowBase, E, 'RowContainer']
 
 
 class RowContainer(Generic[E], ABC):
@@ -59,9 +61,9 @@ class RowContainer(Generic[E], ABC):
         layout: Layout[E] = None,
         *,
         style: StyleSpec = None,
-        anchor_elements: Union[str, Anchor] = None,
-        text_justification: Union[str, Justify] = None,
-        element_side: Union[str, Side] = None,
+        anchor_elements: str | Anchor = None,
+        text_justification: str | Justify = None,
+        element_side: str | Side = None,
         element_padding: XY = None,
         element_size: XY = None,
         scroll_y: Bool = False,
@@ -90,9 +92,9 @@ class RowContainer(Generic[E], ABC):
     def init_container(
         self,
         layout: Layout[E] = None,
-        anchor_elements: Union[str, Anchor] = None,
-        text_justification: Union[str, Justify] = None,
-        element_side: Union[str, Side] = None,
+        anchor_elements: str | Anchor = None,
+        text_justification: str | Justify = None,
+        element_side: str | Side = None,
         element_padding: XY = None,
         element_size: XY = None,
         **kwargs,
@@ -109,12 +111,12 @@ class RowContainer(Generic[E], ABC):
     def __repr__(self) -> str:
         return f'<{self.__class__.__name__}[{self._id}]>'
 
-    def _normalize_rows(self, layout: Layout[E], row_cls: Type[Row] = Row) -> Iterator[Row[E]]:
+    def _normalize_rows(self, layout: Layout[E], row_cls: Type[Row] = Row) -> Iterator[Row[E] | RowBase[E]]:
         for raw_row in layout:
             if isinstance(raw_row, row_cls):
                 log.debug(f'Found pre-built row={raw_row!s}', extra={'color': 11})
                 yield raw_row
-            elif isinstance(raw_row, RowBase) and isinstance(raw_row, Packable):
+            elif isinstance(raw_row, RowBase):
                 log.debug(f'Found pre-built packable base row={raw_row!s}', extra={'color': 11})
                 yield raw_row
             else:
@@ -231,12 +233,12 @@ class RowContainer(Generic[E], ABC):
                 pass
         return id_ele_map
 
-    def all_elements(self) -> Iterator[Union[E, Row[E]]]:
+    def all_elements(self) -> Iterator[E | Row[E]]:
         from ..elements.element import ElementBase
 
         yield from (e for e in self.widget_id_element_map.values() if isinstance(e, (ElementBase, Row)))
 
-    def __getitem__(self, item: Union[str, BaseWidget]) -> E:
+    def __getitem__(self, item: str | BaseWidget) -> E:
         """
         :param item: A widget, widget ID (assigned by tk/tkinter), or element ID (assigned in
           :meth:`ElementBase.__init__`).
@@ -282,10 +284,4 @@ class RowContainer(Generic[E], ABC):
         self.frame.grid_columnconfigure(1, weight=1)
 
 
-@runtime_checkable
-class Packable(Protocol):
-    __slots__ = ()
-
-    @abstractmethod
-    def pack(self, parent_rc: RowContainer, debug: Bool = False):
-        pass
+ElementLike = RowBase | E | RowContainer

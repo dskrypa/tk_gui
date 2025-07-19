@@ -12,14 +12,12 @@ from contextvars import ContextVar
 from itertools import count
 from tkinter import Radiobutton, Checkbutton, BooleanVar, IntVar, StringVar, Event, TclError
 from tkinter.ttk import Combobox
-from typing import TYPE_CHECKING, Optional, Union, Any, Generic, Collection, TypeVar, Sequence, Iterable
-from typing import Mapping, MutableMapping
+from typing import TYPE_CHECKING, Any, Generic, Collection, TypeVar, Sequence, Iterable, Mapping, MutableMapping
 from weakref import WeakValueDictionary
 
 from tk_gui.caching import cached_property
 from tk_gui.enums import ListBoxSelectMode, Anchor
 from tk_gui.environment import ON_WINDOWS
-from tk_gui.typing import Bool, T, BindTarget, BindCallback, TraceCallback, TkContainer, HasFrame
 from tk_gui.utils import max_line_len, extract_kwargs
 from tk_gui.widgets.scroll import ScrollableListbox
 from ._utils import normalize_underline
@@ -32,6 +30,7 @@ if TYPE_CHECKING:
     from tkinter.ttk import Style as TtkStyle
     from tk_gui.geometry.typing import XY
     from tk_gui.pseudo_elements import Row
+    from tk_gui.typing import Bool, BindTarget, BindCallback, TraceCallback, TkContainer, HasFrame
     from tk_gui.window import Window
 
 __all__ = ['Radio', 'RadioGroup', 'CheckBox', 'Combo', 'ComboMap', 'Dropdown', 'ListBox', 'make_checkbox_grid']
@@ -41,7 +40,8 @@ _NotSet = object()
 _radio_group_stack = ContextVar('tk_gui.elements.choices.radio.stack', default=[])
 A = TypeVar('A')
 B = TypeVar('B')
-_Anchor = Union[str, Anchor]
+T = TypeVar('T')
+_Anchor = str | Anchor
 
 # region Radio
 
@@ -57,7 +57,7 @@ class Radio(DisableableMixin, CallbackCommandMixin, Interactive, Generic[T], bas
         default: Bool = False,
         *,
         anchor_info: _Anchor = None,
-        group: Union[RadioGroup, int] = None,
+        group: RadioGroup | int = None,
         callback: BindTarget = None,
         **kwargs,
     ):
@@ -87,7 +87,7 @@ class Radio(DisableableMixin, CallbackCommandMixin, Interactive, Generic[T], bas
         return select_callback
 
     @property
-    def value(self) -> Union[T, str]:
+    def value(self) -> T | str:
         if (value := self._value) is not _NotSet:
             return value
         return self.label
@@ -167,7 +167,7 @@ class RadioGroup(TraceCallbackMixin):
         self._instances[self.id] = self
         self.choices = {}
         self._registered = False
-        self.default: Optional[Radio] = None
+        self.default: Radio | None = None
         if change_cb:
             self.var_change_cb = change_cb
         self.include_label = include_label
@@ -198,7 +198,7 @@ class RadioGroup(TraceCallbackMixin):
     # region Radio Registration & Related Methods
 
     @classmethod
-    def get_group(cls, group: Union[RadioGroup, int, None]) -> RadioGroup:
+    def get_group(cls, group: RadioGroup | int | None) -> RadioGroup:
         if group is None:
             return get_current_radio_group()
         elif isinstance(group, cls):
@@ -251,7 +251,7 @@ class RadioGroup(TraceCallbackMixin):
     def __getitem__(self, value: int) -> Radio:
         return self.choices[value]
 
-    def get_choice(self) -> Optional[Radio]:
+    def get_choice(self) -> Radio | None:
         return self.choices.get(self.selection_var.get())
 
     @property
@@ -263,7 +263,7 @@ class RadioGroup(TraceCallbackMixin):
     # endregion
 
 
-def get_current_radio_group(silent: bool = False) -> Optional[RadioGroup]:
+def get_current_radio_group(silent: bool = False) -> RadioGroup | None:
     """
     Get the currently active RadioGroup.
 
@@ -286,8 +286,8 @@ def get_current_radio_group(silent: bool = False) -> Optional[RadioGroup]:
 
 class CheckBox(DisableableMixin, CallbackCommandMixin, TraceCallbackMixin, Interactive, base_style_layer='checkbox'):
     widget: Checkbutton
-    tk_var: Optional[BooleanVar] = None
-    _values: Optional[tuple[B, A]] = None
+    tk_var: BooleanVar | None = None
+    _values: tuple[B, A] | None = None
     anchor_info: Anchor = Anchor.NONE
     # TODO: Helper for initializing custom checkbox with a locked/unlocked padlock icon?
 
@@ -299,7 +299,7 @@ class CheckBox(DisableableMixin, CallbackCommandMixin, TraceCallbackMixin, Inter
         true_value: A = None,
         false_value: B = None,
         anchor_info: _Anchor = None,
-        underline: Union[str, int] = None,
+        underline: str | int = None,
         callback: BindTarget = None,
         change_cb: TraceCallback = None,
         **kwargs,
@@ -319,20 +319,20 @@ class CheckBox(DisableableMixin, CallbackCommandMixin, TraceCallbackMixin, Inter
     # region Value-related Methods
 
     @property
-    def value(self) -> Union[bool, A, B]:
+    def value(self) -> bool | A | B:
         result = self.tk_var.get()
         if values := self._values:
             return values[result]
         return result
 
     @value.setter
-    def value(self, value: Union[bool, A, B]):
+    def value(self, value: bool | A | B):
         if (values := self._values) and value in values:
             self.tk_var.set(values[0] != value)
         else:
             self.tk_var.set(value)
 
-    def update(self, value: Union[bool, A, B] = _NotSet, disabled: Bool = None):
+    def update(self, value: bool | A | B = _NotSet, disabled: Bool = None):
         if value is not _NotSet:
             self.value = value
         if disabled is not None:
@@ -361,7 +361,7 @@ class CheckBox(DisableableMixin, CallbackCommandMixin, TraceCallbackMixin, Inter
     # region Style Methods
 
     @property
-    def underline(self) -> Optional[int]:
+    def underline(self) -> int | None:
         return normalize_underline(self._underline, self.label)
 
     # @cached_property
@@ -483,7 +483,7 @@ class Combo(
 ):
     """A form element that provides a drop down list of items to select.  Only 1 item may be selected."""
     widget: Combobox
-    tk_var: Optional[StringVar] = None
+    tk_var: StringVar | None = None
     allow_any: Bool
 
     def __init__(
@@ -720,8 +720,8 @@ class ListBox(DisableableMixin, Interactive, base_style_layer='listbox'):
     def __init__(
         self,
         choices: Collection[str],
-        default: Union[str, Collection[str]] = None,
-        select_mode: Union[str, ListBoxSelectMode] = ListBoxSelectMode.EXTENDED,
+        default: str | Collection[str] = None,
+        select_mode: str | ListBoxSelectMode = ListBoxSelectMode.EXTENDED,
         *,
         scroll_y: Bool = True,
         scroll_x: Bool = False,
@@ -735,8 +735,8 @@ class ListBox(DisableableMixin, Interactive, base_style_layer='listbox'):
         self.scroll_y = scroll_y
         self.scroll_x = scroll_x
         self._callback = callback
-        self._prev_selection: Optional[tuple[int]] = None
-        self._last_selection: Optional[tuple[int]] = None
+        self._prev_selection: tuple[int, ...] | None = None
+        self._last_selection: tuple[int, ...] | None = None
 
     # region Selection Methods
 
