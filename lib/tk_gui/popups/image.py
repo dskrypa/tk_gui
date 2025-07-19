@@ -67,7 +67,7 @@ class ImagePopup(Popup):
 
     @property
     def title(self) -> str:
-        return f'{self._title} ({self.image.size_str}, {self.image.size_percent:.0%})'
+        return f'{self._title} ({self.image.size!s}, {self.image.size_percent:.0%})'
 
     @title.setter
     def title(self, value: str):

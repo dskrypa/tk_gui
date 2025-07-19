@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 from ..caching import cached_property
 from .aspect_ratio import AspectRatio
-from .base import Position
+from .base import Position, Size
 from .sized import Resizable
 
 if TYPE_CHECKING:
@@ -88,12 +88,8 @@ class BBox(Resizable):
     # region Size
 
     @cached_property(block=False)
-    def width(self) -> int:
-        return self.right - self.left
-
-    @cached_property(block=False)
-    def height(self) -> int:
-        return self.bottom - self.top
+    def size(self) -> Size:
+        return Size(self.right - self.left, self.bottom - self.top)
 
     # endregion
 

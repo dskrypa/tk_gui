@@ -117,7 +117,7 @@ class Icons:
         bg: Color = None,
         *,
         rotate_angle: int = None,
-        pad: Padding = None,
+        pad: Padding = Padding(0),
     ) -> PILImage:
         bg = pick_transparent_bg(color, bg)
         image = self.draw(icon, size, color, bg)
@@ -144,7 +144,7 @@ class Icons:
         bg: Color = None,
         *,
         rotate_angle: int = None,
-        pad: Padding = None,
+        pad: Padding = Padding(0),
     ) -> PILImage:
         """
         Draws the specified icon with an automatically selected background color that will be rendered transparent, and
@@ -218,12 +218,12 @@ class Icons:
         return image
 
 
-def _rotate_and_pad(image: PILImage, bg: RGBA, rotate_angle: int = None, pad: Padding = None) -> PILImage:
+def _rotate_and_pad(image: PILImage, bg: RGBA, rotate_angle: int = None, pad: Padding = Padding(0)) -> PILImage:
     if rotate_angle:
         image = image.rotate(rotate_angle)
 
     if pad:
-        padded_image: PILImage = new_image('RGBA', pad.size_for(image), bg)  # noqa
+        padded_image: PILImage = new_image('RGBA', pad + image, bg)  # noqa
         log.debug(f'Padding image with size={image.size} -> {padded_image.size} using {pad=}')
         padded_image.paste(image, (pad.left, pad.top))
         return padded_image

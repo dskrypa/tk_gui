@@ -306,7 +306,7 @@ class ActiveImage:
 
     def title_parts(self, show_dir: bool = False) -> tuple[str, str]:
         prefix = f'{self.file_name} \u2014 ' if self.file_name else ''
-        suffix = '' if self.image.size_percent == 1 else f' (Zoom: {self.image.size_str})'
+        suffix = '' if self.image.size_percent == 1 else f' (Zoom: {self.image.size!s})'
         if show_dir and (img_dir := self.image_dir):
             suffix += f' (Folder: {img_dir.path.as_posix()})'
         return prefix, suffix
@@ -330,7 +330,7 @@ class ActiveImage:
         image, src_image, img_dir = self.image, self.src_image, self.image_dir
         mod_time, file_b, raw_b = self._file_info
         data = {
-            'size': f'{src_image.size_str} x {src_image.bits_per_pixel} BPP',
+            'size': f'{src_image.size!s} x {src_image.bits_per_pixel} BPP',
             'dir_pos': f'{self.dir_index}/{len(img_dir)}' if img_dir else '1/1',
             'size_pct': f'{image.size_percent:.0%}',
             'size_bytes': f'{file_b} / {raw_b}',

@@ -20,7 +20,7 @@ from PIL.JpegImagePlugin import RAWMODE
 from tk_gui.caching import cached_property
 from tk_gui.constants import IMAGE_MODE_TO_BPP
 from tk_gui.enums import ImageResizeMode
-from tk_gui.geometry import BBox, Resizable
+from tk_gui.geometry import BBox, Resizable, Size
 from tk_gui.utils import get_user_temp_dir
 
 if TYPE_CHECKING:
@@ -60,19 +60,11 @@ class ImageWrapper(Resizable, ABC):
     # region Size
 
     @cached_property(block=False)
-    def width(self) -> int:
-        return self.size[0]
-
-    @cached_property(block=False)
-    def height(self) -> int:
-        return self.size[1]
-
-    @cached_property(block=False)
-    def size(self) -> XY:
+    def size(self) -> Size:
         try:
-            return self.pil_image.size
+            return Size(*self.pil_image.size)
         except AttributeError:  # self.pil_image is likely None
-            return 0, 0
+            return Size(0, 0)
 
     @cached_property(block=False)
     def size_percent(self) -> float:

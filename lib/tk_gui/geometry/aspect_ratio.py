@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from fractions import Fraction
 from math import floor, ceil
-from typing import Callable, Iterator, overload
+from typing import TYPE_CHECKING, Callable, Iterator, overload
+
+if TYPE_CHECKING:
+    from .base import X, Y
 
 __all__ = ['AspectRatio']
 
@@ -39,11 +42,11 @@ class AspectRatio(Fraction):
             ) from e
 
     @property
-    def x(self):
+    def x(self) -> X:
         return self.numerator
 
     @property
-    def y(self):
+    def y(self) -> Y:
         return self.denominator
 
     # endregion
@@ -51,10 +54,10 @@ class AspectRatio(Fraction):
     # region Internal / Dunder Methods
 
     def __str__(self) -> str:
-        return f'{self.x}:{self.y}'
+        return f'{self.numerator}:{self.denominator}'
 
     def __repr__(self) -> str:
-        return f'<{self.__class__.__name__}[{self.x}:{self.y}][{float(self)}]>'
+        return f'<{self.__class__.__name__}[{self.numerator}:{self.denominator}][{float(self)}]>'
 
     def __iter__(self) -> Iterator[float | int]:
         yield self.numerator  # x

@@ -9,6 +9,7 @@ from .aspect_ratio import AspectRatio
 from .base import Size
 
 if TYPE_CHECKING:
+    from .base import X, Y
     from .typing import XY, OptXYF
 
 __all__ = ['Sized', 'Resizable']
@@ -18,22 +19,17 @@ class Sized(ABC):
     __slots__ = ()
 
     @property
-    @abstractmethod
-    def width(self) -> int:
-        raise NotImplementedError
+    def width(self) -> X:
+        return self.size.width
+
+    @property
+    def height(self) -> Y:
+        return self.size.height
 
     @property
     @abstractmethod
-    def height(self) -> int:
-        raise NotImplementedError
-
-    @property
     def size(self) -> Size:
-        return Size(self.width, self.height)
-
-    @property
-    def size_str(self) -> str:
-        return '{} x {}'.format(*self.size)
+        raise NotImplementedError
 
     @property
     def area(self) -> int:
@@ -41,17 +37,17 @@ class Sized(ABC):
 
     @property
     def aspect_ratio(self) -> AspectRatio:
-        return AspectRatio(self.width, self.height)
+        return AspectRatio(*self.size)
 
 
-class Resizable(Sized, ABC):
+class Resizable(Sized):
     @cached_property(block=False)
     def size(self) -> Size:
         return Size(self.width, self.height)
 
     @cached_property(block=False)
     def aspect_ratio(self) -> AspectRatio:
-        return AspectRatio(self.width, self.height)
+        return AspectRatio(*self.size)
 
     # region Aspect Ratio
 
